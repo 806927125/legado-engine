@@ -200,6 +200,96 @@ final class SemanticsConformanceTests: XCTestCase {
         XCTAssertEqual(e.conclusion, .ok)
     }
 
+    // MARK: - AST 缓存（§S-EVAL-11）
+
+    /// ⭐ **缓存绝不能改变行为** —— 命中缓存的 AST 必须与现算的**逐字相同**。
+    /// 这是缓存类改动**唯一**真正重要的断言。
+    func testCachedASTMatchesFreshAST() throws {
+        let rules: [(String, Bool)] = [
+            ("class.book@tag.a@text", false),
+            ("$.data", true),
+            ("@js:result.x", false),
+            ("//div[@class='x']/p", false),
+            ("a || b", false),
+            ("a && b", false),
+            ("a, b", false),
+            ("@@div.book", false),
+            ("##(\\d+)##$1##", false),
+            ("{{$.title}}", true),
+            ("<js>result.x</js>", false),
+        ]
+        let cached = RuleParser(cache: RuleCache())
+        let fresh = RuleParser()
+        for (rule, isJSON) in rules {
+            XCTAssertEqual(cached.parse(rule, isJSON: isJSON),
+                           fresh.parse(rule, isJSON: isJSON),
+                           "规则「\(rule)」缓存前后 AST 必须一致")
+        }
+    }
+
+    /// 第二次 parse 必须**命中缓存**（统计能证明）
+    func testCacheHitsOnSecondParse() {
+        let cache = RuleCache()
+        let parser = RuleParser(cache: cache)
+        _ = parser.parse("class.book@tag.a@text")
+        XCTAssertEqual(cache.stats.hits, 0)
+        XCTAssertEqual(cache.stats.misses, 1)
+        _ = parser.parse("class.book@tag.a@text")
+        XCTAssertEqual(cache.stats.hits, 1, "第二次必须命中")
+        XCTAssertEqual(cache.stats.misses, 1)
+        XCTAssertEqual(cache.stats.count, 1)
+    }
+
+    /// `isJSON` 不同 ⇒ **不同的缓存键**（它影响模式判定，§S-CLS-08）
+    func testCacheKeyIncludesIsJSON() {
+        let cache = RuleCache()
+        let parser = RuleParser(cache: cache)
+        _ = parser.parse("$.a", isJSON: false)
+        _ = parser.parse("$.a", isJSON: true)
+        XCTAssertEqual(cache.stats.misses, 2, "isJSON 不同 ⇒ 不能共用缓存项")
+        XCTAssertEqual(cache.stats.count, 2)
+    }
+
+    /// ⚠️ **递归切分出来的子段不进缓存**（否则缓存里全是碎片）
+    func testCacheOnlyStoresWholeRules() {
+        let cache = RuleCache()
+        let parser = RuleParser(cache: cache)
+        _ = parser.parse("a || b || c")
+        XCTAssertEqual(cache.stats.count, 1, "只该缓存整条规则这一项")
+    }
+
+    /// 缓存有上限 ⇒ 不会无限涨
+    func testCacheRespectsCapacity() {
+        let cache = RuleCache(capacity: 4)
+        let parser = RuleParser(cache: cache)
+        for i in 0..<20 { _ = parser.parse("rule-\(i)") }
+        XCTAssertLessThanOrEqual(cache.stats.count, 4, "缓存不能超过上限")
+    }
+
+    /// Evaluator 走缓存 ⇒ 重复求值同一规则时命中
+    func testEvaluatorUsesCache() throws {
+        let cache = RuleCache()
+        let ev = Evaluator(cache: cache)
+        let doc = try SwiftSoupDocument(html: "<html><body><h1>标题</h1></body></html>", baseURL: "https://x/")
+        var ctx = EvalContext(base: .page("<html><body><h1>标题</h1></body></html>"), baseUrl: "https://x/")
+        ctx.document = doc.document
+        _ = ev.evalOne("tag.h1@text", base: ctx.base, ctx: ctx)
+        _ = ev.evalOne("tag.h1@text", base: ctx.base, ctx: ctx)
+        XCTAssertEqual(cache.stats.hits, 1, "第二次求值同一规则应命中缓存")
+        XCTAssertEqual(cache.stats.misses, 1)
+    }
+
+    /// 清空缓存（换书源时该清）
+    func testCacheCanBeCleared() {
+        let cache = RuleCache()
+        let parser = RuleParser(cache: cache)
+        _ = parser.parse("x")
+        XCTAssertEqual(cache.stats.count, 1)
+        cache.removeAll()
+        XCTAssertEqual(cache.stats.count, 0)
+        XCTAssertEqual(cache.stats.hits, 0)
+    }
+
     // MARK: - fixture
 
     private func loadFixture() throws -> [String: Any] {

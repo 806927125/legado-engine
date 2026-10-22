@@ -9,7 +9,15 @@ import Foundation
 /// 避免轻阅里「三处切法不一致」的历史问题。
 public struct RuleParser {
 
-    public init() {}
+    /// AST 缓存（可选）—— §S-EVAL-11
+    ///
+    /// ⚠️ **只缓存「整条规则」的 AST**；递归切分出来的子段**不进缓存**
+    /// ⇒ 否则缓存里全是碎片，命中率低且 key 爆炸
+    private let cache: RuleCache?
+
+    public init(cache: RuleCache? = nil) {
+        self.cache = cache
+    }
 
     // MARK: - 入口
 
@@ -18,6 +26,16 @@ public struct RuleParser {
     ///   - raw: 规则原文
     ///   - isJSON: 响应体是不是 JSON（影响模式判定，§S-CLS-08）
     public func parse(_ raw: String?, isJSON: Bool = false) -> RuleNode {
+        // ⭐ **顶层入口走缓存**（§S-EVAL-11）
+        guard let cache else { return parseInternal(raw, isJSON: isJSON) }
+        let key = RuleCache.Key(rule: raw ?? "", isJSON: isJSON)
+        return cache.node(for: key) { [self] in parseInternal(raw, isJSON: isJSON) }
+    }
+
+    /// 内部实现 —— **递归切分出来的子段走这里**（**不进缓存**）
+    ///
+    /// ⚠️ 纪律：缓存里只该有「整条规则」的 AST ⇒ 碎片不入缓存
+    private func parseInternal(_ raw: String?, isJSON: Bool) -> RuleNode {
         let s = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if s.isEmpty { return .empty }
 
@@ -28,25 +46,25 @@ public struct RuleParser {
 
         // ② `@@` 二次解析（§S-CLS-05）
         if s.hasPrefix("@@") {
-            return .reparse(parse(String(s.dropFirst(2)), isJSON: isJSON))
+            return .reparse(parseInternal(String(s.dropFirst(2)), isJSON: isJSON))
         }
 
         // ③ `||` 择一（§S-FBK-01）—— 优先级最高
         let orParts = Self.splitTopLevel(s, separators: ["||"])
         if orParts.count > 1 {
-            return .fallback(orParts.map { parse($0, isJSON: isJSON) })
+            return .fallback(orParts.map { parseInternal($0, isJSON: isJSON) })
         }
 
         // ④ `&&` 串接（§S-FBK-02）
         let andParts = Self.splitTopLevel(s, separators: ["&&"])
         if andParts.count > 1 {
-            return .concat(andParts.map { parse($0, isJSON: isJSON) })
+            return .concat(andParts.map { parseInternal($0, isJSON: isJSON) })
         }
 
         // ⑤ 逗号分隔多规则回退（§S-FBK-03）
         let commaParts = Self.splitTopLevel(s, separators: [","])
         if commaParts.count > 1 {
-            return .alternatives(commaParts.map { parse($0, isJSON: isJSON) })
+            return .alternatives(commaParts.map { parseInternal($0, isJSON: isJSON) })
         }
 
         return parseSingle(s, isJSON: isJSON)

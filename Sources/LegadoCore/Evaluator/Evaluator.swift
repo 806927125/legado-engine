@@ -54,7 +54,13 @@ public struct Evaluator {
     /// JS 后端（Phase 3 接 JSC；本轮为 nil ⇒ JS 规则报「后端未接」而不是静默空）
     public var js: JSExecutor?
 
-    public init(js: JSExecutor? = nil) { self.js = js }
+    /// 规则解析器（带 AST 缓存，§S-EVAL-11）
+    public var parser: RuleParser
+
+    public init(js: JSExecutor? = nil, cache: RuleCache? = nil) {
+        self.js = js
+        self.parser = RuleParser(cache: cache)
+    }
 
     // MARK: - 入口
 
@@ -104,8 +110,8 @@ public struct Evaluator {
             return Evaluation(value: .string(literal), diagnostic: diag)
         }
 
-        // ③ 解析
-        let ast = RuleParser().parse(r, isJSON: ctx.isJSON)
+        // ③ 解析（**走 AST 缓存**）
+        let ast = parser.parse(r, isJSON: ctx.isJSON)
 
         // ④ 求值
         let value = evaluate(ast, base: base, ctx: ctx, diag: &diag)

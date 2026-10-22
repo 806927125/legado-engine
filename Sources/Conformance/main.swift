@@ -15,6 +15,29 @@ import Foundation
 //   （规范见 docs/legado-semantics.md）
 // ===============================================================
 
+// ⭐ `--bench` 模式：量 AST 缓存的收益（§S-EVAL-11）
+if CommandLine.arguments.contains("--bench") {
+    let rules = [
+        "class.book@tag.a@text", "class.booklist@tag.li@text", "$.data.bookList",
+        "//div[@class='x']/p", "tag.h1@ownText", "##(\\d+)##$1##",
+    ]
+    let n = 20_000
+    let plain = RuleParser()
+    var t0 = Date()
+    var sink = 0
+    for _ in 0..<n { for r in rules { sink &+= describeValue2(plain.parse(r)).count } }
+    let plainTime = Date().timeIntervalSince(t0)
+    let cache = RuleCache()
+    let cached = RuleParser(cache: cache)
+    t0 = Date()
+    for _ in 0..<n { for r in rules { sink &+= describeValue2(cached.parse(r)).count } }
+    let cachedTime = Date().timeIntervalSince(t0)
+    print(String(format: "无缓存 %.3fs / 有缓存 %.3fs / 加速 %.1fx / 命中率 %.0f%% (sink=%d)",
+                 plainTime, cachedTime, plainTime / max(cachedTime, 0.000001),
+                 cache.stats.hitRate * 100, sink))
+    exit(0)
+}
+
 let fixturePath = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
     : "conformance/fixtures/semantics-cases.json"
@@ -327,4 +350,26 @@ func quoted(_ s: String) -> String {
             .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "\n", with: "\\n")
             .replacingOccurrences(of: "\t", with: "\\t") + "\""
+}
+
+
+/// AST 的稳定描述（benchmark 用；与 conformance 的 describeValue 同构）
+func describeValue2(_ n: RuleNode) -> String {
+    switch n {
+    case .empty: return "e"
+    case .literal(let s): return "l\(s)"
+    case .css(let s): return "c\(s)"
+    case .xpath(let s): return "x\(s)"
+    case .jsonPath(let s): return "j\(s)"
+    case .regex(let p, let r): return "r\(p)\(r.count)"
+    case .js(let s): return "s\(s)"
+    case .jsWithTail(let c, let t): return "w\(c)\(t ?? "-")"
+    case .reparse(let i): return "p\(describeValue2(i))"
+    case .template(let s): return "t\(s)"
+    case .fallback(let xs): return "f" + xs.map(describeValue2).joined(separator: ",")
+    case .concat(let xs): return "k" + xs.map(describeValue2).joined(separator: ",")
+    case .alternatives(let xs): return "a" + xs.map(describeValue2).joined(separator: ",")
+    case .chain(let h, let hi, let st): return "n\(h)\(hi.map(String.init) ?? "-")\(st.count)"
+    case .post(let i, _): return "o\(describeValue2(i))"
+    }
 }
