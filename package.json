@@ -1,0 +1,12 @@
+{
+  "name": "legado-engine",
+  "private": true,
+  "version": "0.1.0",
+  "description": "自研 Legado 兼容规则引擎（Swift 语义内核 + JS 参考实现对拍）",
+  "scripts": {
+    "conformance": "node conformance/js-runner.js conformance/fixtures/semantics-cases.json",
+    "conformance:swift": "swift run conformance conformance/fixtures/semantics-cases.json",
+    "conformance:diff": "bash tools/conformance-diff.sh"
+  },
+  "devDependencies": { "jsdom": "^29.1.1" }
+}

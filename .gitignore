@@ -1,0 +1,15 @@
+# Swift
+.build/
+.swiftpm/
+Package.resolved
+
+# Node
+node_modules/
+package-lock.json
+
+# 对拍产物
+conformance/out/*.jsonl
+conformance/out/*.err
+
+# 系统
+.DS_Store

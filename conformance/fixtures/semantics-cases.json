@@ -1,0 +1,1225 @@
+{
+  "version": 2,
+  "meta": {
+    "spec": "docs/legado-semantics.md",
+    "note": "每条 case 引用规范里的语义 id。runner 跑当前引擎，产出「现状符合度报告」。",
+    "kinds": {
+      "classify": "规则 → 模式名",
+      "evalOne": "单条规则求值（不含 || && 兜底链）",
+      "getElements": "规则求值（含 || / && / 逗号 回退链）",
+      "jsScope": "作用域观察（target: scope=看作用域本身 / result=看作用域里的 result）"
+    }
+  },
+  "cases": [
+    {
+      "id": "cls-01",
+      "semantic": "S-CLS-01",
+      "title": "@js: 前缀 → JS 模式",
+      "kind": "classify",
+      "rule": "@js:result.name",
+      "expect": {
+        "kind": "js"
+      }
+    },
+    {
+      "id": "cls-02",
+      "semantic": "S-CLS-01",
+      "title": "@JS: 大写前缀 → JS 模式",
+      "kind": "classify",
+      "rule": "@JS:result.name",
+      "expect": {
+        "kind": "js"
+      }
+    },
+    {
+      "id": "cls-03",
+      "semantic": "S-CLS-02",
+      "title": "<js> 块 → JS 模式",
+      "kind": "classify",
+      "rule": "<js>return result.x;</js>",
+      "expect": {
+        "kind": "js"
+      }
+    },
+    {
+      "id": "cls-04",
+      "semantic": "S-CLS-03",
+      "title": "## 开头 → REGEX 模式",
+      "kind": "classify",
+      "rule": "##(\\d+)##$1##",
+      "expect": {
+        "kind": "regex"
+      }
+    },
+    {
+      "id": "cls-05",
+      "semantic": "S-CLS-04",
+      "title": "@CSS: 前缀 → SELECTOR 模式（大小写不敏感）",
+      "kind": "classify",
+      "rule": "@CSS:div.book",
+      "expect": {
+        "kind": "selector"
+      }
+    },
+    {
+      "id": "cls-06",
+      "semantic": "S-CLS-05",
+      "title": "@@ 前缀 → SELECTOR 模式",
+      "kind": "classify",
+      "rule": "@@div.book",
+      "expect": {
+        "kind": "selector"
+      }
+    },
+    {
+      "id": "cls-07",
+      "semantic": "S-CLS-06",
+      "title": "@XPath: 前缀 → XPATH 模式（大小写不敏感）",
+      "kind": "classify",
+      "rule": "@XPath://div[@class='b']",
+      "expect": {
+        "kind": "xpath"
+      }
+    },
+    {
+      "id": "cls-08",
+      "semantic": "S-CLS-07",
+      "title": "@Json: 前缀 → JSONPATH 模式",
+      "kind": "classify",
+      "rule": "@Json:$.data.name",
+      "expect": {
+        "kind": "jsonpath"
+      }
+    },
+    {
+      "id": "cls-09",
+      "semantic": "S-CLS-08",
+      "title": "JSON 响应 + 规则以 $ 开头 → JSONPATH 模式",
+      "kind": "classify",
+      "rule": "$.data.name",
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "kind": "jsonpath"
+      }
+    },
+    {
+      "id": "cls-10",
+      "semantic": "S-CLS-08",
+      "title": "JSON 响应 + 值类型规则（插值）⇒ 不得被塞进 JSONPATH",
+      "kind": "classify",
+      "rule": "{{$.grade}}分",
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "kind": "selector"
+      }
+    },
+    {
+      "id": "cls-11",
+      "semantic": "S-CLS-09",
+      "title": "$. 前缀 → JSONPATH 模式（与响应类型无关）",
+      "kind": "classify",
+      "rule": "$.data.name",
+      "expect": {
+        "kind": "jsonpath"
+      }
+    },
+    {
+      "id": "cls-12",
+      "semantic": "S-CLS-10",
+      "title": "result. 前缀 → JSONPATH 模式（相对当前结果）",
+      "kind": "classify",
+      "rule": "result.bookName",
+      "expect": {
+        "kind": "jsonpath"
+      }
+    },
+    {
+      "id": "cls-13",
+      "semantic": "S-CLS-10",
+      "title": "result[ 前缀 → JSONPATH 模式",
+      "kind": "classify",
+      "rule": "result[\"bookName\"]",
+      "expect": {
+        "kind": "jsonpath"
+      }
+    },
+    {
+      "id": "cls-14",
+      "semantic": "S-CLS-11",
+      "title": "/ 开头 → XPATH 模式",
+      "kind": "classify",
+      "rule": "//div[@class='b']",
+      "expect": {
+        "kind": "xpath"
+      }
+    },
+    {
+      "id": "cls-15",
+      "semantic": "S-CLS-12",
+      "title": "< 开头 → HTML 模式",
+      "kind": "classify",
+      "rule": "<div>hello</div>",
+      "expect": {
+        "kind": "html"
+      }
+    },
+    {
+      "id": "cls-16",
+      "semantic": "S-CLS-13",
+      "title": "其余 → SELECTOR 模式",
+      "kind": "classify",
+      "rule": "div.book@tag.a@text",
+      "expect": {
+        "kind": "selector"
+      }
+    },
+    {
+      "id": "res-01",
+      "semantic": "S-RES-01",
+      "title": "基准是对象 ⇒ result = 那个对象（条目级 / init 输出级）",
+      "kind": "jsScope",
+      "base": {
+        "type": "json",
+        "value": {
+          "book_id": "MTgzNTEy",
+          "source": "番茄"
+        }
+      },
+      "ctx": {
+        "raw": "<html>页原文</html>"
+      },
+      "expect": {
+        "has": "book_id"
+      }
+    },
+    {
+      "id": "res-02",
+      "semantic": "S-RES-02",
+      "title": "基准是 document ⇒ result = 当前页原文（不是纯文本）",
+      "kind": "jsScope",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"book-like\">书</div></body></html>"
+      },
+      "ctx": {
+        "raw": "<html><body><div class=\"book-like\">书</div></body></html>"
+      },
+      "expect": {
+        "value": "<html><body><div class=\"book-like\">书</div></body></html>"
+      }
+    },
+    {
+      "id": "res-03",
+      "semantic": "S-RES-02",
+      "title": "页面级 result 必须是 HTML 源码（能正则匹配到标签）",
+      "kind": "jsScope",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"book-like\">书</div></body></html>"
+      },
+      "ctx": {
+        "raw": "<html><body><div class=\"book-like\">书</div></body></html>"
+      },
+      "expect": {
+        "contains": "class=\"book-like\""
+      }
+    },
+    {
+      "id": "res-04",
+      "semantic": "S-RES-03",
+      "title": "基准是元素 ⇒ result = 元素文本",
+      "kind": "jsScope",
+      "base": {
+        "type": "element",
+        "value": "<a href=\"/x/1\">查看目录</a>",
+        "selector": "a"
+      },
+      "ctx": {
+        "raw": "<html><body>页原文</body></html>"
+      },
+      "expect": {
+        "value": "查看目录"
+      }
+    },
+    {
+      "id": "res-05",
+      "semantic": "S-RES-04",
+      "title": "基准为空 ⇒ result = ctx.raw",
+      "kind": "jsScope",
+      "base": {
+        "type": "null"
+      },
+      "ctx": {
+        "raw": "页原文XYZ"
+      },
+      "expect": {
+        "value": "页原文XYZ"
+      }
+    },
+    {
+      "id": "res-06",
+      "semantic": "S-RES-05",
+      "title": "基准是字符串 ⇒ result = 字符串本身",
+      "kind": "jsScope",
+      "base": {
+        "type": "text",
+        "value": "直接给的值"
+      },
+      "ctx": {},
+      "expect": {
+        "value": "直接给的值"
+      }
+    },
+    {
+      "id": "scp-01",
+      "semantic": "S-SCP-01",
+      "title": "作用域必须提供 raw = 当前页原文",
+      "kind": "jsScope",
+      "base": {
+        "type": "json",
+        "value": {
+          "a": 1
+        }
+      },
+      "ctx": {
+        "raw": "<div>RAW标记</div>"
+      },
+      "expect": {
+        "target": "scope",
+        "has": "raw"
+      }
+    },
+    {
+      "id": "scp-02",
+      "semantic": "S-SCP-07",
+      "title": "作用域必须有 key",
+      "kind": "jsScope",
+      "base": {
+        "type": "json",
+        "value": {
+          "a": 1
+        }
+      },
+      "ctx": {},
+      "expect": {
+        "target": "scope",
+        "has": "key"
+      }
+    },
+    {
+      "id": "scp-03",
+      "semantic": "S-SCP-08",
+      "title": "作用域必须有 baseUrl（= 当前页 URL）",
+      "kind": "jsScope",
+      "base": {
+        "type": "json",
+        "value": {
+          "a": 1
+        }
+      },
+      "ctx": {
+        "baseUrl": "https://aaccoo.com/list?p=2"
+      },
+      "expect": {
+        "target": "scope",
+        "has": "baseUrl"
+      }
+    },
+    {
+      "id": "scp-04",
+      "semantic": "S-SCP-05",
+      "title": "作用域必须有 document（站方 @js: 里直接 querySelectorAll）",
+      "kind": "jsScope",
+      "base": {
+        "type": "json",
+        "value": {
+          "a": 1
+        }
+      },
+      "ctx": {},
+      "expect": {
+        "target": "scope",
+        "has": "document"
+      }
+    },
+    {
+      "id": "json-01",
+      "semantic": "S-JSON-01",
+      "title": "$.data 命中数组 ⇒ 摊平一层返回元素",
+      "kind": "evalOne",
+      "rule": "$.data",
+      "base": {
+        "type": "json",
+        "value": {
+          "data": [
+            {
+              "n": "书一"
+            },
+            {
+              "n": "书二"
+            }
+          ]
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "count": 2
+      }
+    },
+    {
+      "id": "json-02",
+      "semantic": "S-JSON-01",
+      "title": "摊平只做一层（嵌套数组不二次摊平）",
+      "kind": "evalOne",
+      "rule": "$.data",
+      "base": {
+        "type": "json",
+        "value": {
+          "data": [
+            [
+              {
+                "n": "x"
+              }
+            ]
+          ]
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "count": 1
+      }
+    },
+    {
+      "id": "json-03",
+      "semantic": "S-JSON-02",
+      "title": "单值路径命中 JSON 对象 ⇒ 不得被 stringify 成字符串",
+      "kind": "evalOne",
+      "rule": "$.item",
+      "base": {
+        "type": "json",
+        "value": {
+          "item": {
+            "title": "章节名",
+            "url": "u1"
+          }
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "values": [
+          {
+            "title": "章节名",
+            "url": "u1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "json-04",
+      "semantic": "S-JSON-06",
+      "title": "单值路径命中 {title,url} 对象 ⇒ 标题不得被吃掉",
+      "kind": "evalOne",
+      "rule": "$.item",
+      "base": {
+        "type": "json",
+        "value": {
+          "item": {
+            "title": "章节名",
+            "url": "u1"
+          }
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "value": "章节名\tu1"
+      }
+    },
+    {
+      "id": "json-05",
+      "semantic": "S-JSON-03",
+      "title": "result. 前缀在每个 || 分段都要改写",
+      "kind": "getElements",
+      "rule": "result.n || result.m",
+      "base": {
+        "type": "json",
+        "value": {
+          "m": "备选",
+          "n": ""
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "value": "备选"
+      }
+    },
+    {
+      "id": "json-06",
+      "semantic": "S-CLS-10",
+      "title": "result. 前缀求值：拿到的是相对当前结果的字段",
+      "kind": "evalOne",
+      "rule": "result.bookName",
+      "base": {
+        "type": "json",
+        "value": {
+          "bookName": "斗破苍穹"
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "value": "斗破苍穹"
+      }
+    },
+    {
+      "id": "sel-01",
+      "semantic": "S-SEL-01",
+      "title": "text. 前缀 = 文本完全相等（不含 title 里的同名文字）",
+      "kind": "evalOne",
+      "rule": "text.查看目录",
+      "base": {
+        "type": "html",
+        "value": "<html><head><title>查看目录 - 肉文屋</title></head><body><a>查看目录</a><a>查看目录2</a></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 1
+      }
+    },
+    {
+      "id": "sel-02",
+      "semantic": "S-SEL-02",
+      "title": "class 值带空格 ⇒ 并列 class（不是后代选择器）",
+      "kind": "evalOne",
+      "rule": "class.clearfix chapter-list",
+      "base": {
+        "type": "html",
+        "value": "<html><body><ul class=\"clearfix chapter-list\"><li>一</li></ul></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 1
+      }
+    },
+    {
+      "id": "sel-03",
+      "semantic": "S-SEL-03",
+      "title": "tag. 前缀方言",
+      "kind": "evalOne",
+      "rule": "tag.h2",
+      "base": {
+        "type": "html",
+        "value": "<html><body><h2>标题</h2></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "value": "标题"
+      }
+    },
+    {
+      "id": "sel-04",
+      "semantic": "S-SEL-04",
+      "title": "链式选择 + 取值模式（@tag.a@href）",
+      "kind": "evalOne",
+      "rule": "@tag.a@href",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"c\"><a href=\"/x/1\">看</a></div></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "value": "https://x.example/x/1"
+      }
+    },
+    {
+      "id": "sel-05",
+      "semantic": "S-SEL-05",
+      "title": "索引：第 0 个",
+      "kind": "evalOne",
+      "rule": "tag.li.0",
+      "base": {
+        "type": "html",
+        "value": "<html><body><ul><li>一</li><li>二</li></ul></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "value": "一"
+      }
+    },
+    {
+      "id": "sel-06",
+      "semantic": "S-EXCL-01",
+      "title": "排除语法：链首段 !0 ⇒ 排除第 0 个",
+      "kind": "evalOne",
+      "rule": "span!0@text",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"tips\"><span>提示A</span><span>提示B</span></div></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 1
+      }
+    },
+    {
+      "id": "sel-07",
+      "semantic": "S-EXCL-01",
+      "title": "排除语法：链尾段 !0 ⇒ 排除第 0 个（用 tag. 前缀隔离排除语义）",
+      "kind": "evalOne",
+      "rule": "tbody@tag.tr!0",
+      "base": {
+        "type": "html",
+        "value": "<html><body><table><tbody><tr><td>表头</td></tr><tr><td>正文</td></tr></tbody></table></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 1
+      }
+    },
+    {
+      "id": "sel-08",
+      "semantic": "S-EXCL-02",
+      "title": "排除语法：链中段 !0 ⇒ 排除第 0 个（用 tag. 前缀）",
+      "kind": "evalOne",
+      "rule": ".tips@tag.span!0@text",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"tips\"><span>提示A</span><span>提示B</span></div></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 1
+      }
+    },
+    {
+      "id": "sel-09",
+      "semantic": "S-EXCL-01",
+      "title": "排除语法：多索引 !0:1 ⇒ 排除第 0、1 个",
+      "kind": "evalOne",
+      "rule": "id.list@tag.li!0:1",
+      "base": {
+        "type": "html",
+        "value": "<html><body><ul id=\"list\"><li>一</li><li>二</li><li>三</li></ul></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 1
+      }
+    },
+    {
+      "id": "sel-10",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 必须当【子元素选择器】（神马小说 ruleToc.chapterList）",
+      "kind": "evalOne",
+      "rule": "class.catalog_ls@li",
+      "base": {
+        "type": "html",
+        "value": "<html><body><ul class=\"catalog_ls\"><li>第一章</li><li>第二章</li></ul></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 2
+      }
+    },
+    {
+      "id": "sel-11",
+      "semantic": "S-SEL-06",
+      "title": "对照组：@tag.li ⇒ 子元素选择器（现在是对的）",
+      "kind": "evalOne",
+      "rule": "class.catalog_ls@tag.li",
+      "base": {
+        "type": "html",
+        "value": "<html><body><ul class=\"catalog_ls\"><li>第一章</li><li>第二章</li></ul></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 2
+      }
+    },
+    {
+      "id": "sel-12",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @img@src ⇒ 必须取到 img 的 src（过期杂志 ruleBookInfo.coverUrl）",
+      "kind": "evalOne",
+      "rule": "class.sidebar@img@src",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"sidebar\"><img src=\"/cover.jpg\"></div></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "value": "https://x.example/cover.jpg"
+      }
+    },
+    {
+      "id": "sel-13",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @a@text ⇒ 必须取到 a 的文本（去读书 ruleBookInfo.name）",
+      "kind": "evalOne",
+      "rule": "class.c_subject@a@text",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"c_subject\"><a>书名</a></div></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "value": "书名"
+      }
+    },
+    {
+      "id": "sel-14",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li || @li ⇒ 兜底链里也要当子选择器（读读小说 ruleExplore.bookList）",
+      "kind": "getElements",
+      "rule": ".lis@li||.topli@li",
+      "base": {
+        "type": "html",
+        "value": "<html><body><ul class=\"lis\"><li>书一</li><li>书二</li></ul></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 2
+      }
+    },
+    {
+      "id": "sel-15",
+      "semantic": "S-SEL-04",
+      "title": "属性白名单 @text 仍然必须是属性后缀（别被 S-SEL-06 的修复改坏）",
+      "kind": "evalOne",
+      "rule": "class.c_subject@a@text",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"c_subject\"><a>书名</a></div></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "value": "书名"
+      }
+    },
+    {
+      "id": "sel-16",
+      "semantic": "S-SEL-04",
+      "title": "属性白名单 @html 仍然是属性后缀",
+      "kind": "evalOne",
+      "rule": "class.c_subject@a@html",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"c_subject\"><a>书名</a></div></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "contains": "书名"
+      }
+    },
+    {
+      "id": "sel-17",
+      "semantic": "S-SEL-04",
+      "title": "属性白名单 @href 仍然是属性后缀",
+      "kind": "evalOne",
+      "rule": "class.c_subject@a@href",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"c_subject\"><a href=\"/b/1\">书名</a></div></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "value": "https://x.example/b/1"
+      }
+    },
+    {
+      "id": "put-01",
+      "semantic": "S-PUT-01",
+      "title": "内嵌 @get: 从上下文变量取值",
+      "kind": "evalOne",
+      "rule": "https://x.example/read/@get:{xid}/1.html",
+      "base": {
+        "type": "json",
+        "value": {
+          "a": 1
+        }
+      },
+      "ctx": {
+        "vars": {
+          "xid": "XID-001"
+        }
+      },
+      "expect": {
+        "value": "https://x.example/read/XID-001/1.html"
+      }
+    },
+    {
+      "id": "put-02",
+      "semantic": "S-PUT-02",
+      "title": "@put: 的值用 $.a 求值（存变量）",
+      "kind": "evalOne",
+      "rule": "$.bookName@put:{xid:x_id}",
+      "base": {
+        "type": "json",
+        "value": {
+          "bookName": "书名一",
+          "x_id": "XID-001"
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "value": "书名一"
+      }
+    },
+    {
+      "id": "rgx-01",
+      "semantic": "S-RGX-01",
+      "title": "纯提取：取第 1 捕获组",
+      "kind": "evalOne",
+      "rule": "##(\\d+)##",
+      "base": {
+        "type": "text",
+        "value": "编号 12345 结尾"
+      },
+      "ctx": {},
+      "expect": {
+        "value": "12345"
+      }
+    },
+    {
+      "id": "rgx-02",
+      "semantic": "S-RGX-01",
+      "title": "带替换：$1 分组引用",
+      "kind": "evalOne",
+      "rule": "##(\\d+)##id=$1##",
+      "base": {
+        "type": "text",
+        "value": "编号 12345 结尾"
+      },
+      "ctx": {},
+      "expect": {
+        "value": "id=12345"
+      }
+    },
+    {
+      "id": "rgx-03",
+      "semantic": "S-RGX-02",
+      "title": "非 URL 片段不得被绝对化",
+      "kind": "evalOne",
+      "rule": "##(\\d+)##",
+      "base": {
+        "type": "text",
+        "value": "第 7 章正文"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/dir/"
+      },
+      "expect": {
+        "value": "7"
+      }
+    },
+    {
+      "id": "tpl-01",
+      "semantic": "S-TPL-02",
+      "title": "整条规则就是一个 {{占位符}} ⇒ 结果就是这个值",
+      "kind": "evalOne",
+      "rule": "{{$.title}}",
+      "base": {
+        "type": "json",
+        "value": {
+          "title": "书名"
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "value": "书名"
+      }
+    },
+    {
+      "id": "tpl-02",
+      "semantic": "S-TPL-03",
+      "title": "插值产出的值不得再当选择器（含 . 和换行）",
+      "kind": "evalOne",
+      "rule": "{{$.intro}}",
+      "base": {
+        "type": "json",
+        "value": {
+          "intro": "105.3万字\n第二行"
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "contains": "105.3万字"
+      }
+    },
+    {
+      "id": "tpl-03",
+      "semantic": "S-TPL-05",
+      "title": "裸词兜底不得被当字面量返回",
+      "kind": "getElements",
+      "rule": "tag.a@text || text",
+      "base": {
+        "type": "html",
+        "value": "<html><body><a>真章节名</a></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "values": [
+          "真章节名"
+        ]
+      }
+    },
+    {
+      "id": "fbk-01",
+      "semantic": "S-FBK-01",
+      "title": "|| 择一：第一个非空胜出",
+      "kind": "getElements",
+      "rule": "tag.h1@text || tag.h2@text",
+      "base": {
+        "type": "html",
+        "value": "<html><body><h2>副标题</h2></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "value": "副标题"
+      }
+    },
+    {
+      "id": "fbk-02",
+      "semantic": "S-FBK-03",
+      "title": "逗号分隔多规则回退",
+      "kind": "getElements",
+      "rule": "tag.h1@text, tag.h2@text",
+      "base": {
+        "type": "html",
+        "value": "<html><body><h2>副标题</h2></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "value": "副标题"
+      }
+    },
+    {
+      "id": "fbk-03",
+      "semantic": "S-FBK-02",
+      "title": "&& 串接：各段结果拼接",
+      "kind": "getElements",
+      "rule": "tag.h1@text && tag.h2@text",
+      "base": {
+        "type": "html",
+        "value": "<html><body><h1>主标题</h1><h2>副标题</h2></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "contains": "主标题"
+      }
+    },
+    {
+      "id": "cmp-01",
+      "semantic": "S-CLS-02",
+      "title": "<js> 块求值：取完成值",
+      "kind": "evalOne",
+      "rule": "<js>var x = result.a; x + '!';</js>",
+      "base": {
+        "type": "json",
+        "value": {
+          "a": "A"
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "value": "A!"
+      }
+    },
+    {
+      "id": "cmp-02",
+      "semantic": "S-CLS-02",
+      "title": "<js> 块不能按 || 拆（块内 JS 运算符要活着）",
+      "kind": "evalOne",
+      "rule": "<js>var t = result.tab || '小说'; t;</js>",
+      "base": {
+        "type": "json",
+        "value": {
+          "tab": ""
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "value": "小说"
+      }
+    },
+    {
+      "id": "cmp-03",
+      "semantic": "S-CMP-05",
+      "title": "@js: 规则认 result 变量",
+      "kind": "evalOne",
+      "rule": "@js:typeof result !== 'undefined' ? result.a : 'NO_RESULT'",
+      "base": {
+        "type": "json",
+        "value": {
+          "a": "A"
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "value": "A"
+      }
+    },
+    {
+      "id": "js-01",
+      "semantic": "S-RES-06",
+      "title": "条目级 JS：result.book_id 拿得到（大灰狼场景）",
+      "kind": "evalOne",
+      "rule": "@js:let { book_id } = result; book_id;",
+      "base": {
+        "type": "json",
+        "value": {
+          "book_id": "MTgzNTEy",
+          "source": "番茄"
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "value": "MTgzNTEy"
+      }
+    },
+    {
+      "id": "js-02",
+      "semantic": "S-RES-02",
+      "title": "页面级 JS：raw 能正则匹配到 HTML 标签（NovelHub 场景）",
+      "kind": "evalOne",
+      "rule": "@js:try { var raw = (typeof result !== 'undefined' && result != null) ? result : ''; var s = String(raw); var m = s.match(/<div class=\"book-like\">([\\s\\S]*?)<\\/div>/); m ? m[1] : 'NOMATCH'; } catch(e) { 'ERR:' + e.message; }",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"book-like\">书名A|||作者A</div></body></html>"
+      },
+      "ctx": {
+        "raw": "<html><body><div class=\"book-like\">书名A|||作者A</div></body></html>",
+        "baseUrl": "https://aaccoo.com/list"
+      },
+      "expect": {
+        "value": "书名A|||作者A"
+      }
+    },
+    {
+      "id": "js-03",
+      "semantic": "S-JSON-05",
+      "title": "复合规则 <js>…</js>$.data ⇒ 先跑 JS 再取尾部",
+      "kind": "evalOne",
+      "rule": "<js>JSON.stringify({data:[{n:1},{n:2}]})</js>$.data",
+      "base": {
+        "type": "json",
+        "value": {
+          "a": 1
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "count": 2
+      }
+    },
+    {
+      "id": "sel-08b",
+      "semantic": "S-SEL-06",
+      "title": "裸标签名 + !N ⇒ 整段变属性名，链断且排除失效（125 源 .tips@span!0@text）",
+      "kind": "evalOne",
+      "rule": ".tips@span!0@text",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"tips\"><span>提示A</span><span>提示B</span></div></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 1
+      }
+    },
+    {
+      "id": "chain-01",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 子选择器（神马小说 ruleToc.chapterList）",
+      "kind": "chainSegment",
+      "rule": "class.catalog_ls@li",
+      "expect": {
+        "steps": "sub,sub"
+      }
+    },
+    {
+      "id": "chain-02",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 子选择器（梧桐中文 ruleSearch.bookList）",
+      "kind": "chainSegment",
+      "rule": "class.searchList@li",
+      "expect": {
+        "steps": "sub,sub"
+      }
+    },
+    {
+      "id": "chain-03",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @img ⇒ 子选择器（过期杂志 ruleBookInfo.coverUrl）",
+      "kind": "chainSegment",
+      "rule": ".sidebar@img@src",
+      "expect": {
+        "steps": "sub,sub,attr"
+      }
+    },
+    {
+      "id": "chain-04",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @a ⇒ 子选择器（去读书 ruleBookInfo.name）",
+      "kind": "chainSegment",
+      "rule": "class.c_subject@a@text",
+      "expect": {
+        "steps": "sub,sub,attr"
+      }
+    },
+    {
+      "id": "chain-05",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @dd ⇒ 子选择器（读读小说 ruleBookInfo.intro）",
+      "kind": "chainSegment",
+      "rule": "class.book_about@dd@text",
+      "expect": {
+        "steps": "sub,sub,attr"
+      }
+    },
+    {
+      "id": "chain-06",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @span ⇒ 子选择器（神魔 ruleSearch.bookList）",
+      "kind": "chainSegment",
+      "rule": ".show@li",
+      "expect": {
+        "steps": "sub,sub"
+      }
+    },
+    {
+      "id": "chain-10",
+      "semantic": "S-SEL-04",
+      "title": "对照组：@tag.li ⇒ 子选择器（两边都该对）",
+      "kind": "chainSegment",
+      "rule": "class.catalog_ls@tag.li",
+      "expect": {
+        "steps": "sub,sub"
+      }
+    },
+    {
+      "id": "chain-11",
+      "semantic": "S-SEL-04",
+      "title": "对照组：@tag.dd@text",
+      "kind": "chainSegment",
+      "rule": "class.book_about@tag.dd@text",
+      "expect": {
+        "steps": "sub,sub,attr"
+      }
+    },
+    {
+      "id": "chain-20",
+      "semantic": "S-SEL-04",
+      "title": "属性白名单 @text ⇒ 属性后缀",
+      "kind": "chainSegment",
+      "rule": "class.c_subject@a@text",
+      "expect": {
+        "steps": "sub,sub,attr"
+      }
+    },
+    {
+      "id": "chain-21",
+      "semantic": "S-SEL-04",
+      "title": "属性白名单 @html ⇒ 属性后缀",
+      "kind": "chainSegment",
+      "rule": "div@html",
+      "expect": {
+        "steps": "sub,attr"
+      }
+    },
+    {
+      "id": "chain-22",
+      "semantic": "S-SEL-04",
+      "title": "属性白名单 @href ⇒ 属性后缀",
+      "kind": "chainSegment",
+      "rule": "div@a@href",
+      "expect": {
+        "steps": "sub,sub,attr"
+      }
+    },
+    {
+      "id": "chain-30",
+      "semantic": "S-SEL-06",
+      "title": "链里连续两个裸标签 @h2@h4（五二书库 ruleSearch.author）",
+      "kind": "chainSegment",
+      "rule": "header@h2@h4@text",
+      "expect": {
+        "steps": "sub,sub,sub,attr"
+      }
+    }
+  ]
+}

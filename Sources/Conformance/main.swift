@@ -1,0 +1,113 @@
+import Foundation
+import LegadoCore
+
+// ===============================================================
+// **双实现对拍运行器**（Swift 侧）
+//
+// 跑法：swift run conformance <fixture.json>
+//
+// 输出：每行一个 JSON —— `{"id":…,"kind":…,"expected":…,"actual":…,"ok":…}`
+// ⇒ 与 `conformance/js-runner.js` 输出**同构** ⇒ 可以直接 diff。
+//
+// ⭐ 这是本项目的工作流核心：
+//   同一份 fixture ⇒ Swift 新实现 与 JS 参考实现 各跑一遍 ⇒ **差异 = 债**。
+//   （规范见 docs/legado-semantics.md）
+// ===============================================================
+
+let fixturePath = CommandLine.arguments.count > 1
+    ? CommandLine.arguments[1]
+    : "conformance/fixtures/semantics-cases.json"
+
+guard let data = FileManager.default.contents(atPath: fixturePath),
+      let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let cases = root["cases"] as? [[String: Any]] else {
+    FileHandle.standardError.write("读不了 fixture: \(fixturePath)\n".data(using: .utf8)!)
+    exit(2)
+}
+
+let parser = RuleParser()
+var out: [String] = []
+var pass = 0, fail = 0
+
+func emit(_ id: String, _ kind: String, _ expected: Any, _ actual: Any) {
+    let ok = String(describing: expected) == String(describing: actual)
+    ok ? (pass += 1) : (fail += 1)
+    let obj: [String: Any] = ["id": id, "kind": kind, "expected": expected, "actual": actual, "ok": ok]
+    let enc = (try? JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys])) ?? Data()
+    out.append(String(decoding: enc, as: UTF8.self))
+}
+
+for c in cases {
+    guard let id = c["id"] as? String else { continue }
+    let kind = c["kind"] as? String ?? ""
+    let expect = (c["expect"] as? [String: Any]) ?? [:]
+    let ctx = (c["ctx"] as? [String: Any]) ?? [:]
+    let isJSON = (ctx["isJSON"] as? Bool) ?? false
+
+    switch kind {
+    case "classify":
+        let rule = c["rule"] as? String ?? ""
+        let actual = RuleClassifier.classify(rule, isJSON: isJSON).rawValue
+        emit(id, kind, expect["kind"] as? String ?? "", actual)
+
+    case "chainSegment":
+        // 链段分类（§S-SEL-03~06）—— 本项目最关键的一条判定
+        // 输出：每段是 "sub"（子选择器）还是 "attr"（属性后缀），逗号分隔
+        let rule = c["rule"] as? String ?? ""
+        let node = parser.parse(rule, isJSON: isJSON)
+        var steps: [String] = []
+        if case .chain(let cs) = node {
+            steps = cs.map { s -> String in
+                if case .sub = s { return "sub" } else { return "attr" }
+            }
+        }
+        emit(id, kind, expect["steps"] as? String ?? "", steps.joined(separator: ","))
+
+    case "parse":
+        // 整条规则解析成什么 AST（快照式比对）
+        let rule = c["rule"] as? String ?? ""
+        let node = parser.parse(rule, isJSON: isJSON)
+        emit(id, kind, expect["ast"] as? String ?? "", describe(node))
+
+    default:
+        // 其余 kind（evalOne / getElements / jsScope / parse）需要 DOM / JS 后端，
+        // 属于后续切片 —— 两边都标 SKIPPED（保持对拍同构）。
+        emit(id, kind, "SKIPPED", "SKIPPED")
+    }
+}
+
+out.forEach { print($0) }
+FileHandle.standardError.write("Swift 侧：通过 \(pass) / 不符合 \(fail)\n".data(using: .utf8)!)
+
+// MARK: - AST 描述（给对拍用的稳定文本形式）
+
+func describe(_ n: RuleNode) -> String {
+    switch n {
+    case .empty: return "empty"
+    case .literal(let s): return "literal(\(s))"
+    case .css(let s): return "css(\(s))"
+    case .xpath(let s): return "xpath(\(s))"
+    case .jsonPath(let s): return "jsonpath(\(s))"
+    case .regex(let p, let r): return "regex(\(p)|\(r.count))"
+    case .js(let s): return "js(\(s))"
+    case .jsWithTail(let c, let t): return "jsWithTail(\(c)|\(t ?? "-"))"
+    case .reparse(let inner): return "reparse(\(describe(inner)))"
+    case .template(let s): return "template(\(s))"
+    case .fallback(let xs): return "fallback[\(xs.map(describe).joined(separator: ","))]"
+    case .concat(let xs): return "concat[\(xs.map(describe).joined(separator: ","))]"
+    case .alternatives(let xs): return "alternatives[\(xs.map(describe).joined(separator: ","))]"
+    case .chain(let steps): return "chain[" + steps.map(describeStep).joined(separator: ",") + "]"
+    case .post(let inner, let pst): return "post(\(describe(inner))|\(pst))"
+    }
+}
+
+
+/// 单个链步的稳定描述（⚠️ 抽成独立函数 —— 字符串插值里放不了 `switch` 语句）
+func describeStep(_ s: ChainStep) -> String {
+    switch s {
+    case .sub(let sel, let idx, let excl):
+        return "sub:" + sel + ":idx=" + (idx.map(String.init) ?? "-") + ":excl=" + String(excl.count)
+    case .attr(let n):
+        return "attr:" + n
+    }
+}
