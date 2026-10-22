@@ -957,6 +957,59 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 **现状**：⏳ **未实现**（Phase 3 接 JSC）⇒ fixture 里标 `requires: "js"` ⇒ **两边都跳过**，不算差异。
 ⚠️ **未实现的规则必须明确跳过，不许伪装成「没命中」**。
 
+## 17.9 S-HOST 宿主适配（Phase 2e 新增）
+
+> 实现：`Sources/LegadoCore/Host/`
+> 对拍：fixture 的 `urlRule` 用例（12 条）+ `reference/swift/AnalyzeUrl.swift`（轻阅的参考实现，**只读**）
+
+### S-HOST-01 ⭐ URL 规则 = 请求构造的语义核心
+**规范**：规则里的 URL 决定用什么 method、带什么 headers、body 是什么、query 怎么编码。
+**依据**：🟢 栖阅的 `AnalyzeUrl` 是**原生 Swift**；🟡 轻阅原来放在 JS 里 ⇒ 沙盒（Node fetch）和真机（`URL(string:)`）
+用了**两套不同的 URL 实现** ⇒ 已经栽了两次（build166 / build167）。
+**现状**：✅ 自研已实现（`URLBuilder`），**与参考实现逐字一致**（12 条对拍全过，0 DIVERGE）。
+
+⭐ **四条最容易错的语义**：
+| # | 规则 | 栽过的坑 |
+|---|---|---|
+| 1 | **query 重新编码对【所有方法】做** | 只给 GET 编码 ⇒ POST 的裸中文 + 裸 JSON ⇒ `URL(string:)` 判非法 ⇒ **请求压根没发出去** |
+| 2 | **`+` → `%2B`** | 留着 `+` ⇒ 服务器 form 解码成**空格** ⇒ base64 `book_id` 被损坏 ⇒ **有的书能开、有的书开不了** |
+| 3 | **`data:` / `blob:` 原样返回** | 百分号编码会改掉 base64 载荷里的 `+` `/` ⇒ 站方解不出 JSON |
+| 4 | **选项后缀从【左边】第一个逗号找** | 用 `lastIndex` ⇒ 对 `url,{"method":"POST","body":{...}}` 最后一个逗号在 `"POST",` 后面 ⇒ **选项拆不出来** ⇒ method/body 全丢 ⇒ 请求用 GET 发 |
+
+⚠️ **「原样返回」的 scheme 必须是【白名单】**，不能是「所有自定义 scheme」
+⇒ 我第一版写成「所有自定义 scheme」⇒ **`https:` 也被当成自定义** ⇒ 整个 URL 原样返回
+⇒ query 里的裸中文不编码 ⇒ 请求发不出去 ⭐
+
+⚠️ **绝对化 / 取目录要用 Foundation**（`URL(string:)` / `deletingLastPathComponent`），别手搓字符串拼接
+⇒ 沙盒验的就是真机同一套 Foundation 行为。
+
+### S-HOST-02 ⭐ Cookie 罐必须由宿主自己管
+**规范**：
+- **写了 `Domain`** ⇒ 匹配该域**及其所有子域**
+- **没写 `Domain`** ⇒ **只匹配 host 完全相等**（不能给子域发，更不能给父域发）
+- `Path` 前缀匹配
+- `secure` cookie 只走 https
+- **过期 cookie 要删掉**（不然登录态"看着还在、其实已失效"）
+- 同名 + 同域 + 同路径 ⇒ 覆盖
+
+**依据**：🟡 站方聚合源的 cookie 是**站方服务器认的**（如番茄的 `sessionid_ss`）⇒ 必须**同一个罐**跨请求保持。
+**现状**：✅ 自研已实现（`CookieJar`）。
+
+⚠️ **「没写 Domain」的判定我写错过**：早先写成 `host == url.host?.lowercased()`
+⇒ **自己跟自己比，恒真** ⇒ 没写 Domain 的 cookie 会被发给**任何域** ⭐
+⇒ 修法：Cookie 额外记 `host`（来源 host）⇒ 没写 Domain 时拿它做「完全相等」判定。
+
+### S-HOST-03 HTTP 传输是**协议**，宿主注入
+**规范**：核心层只依赖 `HTTPTransport` 协议 ⇒ **不依赖 URLSession**。
+**依据**：⭐ 核心层要能在 **Linux 沙盒**里真编真跑 ⇒ URLSession 在 Linux 上行为与 Apple 有差异，
+且同步封装麻烦 ⇒ 不适合放进核心层。
+**现状**：✅ `HTTPTransport` 协议 + `HTTPRequest` / `HTTPResponse` / `PageFetcher`（规则 → 请求 → 响应一条龙）。
+
+### S-HOST-04 `PageFetcher` 把「URL 规则」和「取页面」合成一步
+**规范**：取页面 = URL 规则解析 + 带上 cookie + 发请求 + 收 cookie。
+**依据**：🟢 这两件事本来就是**一件事**（URL 规则决定 request 怎么发）⇒ 不该拆在两个层里。
+**现状**：✅ `PageFetcher.fetch(rule:baseUrl:timeout:)`。
+
 ## 18. 尚未覆盖 / 已知缺口
 
 | # | 缺口 | 状态 | 备注 |
@@ -982,6 +1035,7 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 | 日期 | 变更 |
 |---|---|
 | 2026-10-23 | 初版。从 build214 源码 + 125 源活体体检 + 栖阅反推材料反推成规范。共 17 域 / 81 条。 |
+| 2026-10-23 | **Phase 2e（宿主适配）**：新增 **§17.9 S-HOST（4 条）**；实现 `URLBuilder`（URL 规则）+ `HTTPTransport` 协议 + `CookieJar` + `PageFetcher`；把轻阅的 `AnalyzeUrl.swift` 拉进 `reference/swift/` 做**Swift 侧对拍**（12 条 URL 规则**逐字一致**，0 DIVERGE）；fixture 122 条 · XCTest 29 项；**自查抓到 3 个实现 bug**（scheme 白名单写成「所有自定义」⇒ `https:` 也放行 / `splitOptions` 用 `lastIndex` ⇒ 选项拆不出来 / Cookie 的 host 比较自己比自己 ⇒ 越权发 cookie） |
 | 2026-10-23 | **Phase 2d（AST 缓存）**：新增 **S-EVAL-11**（规则 AST 可缓存）；实现 `RuleCache`（线程安全 + 容量上限 + 命中率统计）；`RuleParser` 支持注入缓存、`Evaluator` 持有缓存解析器；门禁 +7 项（**缓存前后 AST 逐字相同** / 命中 / isJSON 分键 / 只存整条规则 / 容量上限 / Evaluator 走缓存 / 可清空）；实测 **加速 ≈ 85 倍** |
 | 2026-10-23 | **Phase 2c（XPath 子集）**：新增 **S-DOM-07**（8 种语法，子集照 125 源 28 条真用法定）；实现 `XPathEngine`（纯 Swift，不依赖 libxml2）；DOMNode 协议加 `children()` / `directText()`；fixture 110 条（+6 条 XPath 对拍）；**两边逐字一致 5/6** ⇒ 第 6 条是我**期望值写错**（以为 `@class='a b'` 匹配不上，**其实匹配得上**）⇒ 已更正规格与代码注释 |
 | 2026-10-23 | **自查后修订**（实现 F1~F4）：新增 **S-DIA-07**（真错误 vs 没命中必须分开）+ **S-EVAL-09b**（基准类型不对 = 真错误），语义总数 **113 条**；求值器 19 处静默 `.void` **全部改成带诊断**；`EngineDiagnostic` 从「定义了不用」变成**求值器的一等输出**；XPath 分支不再骗人；attr 步补 `break`；Swift 侧新增 3 项诊断测试 + 5 条 `diagnose` 对拍用例 |

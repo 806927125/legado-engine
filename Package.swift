@@ -21,7 +21,9 @@ let package = Package(
         .target(name: "LegadoCore", dependencies: [
             .product(name: "SwiftSoup", package: "SwiftSoup")
         ]),
-        .executableTarget(name: "Conformance", dependencies: ["LegadoCore"]),
-        .testTarget(name: "LegadoCoreTests", dependencies: ["LegadoCore"]),
+        // ⭐ 参考实现（轻阅的 AnalyzeUrl.swift）—— 只读，用于 URL 规则对拍
+        .target(name: "AnalyzeUrlReference", path: "reference/swift"),
+        .executableTarget(name: "Conformance", dependencies: ["LegadoCore", "AnalyzeUrlReference"]),
+        .testTarget(name: "LegadoCoreTests", dependencies: ["LegadoCore", "AnalyzeUrlReference"]),
     ]
 )

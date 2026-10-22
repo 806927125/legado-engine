@@ -1661,6 +1661,178 @@
         "type": "html",
         "value": "<html><body><p class=\"mb-1 text-muted\"><a>作者A</a></p></body></html>"
       }
+    },
+    {
+      "id": "url-01",
+      "semantic": "S-URL-01",
+      "title": "query 里的裸中文 ⇒ 百分号编码（build166 的坑）",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "https://x.com/s?q=搜索词",
+      "baseUrl": "",
+      "expect": {
+        "method": "GET",
+        "body": "",
+        "url": "https://x.com/s?q=%E6%90%9C%E7%B4%A2%E8%AF%8D"
+      }
+    },
+    {
+      "id": "url-02",
+      "semantic": "S-URL-03",
+      "title": "query 里的 + ⇒ %2B（base64 book_id 被损坏的坑）",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "https://x.com/s?id=MTgzNTEy+q",
+      "baseUrl": "",
+      "expect": {
+        "method": "GET",
+        "body": "",
+        "url": "https://x.com/s?id=MTgzNTEy%2Bq"
+      }
+    },
+    {
+      "id": "url-03",
+      "semantic": "S-URL-01",
+      "title": "已经是 %XX 的不重复编码",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "https://x.com/s?q=a%20b",
+      "baseUrl": "",
+      "expect": {
+        "method": "GET",
+        "body": "",
+        "url": "https://x.com/s?q=a%20b"
+      }
+    },
+    {
+      "id": "url-04",
+      "semantic": "S-URL-04",
+      "title": "对象 body ⇒ JSON + Content-Type",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "https://x.com/api,{\"method\":\"POST\",\"body\":{\"a\":1}}",
+      "baseUrl": "",
+      "expect": {
+        "method": "POST",
+        "body": "{\"a\":1}",
+        "url": "https://x.com/api",
+        "contentType": "application/json; charset=utf-8"
+      }
+    },
+    {
+      "id": "url-05",
+      "semantic": "S-URL-04",
+      "title": "字符串 body ⇒ form 编码 + Content-Type",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "https://x.com/api,{\"method\":\"POST\",\"body\":\"a=1&b=2\"}",
+      "baseUrl": "",
+      "expect": {
+        "method": "POST",
+        "body": "a=1&b=2",
+        "url": "https://x.com/api",
+        "contentType": "application/x-www-form-urlencoded; charset=utf-8"
+      }
+    },
+    {
+      "id": "url-06",
+      "semantic": "S-URL-04",
+      "title": "headers 透传 + 已有 Content-Type 不被覆盖（body 的 = 是结构符，不编码）",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "https://x.com/api,{\"method\":\"POST\",\"headers\":{\"X-A\":\"1\",\"Content-Type\":\"text/plain\"},\"body\":\"x=1\"}",
+      "baseUrl": "",
+      "expect": {
+        "method": "POST",
+        "body": "x=1",
+        "url": "https://x.com/api",
+        "contentType": "text/plain",
+        "xA": "1"
+      }
+    },
+    {
+      "id": "url-07",
+      "semantic": "S-DAT-01",
+      "title": "data: 伪 URL ⇒ 原样返回（百分号编码会毁掉 base64 载荷）",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "data:;base64,eyJ0YWI6Im5vdmVsIn0+,{\"type\":\"qingtian\"}",
+      "baseUrl": "",
+      "expect": {
+        "method": "GET",
+        "body": "",
+        "url": "data:;base64,eyJ0YWI6Im5vdmVsIn0+,{\"type\":\"qingtian\"}"
+      }
+    },
+    {
+      "id": "url-08",
+      "semantic": "S-URL-01",
+      "title": "相对地址 ⇒ 绝对化",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "/api/book/1",
+      "baseUrl": "https://book.example.com/",
+      "expect": {
+        "method": "GET",
+        "body": "",
+        "url": "https://book.example.com/api/book/1"
+      }
+    },
+    {
+      "id": "url-09",
+      "semantic": "S-URL-01",
+      "title": "协议相对地址 ⇒ 补上 baseUrl 的 scheme（跟参考实现一致）",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "//cdn.example.com/a.png",
+      "baseUrl": "https://book.example.com/",
+      "expect": {
+        "method": "GET",
+        "body": "",
+        "url": "https://cdn.example.com/a.png"
+      }
+    },
+    {
+      "id": "url-10",
+      "semantic": "S-URL-01",
+      "title": "GET ⇒ body 清空",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "https://x.com/api,{\"method\":\"GET\",\"body\":\"a=1\"}",
+      "baseUrl": "",
+      "expect": {
+        "method": "GET",
+        "body": "",
+        "url": "https://x.com/api"
+      }
+    },
+    {
+      "id": "url-11",
+      "semantic": "S-URL-01",
+      "title": "query 里的裸 JSON ⇒ 百分号编码（POST 也一样）",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "https://x.com/d?book_id=x&source=番茄&variable={\"custom\":\"\"}",
+      "baseUrl": "",
+      "expect": {
+        "method": "GET",
+        "body": "",
+        "url": "https://x.com/d?book_id=x&source=%E7%95%AA%E8%8C%84&variable=%7B%22custom%22%3A%22%22%7D"
+      }
+    },
+    {
+      "id": "url-12",
+      "semantic": "S-URL-01",
+      "title": "逗号后紧跟 { 才算选项后缀（否则是普通 URL）",
+      "kind": "urlRule",
+      "requires": "swift-only",
+      "rule": "https://x.com/a,b",
+      "baseUrl": "https://book.example.com/",
+      "expect": {
+        "method": "GET",
+        "body": "",
+        "url": "https://x.com/a,b"
+      }
     }
   ]
 }

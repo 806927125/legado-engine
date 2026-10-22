@@ -1,5 +1,6 @@
 import XCTest
 @testable import LegadoCore
+import AnalyzeUrlReference
 
 /// 假的 DOM 节点（测试用，不依赖 SwiftSoup）
 final class FakeNode: DOMNode {
@@ -288,6 +289,127 @@ final class SemanticsConformanceTests: XCTestCase {
         cache.removeAll()
         XCTAssertEqual(cache.stats.count, 0)
         XCTAssertEqual(cache.stats.hits, 0)
+    }
+
+    // MARK: - URL 规则（§S-URL）—— 与参考实现逐字一致
+
+    /// ⭐ **自研实现必须与参考实现（轻阅 AnalyzeUrl.swift）一致**。
+    /// 对拍时若两者有差异 ⇒ 运行器会打 `DIVERGE` ⇒ 这里再钉一遍。
+    func testURLBuilderMatchesReferenceImplementation() {
+        let cases: [(String, String)] = [
+            ("https://x.com/s?q=搜索词", "https://book.example.com/"),
+            ("https://x.com/s?id=MTgzNTEy+q", "https://book.example.com/"),
+            ("https://x.com/s?q=a%20b", "https://book.example.com/"),
+            ("https://x.com/api,{\"method\":\"POST\",\"body\":{\"a\":1}}", "https://book.example.com/"),
+            ("https://x.com/api,{\"method\":\"POST\",\"body\":\"a=1&b=2\"}", "https://book.example.com/"),
+            ("data:;base64,eyJ0YWI6Im5vdmVsIn0+,\"type\":\"qingtian\"}", "https://book.example.com/"),
+            ("/api/book/1", "https://book.example.com/"),
+            ("//cdn.example.com/a.png", "https://book.example.com/"),
+            ("https://x.com/a,b", "https://book.example.com/"),
+        ]
+        for (rule, base) in cases {
+            let mine = URLBuilder.parse(rule, baseUrl: base)
+            let ref = AnalyzeUrl.parse(rule, baseUrl: base)
+            XCTAssertEqual(mine.url, ref.url, "URL 不一致：\(rule)")
+            XCTAssertEqual(mine.method, ref.method, "method 不一致：\(rule)")
+            XCTAssertEqual(mine.body, ref.body, "body 不一致：\(rule)")
+        }
+    }
+
+    /// ⭐ **`+` 必须编码成 `%2B`**（base64 book_id 被损坏的坑）
+    func testURLBuilderEncodesPlusInQuery() {
+        let b = URLBuilder.parse("https://x.com/s?id=MTgzNTEy+q", baseUrl: "")
+        XCTAssertEqual(b.url, "https://x.com/s?id=MTgzNTEy%2Bq")
+    }
+
+    /// ⭐ **query 重新编码对【所有方法】做**（只给 GET 编码 ⇒ POST 的裸中文让 URL(string:) 判非法 ⇒ 请求发不出去）
+    func testURLBuilderEncodesQueryForAllMethods() {
+        let b = URLBuilder.parse("https://x.com/d?source=番茄&variable={\"custom\":\"\"}", baseUrl: "")
+        XCTAssertTrue(b.url.contains("%E7%95%AA%E8%8C%84"), "裸中文没编码：\(b.url)")
+        XCTAssertTrue(b.url.contains("%7B%22custom%22%3A%22%22%7D"), "裸 JSON 没编码：\(b.url)")
+    }
+
+    /// ⭐ **`data:` 伪 URL 必须原样返回**（百分号编码会毁掉 base64 载荷）
+    func testURLBuilderKeepsDataURLIntact() {
+        let raw = "data:;base64,eyJ0YWI6Im5vdmVsIn0+,\"type\":\"qingtian\"}"
+        let b = URLBuilder.parse(raw, baseUrl: "")
+        XCTAssertEqual(b.url, raw, "data: 载荷被改了")
+    }
+
+    /// ⭐ **方案后缀从【左边】第一个逗号找**（用 lastIndex 会拆不出来 method/body）
+    func testURLBuilderSplitsOptionSuffixFromFirstComma() {
+        let b = URLBuilder.parse("https://x.com/api,{\"method\":\"POST\",\"body\":{\"a\":1}}", baseUrl: "")
+        XCTAssertEqual(b.method, "POST")
+        XCTAssertEqual(b.url, "https://x.com/api")
+        XCTAssertEqual(b.body, "{\"a\":1}")
+        XCTAssertEqual(b.headers["Content-Type"], "application/json; charset=utf-8")
+    }
+
+    /// 逗号后**不**紧跟 `{` ⇒ 不是选项后缀
+    func testURLBuilderIgnoresNonOptionComma() {
+        let b = URLBuilder.parse("https://x.com/a,b", baseUrl: "")
+        XCTAssertEqual(b.method, "GET")
+        XCTAssertEqual(b.url, "https://x.com/a,b")
+    }
+
+    // MARK: - Cookie 罐（§S-HOST-02）
+
+    func testCookieJarDomainAndPathMatching() {
+        let jar = CookieJar()
+        jar.set(.init(name: "a", value: "1", domain: "example.com", host: "example.com"))
+        jar.set(.init(name: "b", value: "2", domain: "other.com", host: "other.com"))
+        XCTAssertEqual(jar.cookieHeader(for: "https://example.com/x"), "a=1")
+        XCTAssertEqual(jar.cookieHeader(for: "https://sub.example.com/x"), "a=1", "子域也要匹配")
+        XCTAssertEqual(jar.cookieHeader(for: "https://other.com/x"), "b=2")
+        XCTAssertNil(jar.cookieHeader(for: "https://nomatch.com/x"))
+    }
+
+    /// ⚠️ **没写 Domain ⇒ 只匹配 host 完全相等**（不能给父域发）
+    func testCookieJarWithoutDomainIsHostExact() {
+        let jar = CookieJar()
+        jar.set(.init(name: "a", value: "1", domain: nil, host: "example.com"))
+        XCTAssertEqual(jar.cookieHeader(for: "https://example.com/x"), "a=1")
+        XCTAssertNil(jar.cookieHeader(for: "https://sub.example.com/x"), "不能给子域发")
+    }
+
+    /// `secure` cookie 只走 https
+    func testCookieJarSecureFlag() {
+        let jar = CookieJar()
+        jar.set(.init(name: "s", value: "1", domain: "example.com", host: "example.com", secure: true))
+        XCTAssertNil(jar.cookieHeader(for: "http://example.com/x"))
+        XCTAssertEqual(jar.cookieHeader(for: "https://example.com/x"), "s=1")
+    }
+
+    /// ⚠️ **过期 cookie 要删掉**（不然登录态"看着还在、其实已失效"）
+    func testCookieJarDropsExpiredCookies() {
+        let jar = CookieJar()
+        jar.set(.init(name: "old", value: "1", domain: "example.com", host: "example.com",
+                       expires: Date().addingTimeInterval(-10)))
+        XCTAssertNil(jar.cookieHeader(for: "https://example.com/x"))
+        XCTAssertTrue(jar.all.isEmpty, "过期项要清掉")
+    }
+
+    /// `Set-Cookie` 解析
+    func testCookieJarParsesSetCookie() {
+        let jar = CookieJar()
+        let c = jar.parseSetCookie(
+            "sid=abc; Path=/; Domain=example.com; Secure; HttpOnly",
+            for: "https://www.example.com/p")
+        XCTAssertEqual(c?.name, "sid")
+        XCTAssertEqual(c?.value, "abc")
+        XCTAssertEqual(c?.domain, "example.com")
+        XCTAssertEqual(c?.path, "/")
+        XCTAssertEqual(c?.secure, true)
+        XCTAssertEqual(c?.httpOnly, true)
+    }
+
+    /// 同名同域同路径 ⇒ 覆盖（不重复）
+    func testCookieJarOverwritesSameKey() {
+        let jar = CookieJar()
+        jar.set(.init(name: "a", value: "1", domain: "example.com", host: "example.com"))
+        jar.set(.init(name: "a", value: "2", domain: "example.com", host: "example.com"))
+        XCTAssertEqual(jar.all.count, 1)
+        XCTAssertEqual(jar.cookieHeader(for: "https://example.com/x"), "a=2")
     }
 
     // MARK: - fixture

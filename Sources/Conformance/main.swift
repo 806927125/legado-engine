@@ -1,5 +1,6 @@
 import Foundation
 import LegadoCore
+import AnalyzeUrlReference
 import Foundation
 
 // ===============================================================
@@ -104,6 +105,43 @@ for c in cases {
         let rule = c["rule"] as? String ?? ""
         let node = parser.parse(rule, isJSON: isJSON)
         emit(id, kind, expect["ast"] as? String ?? "", describe(node))
+
+    case "urlRule":
+        // URL 规则对拍：自研 URLBuilder vs 参考实现（轻阅 AnalyzeUrl.swift）
+        let rule = c["rule"] as? String ?? ""
+        let baseUrl = c["baseUrl"] as? String ?? ""
+        let mine = URLBuilder.parse(rule, baseUrl: baseUrl)
+        let ref = AnalyzeUrl.parse(rule, baseUrl: baseUrl)
+        let exp = expect
+        var expParts: [String] = []
+        var actParts: [String] = []
+        func add(_ k: String, _ e: Any?, _ a: Any?) {
+            guard let e = e else { return }
+            expParts.append("\(k)=\(jsonAnyString(e))")
+            actParts.append("\(k)=\(jsonAnyString(a ?? ""))")
+        }
+        add("method", exp["method"], mine.method)
+        add("body", exp["body"], mine.body)
+        add("url", exp["url"], mine.url)
+        if let ct = exp["contentType"] as? String {
+            expParts.append("ct=\(jsonAnyString(ct))")
+            let got = mine.headers.first { $0.key.lowercased() == "content-type" }?.value ?? ""
+            actParts.append("ct=\(jsonAnyString(got))")
+        }
+        for (k, v) in (exp["headers"] as? [String: String] ?? [:]) {
+            expParts.append("h.\(k)=\(jsonAnyString(v))")
+            let got = mine.headers.first { $0.key.lowercased() == k.lowercased() }?.value ?? ""
+            actParts.append("h.\(k)=\(jsonAnyString(got))")
+        }
+        // ⭐ 同时把**参考实现**的结果算进去 —— 两边都跟「规格期望」一致才算过
+        //    （若 ref ≠ mine ⇒ 说明自研实现与参考实现有语义差异 ⇒ 要人看一眼）
+        let refSame = (ref.method == mine.method) && (ref.body == mine.body) && (ref.url == mine.url)
+        if !refSame {
+            let refDesc = "method=\(jsonAnyString(ref.method)),body=\(jsonAnyString(ref.body)),url=\(jsonAnyString(ref.url))"
+            let mineDesc = "method=\(jsonAnyString(mine.method)),body=\(jsonAnyString(mine.body)),url=\(jsonAnyString(mine.url))"
+            FileHandle.standardError.write(("DIVERGE \(id) ref=" + refDesc + " mine=" + mineDesc + "\n").data(using: .utf8)!)
+        }
+        emit(id, kind, expParts.joined(separator: ","), actParts.joined(separator: ","))
 
     case "diagnose":
         // 诊断对拍：规则 + 基准 ⇒ 结论分级 + 是不是真错误

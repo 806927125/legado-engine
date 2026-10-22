@@ -6,9 +6,9 @@
 
 | 指标 | 值 |
 |---|---|
-| 用例总数 | 110 |
+| 用例总数 | 122 |
 | 两边一致 | **87** |
-| 存在差异 | **23** |
+| 存在差异 | **35** |
 
 ## 差异明细
 
@@ -37,6 +37,18 @@
 | `sel-08b` | `{"count":1}` | `{"count":1}` | `{"count":2}` | **轻阅的 bug**（自研已按规格修对） |
 | `sel-10` | `{"count":2}` | `{"count":2}` | `{"count":0}` | **轻阅的 bug**（自研已按规格修对） |
 | `sel-14` | `{"count":2}` | `{"count":2}` | `{"count":0}` | **轻阅的 bug**（自研已按规格修对） |
+| `url-01` | `method="GET",body="",url="https://x.com/s?q=%E6%90%9C%E7%B4%A2%E8%AF%8D"` | `method="GET",body="",url="https://x.com/s?q=%E6%90%9C%E7%B4%A2%E8%AF%8D"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `url-02` | `method="GET",body="",url="https://x.com/s?id=MTgzNTEy%2Bq"` | `method="GET",body="",url="https://x.com/s?id=MTgzNTEy%2Bq"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `url-03` | `method="GET",body="",url="https://x.com/s?q=a%20b"` | `method="GET",body="",url="https://x.com/s?q=a%20b"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `url-04` | `method="POST",body="{\"a\":1}",url="https://x.com/api",ct="application/json; charset=utf-8"` | `method="POST",body="{\"a\":1}",url="https://x.com/api",ct="application/json; charset=utf-8"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `url-05` | `method="POST",body="a=1&b=2",url="https://x.com/api",ct="application/x-www-form-urlencoded; charset=utf-8"` | `method="POST",body="a=1&b=2",url="https://x.com/api",ct="application/x-www-form-urlencoded; charset=utf-8"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `url-06` | `method="POST",body="x=1",url="https://x.com/api",ct="text/plain"` | `method="POST",body="x=1",url="https://x.com/api",ct="text/plain"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `url-07` | `method="GET",body="",url="data:;base64,eyJ0YWI6Im5vdmVsIn0+,{\"type\":\"qingtian\"}"` | `method="GET",body="",url="data:;base64,eyJ0YWI6Im5vdmVsIn0+,{\"type\":\"qingtian\"}"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `url-08` | `method="GET",body="",url="https://book.example.com/api/book/1"` | `method="GET",body="",url="https://book.example.com/api/book/1"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `url-09` | `method="GET",body="",url="https://cdn.example.com/a.png"` | `method="GET",body="",url="https://cdn.example.com/a.png"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `url-10` | `method="GET",body="",url="https://x.com/api"` | `method="GET",body="",url="https://x.com/api"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `url-11` | `method="GET",body="",url="https://x.com/d?book_id=x&source=%E7%95%AA%E8%8C%84&variable=%7B%22custom%22%3A%22%22%7D"` | `method="GET",body="",url="https://x.com/d?book_id=x&source=%E7%95%AA%E8%8C%84&variable=%7B%22custom%22%3A%22%22%7D"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `url-12` | `method="GET",body="",url="https://x.com/a,b"` | `method="GET",body="",url="https://x.com/a,b"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
 
 ## 说明
 

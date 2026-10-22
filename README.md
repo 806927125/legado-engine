@@ -115,7 +115,7 @@ npm install --registry=https://registry.npmmirror.com
 export LD_LIBRARY_PATH=/workspace/.toolchain/swift/usr/lib/swift/linux:$LD_LIBRARY_PATH
 
 swift build                      # 编译语义内核（~4 秒）
-swift test                       # 跑 17 项规格测试（~0.13 秒）
+swift test                       # 跑 29 项规格测试（~0.14 秒）
 bash tools/conformance-diff.sh   # 双实现对拍 → conformance/out/report.md
 swift run conformance --bench    # 量 AST 缓存的收益（无缓存 vs 有缓存）
 ```
