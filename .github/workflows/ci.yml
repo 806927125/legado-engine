@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  conformance:
+    name: 语义规格 + 双实现对拍
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 装 Swift 工具链
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.1.2"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 装 jsdom（JS 参考实现需要 DOM）
+        run: npm install --no-audit --no-fund
+
+      - name: 编译语义内核
+        run: swift build
+
+      - name: 规格门禁（swift test）
+        run: swift test
+
+      - name: 双实现对拍（差异 = 债）
+        run: bash tools/conformance-diff.sh
+
+      - name: 归档对拍报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-report
+          path: conformance/out/
+          if-no-files-found: ignore
