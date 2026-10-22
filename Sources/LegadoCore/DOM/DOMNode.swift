@@ -28,6 +28,10 @@ public protocol DOMNode: AnyObject {
     func matchesCSS(_ css: String) -> Bool
     /// **所有后代**（不含自身）—— 后置伪类过滤时需要「全文档范围」的候选集
     func descendants() -> [DOMNode]
+    /// **直接子元素** —— XPath 的 `/tag` 需要
+    func children() -> [DOMNode]
+    /// **直接子文本节点** —— XPath 的 `text()` 取的是这个，**不是**完整文本
+    func directText() -> String
 }
 
 /// 节点引用 —— 可跨线程传递的薄包装。

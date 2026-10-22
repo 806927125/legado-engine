@@ -16,6 +16,8 @@ final class FakeNode: DOMNode {
     func queryAll(_ css: String) -> [DOMNode] { [] }
     func matchesCSS(_ css: String) -> Bool { false }
     func descendants() -> [DOMNode] { [] }
+    func children() -> [DOMNode] { [] }
+    func directText() -> String { textContent }
 }
 
 /// 语义规格的**可执行**版本。
@@ -150,10 +152,15 @@ final class SemanticsConformanceTests: XCTestCase {
         XCTAssertTrue(e1.isHardFailure, "HTML 基准走 JSONPath 必须是真错误")
         XCTAssertEqual(e1.conclusion, .unsupported)
 
-        // ② XPath 尚未实现 ⇒ 真错误（不支持）
+        // ② XPath **已实现**（§S-DOM-07）⇒ 没命中是「规则没命中」，不是真错误
         let e2 = ev.evalOne("@XPath://div", base: htmlBase, ctx: ctx)
-        XCTAssertTrue(e2.isHardFailure)
-        XCTAssertEqual(e2.conclusion, .unsupported)
+        XCTAssertFalse(e2.isHardFailure, "XPath 已实现 ⇒ 没命中不是真错误")
+        XCTAssertEqual(e2.conclusion, .ruleNotMatched)
+
+        // ②' XPath 命中 ⇒ 正常求值
+        let e2b = ev.evalOne("@XPath://h1/text()", base: htmlBase, ctx: ctx)
+        XCTAssertNil(e2b.diagnostic.failure)
+        XCTAssertEqual(e2b.value.text, "标题")
 
         // ③ 选择器没匹配上 ⇒ **不是**真错误
         let e3 = ev.evalOne("div.nope", base: htmlBase, ctx: ctx)

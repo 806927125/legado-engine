@@ -211,11 +211,25 @@ public struct Evaluator {
             if hits.count == 1 { return .json(hits[0]) }
             return .list(hits.map { RuleValue.json($0) })
 
-        // ⑧ XPath —— ⬜ **未实现**（Phase 2b 之后）⇒ 明确报「不支持」，不是静默空
+        // ⑧ XPath（自研子集，§S-DOM-07）
         case .xpath(let expr):
-            diag.failure = .unsupportedSyntax("XPath 尚未实现：\(expr)")
+            guard let node = baseNode(base, ctx: ctx) else {
+                diag.failure = .baseTypeMismatch(expected: "DOM", actual: baseTypeName(base))
+                diag.branch = "XPath"
+                return .void
+            }
+            guard let hits = XPathEngine.select(node, expr) else {
+                diag.failure = .unsupportedSyntax("XPath 语法不支持：\(expr)")
+                diag.branch = "XPath"
+                return .void
+            }
+            guard !hits.isEmpty else {
+                diag.failure = .noMatch(reason: "XPath 未命中：\(expr)")
+                diag.branch = "XPath"
+                return .void
+            }
             diag.branch = "XPath"
-            return .void
+            return .list(hits)
 
         // ⑨ CSS / 默认规则链
         case .css(let sel):

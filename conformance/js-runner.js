@@ -193,6 +193,8 @@ function jsonAny(v) {
       } else if (kind === 'evalOne' || kind === 'getElements') {
         const base = buildBase(c.base, ctxSpec);
         const ctx = buildCtx(ctxSpec, c.base || {});
+        // ⚠️ XPath 规则要**完整求值路径**（`QR.rule.evalOne`）——
+        //    `QR.dom.selectAll` 走的 jsoup-compat **不支持 XPath**（当 CSS 处理了）
         let outVals = [];
         try {
           if (kind === 'evalOne') {

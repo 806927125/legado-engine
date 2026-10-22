@@ -829,6 +829,39 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 **现状**：✅ 已接入（`Package.swift` 的 SPM 依赖）。
 ⚠️ **SPM 拉依赖会被沙盒的 CA 问题卡住** ⇒ 需 `git config --global http.sslCAInfo <ca>` + `http.version HTTP/1.1`。
 
+### S-DOM-07 ⭐ XPath 子集（自研，2026-10-23）
+**规范**：宿主必须支持 Legado 的 `@XPath:` / 裸 `/` 开头规则。
+**依据**：🟡 125 源实测 **28 条** XPath 用法，语法种类就那么几样 ⇒ 子集照真实需求定。
+
+| 语法 | 例子（**都是 125 源的真规则**） | 语义 |
+|---|---|---|
+| `//tag` / `//*` | `//ul[@class='mulu_list']/li` | 所有后代里的元素 |
+| `/tag` | `/html/body` | 直接子元素 |
+| `tag[@attr='v']` | `//p[@class='mb-1 text-muted']` | 属性**完全相等**（⭐ 标准 XPath） |
+| `tag[contains(@attr,'v')]` | `//ul[contains(@class,'vodlist')]/li` | 属性包含 |
+| `tag[n]` | `//tr[1]` | 第 n 个（**1-based**） |
+| `tag[p1][p2]` | `//div[@class='x'][@id='y']` | 多个谓词（AND） |
+| `/text()` | `//a/text()` | **直接子文本节点**（不是完整文本） |
+| `/@attr` | `//a/@href` | 属性值 |
+
+**现状**：✅ 自研已实现（`Sources/LegadoCore/DOM/XPathEngine.swift`），
+与轻阅的 `document.evaluate`（**标准 XPath**）**逐字一致**（6 条对拍用例全过）。
+
+⚠️ **三个容易搞错的点**：
+1. **`@class='a b'` 是完全相等** ⇒ ⚠️ **HTML 的 class 属性值本来就是空格分隔的整串**
+   （`<p class="a b">` 的属性值就是 "a b"）⇒ **匹配得上**（我一开始以为匹配不上，**错了**）
+   ⇒ 站方要「按 class 包含」才写 `contains(@class,'a')`
+2. **`text()` 取的是直接子文本节点**，不是元素的完整文本
+   ⇒ `<a><span>x</span></a>` 的 `text()` 是**空串**
+3. **位置索引是 1-based**（XPath 语义）⇒ `tr[1]` 是**第一个**（不是第 0 个）
+
+⚠️ **`//xpath:` 前缀不剥**（那是 XPath 1.0 的命名空间语法，jsoup / document.evaluate 都不认）
+⇒ 只剥 `xpath:`（跟轻阅 `evalXPath` 的 `replace(/^xpath:/i,'')` 一致）
+
+⚠️ **轻阅的 `jsoup-compat.js` 完全没有 XPath** ⇒ `QR.dom.selectAll(doc, xpathRule)`
+会把 XPath 规则**当 CSS 处理** ⇒ 结果乱。**只有 `QR.rule.evalOne` 的 XPath 分支是对的**。
+⇒ ⇒ **对拍 XPath 必须走完整求值路径，不能只测选择器** ⭐（这个坑我踩了一次）
+
 ## 17.8 S-EVAL 求值器语义（Phase 2b 新增）
 
 > 实现：`Sources/LegadoCore/Evaluator/`
@@ -929,6 +962,7 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 | 日期 | 变更 |
 |---|---|
 | 2026-10-23 | 初版。从 build214 源码 + 125 源活体体检 + 栖阅反推材料反推成规范。共 17 域 / 81 条。 |
+| 2026-10-23 | **Phase 2c（XPath 子集）**：新增 **S-DOM-07**（8 种语法，子集照 125 源 28 条真用法定）；实现 `XPathEngine`（纯 Swift，不依赖 libxml2）；DOMNode 协议加 `children()` / `directText()`；fixture 110 条（+6 条 XPath 对拍）；**两边逐字一致 5/6** ⇒ 第 6 条是我**期望值写错**（以为 `@class='a b'` 匹配不上，**其实匹配得上**）⇒ 已更正规格与代码注释 |
 | 2026-10-23 | **自查后修订**（实现 F1~F4）：新增 **S-DIA-07**（真错误 vs 没命中必须分开）+ **S-EVAL-09b**（基准类型不对 = 真错误），语义总数 **113 条**；求值器 19 处静默 `.void` **全部改成带诊断**；`EngineDiagnostic` 从「定义了不用」变成**求值器的一等输出**；XPath 分支不再骗人；attr 步补 `break`；Swift 侧新增 3 项诊断测试 + 5 条 `diagnose` 对拍用例 |
 | 2026-10-23 | **Phase 2b（求值器）后修订**：新增 **§17.8 S-EVAL（10 条）** + **S-PUT-03**（`@get:` 内嵌在 URL 里轻阅也不替换 = 新债），语义总数 **111 条**；记我自己实现的 **4 个 bug**（漏「整条 {{}}」短路、漏「字面 URL」短路、JSON 空字符串判空错、正则捕获组 range 用错）；记两条新查实的差异（**`@get:` 内嵌在 URL 里轻阅也不替换**、**`text.X` 匹配完整文本 ⇒ 祖先也可能命中**） |
 | 2026-10-23 | **Phase 2（DOM 层）后修订**：<br>① 新增 **§17.5 S-DOM**（DOM 层 6 条：头段/链段分流、隐式标签前缀、空 CSS 候选集、含自身、`:textEquals` 后置过滤、SwiftSoup 选型）<br>② S-SEL-01 补「完全相等比的是**完整文本** ⇒ 祖先元素也可能命中」<br>③ S-SEL-02 补「**零误伤已坐实**」（125 源：并列 class 40 处 + 纯 CSS 后代 50 处，两种都对）<br>④ S-SEL-04 记 **`@html` 语义差异**（Legado innerHTML vs 轻阅 outerHTML）—— 本项目按 Legado 语义<br>⑤ 记我自己的两个实现 bug：头段/链段混用分类器、空 CSS 候选集漏了后代（**均已修**） |

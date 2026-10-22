@@ -1494,14 +1494,16 @@
     {
       "id": "diag-02",
       "semantic": "S-DIA-07",
-      "title": "XPath 尚未实现 ⇒ 真错误（不支持），不是「没命中」",
+      "title": "JSONPath 语法不支持 ⇒ 真错误（规则写错了）",
       "kind": "diagnose",
       "requires": "swift-only",
       "base": {
-        "type": "html",
-        "value": "<html><body><div>x</div></body></html>"
+        "type": "json",
+        "value": {
+          "a": 1
+        }
       },
-      "rule": "@XPath://div",
+      "rule": "$.a[",
       "expect": {
         "conclusion": "unsupported",
         "hard": "1"
@@ -1555,6 +1557,109 @@
       "expect": {
         "conclusion": "unsupported",
         "hard": "1"
+      }
+    },
+    {
+      "id": "xpath-01",
+      "semantic": "S-DOM-07",
+      "title": "XPath 取属性 //h5/a/@href（爱丽丝书屋 ruleSearch.bookUrl）",
+      "kind": "evalOne",
+      "rule": "//h5/a/@href",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "/book/1"
+        ]
+      },
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"list-group\"><div class=\"list-group-item\"><h5><a href=\"/book/1\">书名一</a></h5></div></div></body></html>"
+      }
+    },
+    {
+      "id": "xpath-02",
+      "semantic": "S-DOM-07",
+      "title": "XPath 取文本 //h5/a/text()（爱丽丝书屋 ruleToc.chapterName）",
+      "kind": "evalOne",
+      "rule": "//h5/a/text()",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "书名一"
+        ]
+      },
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"list-group\"><div class=\"list-group-item\"><h5><a href=\"/book/1\">书名一</a></h5></div></div></body></html>"
+      }
+    },
+    {
+      "id": "xpath-03",
+      "semantic": "S-DOM-07",
+      "title": "XPath 含 contains() + 子路径（卡拉漫画 ruleExplore.bookList）",
+      "kind": "evalOne",
+      "rule": "//ul[contains(@class,'vodlist')]/li",
+      "expect": {
+        "count": 2,
+        "texts": [
+          "漫画一",
+          "漫画二"
+        ]
+      },
+      "base": {
+        "type": "html",
+        "value": "<html><body><ul class=\"vodlist\"><li>漫画一</li><li>漫画二</li></ul></body></html>"
+      }
+    },
+    {
+      "id": "xpath-04",
+      "semantic": "S-DOM-07",
+      "title": "XPath 通配 + 属性谓词 + 取属性（悦读小说 ruleBookInfo.coverUrl）",
+      "kind": "evalOne",
+      "rule": "//*[@property=\"og:image\"]/@content",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "/cover.jpg"
+        ]
+      },
+      "base": {
+        "type": "html",
+        "value": "<html><head><meta property=\"og:image\" content=\"/cover.jpg\"></head><body></body></html>"
+      }
+    },
+    {
+      "id": "xpath-05",
+      "semantic": "S-DOM-07",
+      "title": "XPath 多级路径 + 数字索引（1-based）（爱丽丝书屋 ruleBookInfo.author）",
+      "kind": "evalOne",
+      "rule": "//div[@class='box_info']/table/tbody/tr[1]/td/div/p[1]/a[1]/text()",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "作者名"
+        ]
+      },
+      "base": {
+        "type": "html",
+        "value": "<html><body><div class=\"box_info\"><table><tbody><tr><td><div><p><a>作者名</a><a>另一个</a></p></div></td></tr></tbody></table></div></body></html>"
+      }
+    },
+    {
+      "id": "xpath-06",
+      "semantic": "S-DOM-07",
+      "title": "XPath class 属性【完全相等】⇒ HTML 的 class 值本来就是空格分隔的整串 ⇒ 匹配得上（两边一致）",
+      "kind": "evalOne",
+      "rule": "//p[@class='mb-1 text-muted']/a/text()",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "作者A"
+        ]
+      },
+      "base": {
+        "type": "html",
+        "value": "<html><body><p class=\"mb-1 text-muted\"><a>作者A</a></p></body></html>"
       }
     }
   ]

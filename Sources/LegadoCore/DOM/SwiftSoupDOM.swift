@@ -49,6 +49,17 @@ public final class SwiftSoupNode: DOMNode {
         return els.map { SwiftSoupNode($0) as DOMNode }
     }
 
+    /// 直接子元素
+    public func children() -> [DOMNode] {
+        let els = element.children()
+        return els.map { SwiftSoupNode($0) as DOMNode }
+    }
+
+    /// 直接子文本节点（XPath `text()` 语义）
+    public func directText() -> String {
+        element.textNodes().map { $0.text() }.joined()
+    }
+
     /// ⭐ SwiftSoup 没有 `Element.is(_:)` ⇒ 用 `select`（**含自身**）+ 身份比较
     public func matchesCSS(_ css: String) -> Bool {
         guard let found = try? element.select(css) else { return false }
