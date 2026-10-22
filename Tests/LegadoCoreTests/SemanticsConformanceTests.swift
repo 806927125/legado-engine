@@ -132,6 +132,67 @@ final class SemanticsConformanceTests: XCTestCase {
         XCTAssertEqual(excl, [0, 1], "`!0:1` = 排除第 0、1 个")
     }
 
+    // MARK: - 诊断（§S-DIA-07）——「真错误」vs「规则没命中」必须能区分
+
+    /// ⭐ **这是整个项目最要紧的一条**：静默失效是轻阅最贵的病根。
+    /// 「规则没命中」是正常结果；「响应类型不对 / 后端没接 / 语法不支持」是真错误。
+    /// ⇒ 宿主 UI 必须能显示不同的提示。
+    func testDiagnosisDistinguishesHardFailureFromNoMatch() throws {
+        let ev = Evaluator()
+
+        // ① 响应是 HTML，规则却是 JSONPath ⇒ **基准类型不符**（真错误）
+        let htmlDoc = try SwiftSoupDocument(html: "<html><body><h1>标题</h1></body></html>",
+                                           baseURL: "https://x/")
+        let htmlBase = RuleBase.page("<html><body><h1>标题</h1></body></html>")
+        var ctx = EvalContext(base: htmlBase, baseUrl: "https://x/")
+        ctx.document = htmlDoc.document
+        let e1 = ev.evalOne("$.title", base: htmlBase, ctx: ctx)
+        XCTAssertTrue(e1.isHardFailure, "HTML 基准走 JSONPath 必须是真错误")
+        XCTAssertEqual(e1.conclusion, .unsupported)
+
+        // ② XPath 尚未实现 ⇒ 真错误（不支持）
+        let e2 = ev.evalOne("@XPath://div", base: htmlBase, ctx: ctx)
+        XCTAssertTrue(e2.isHardFailure)
+        XCTAssertEqual(e2.conclusion, .unsupported)
+
+        // ③ 选择器没匹配上 ⇒ **不是**真错误
+        let e3 = ev.evalOne("div.nope", base: htmlBase, ctx: ctx)
+        XCTAssertFalse(e3.isHardFailure, "没命中是正常结果，不是真错误")
+        XCTAssertEqual(e3.conclusion, .ruleNotMatched)
+
+        // ④ JS 后端未接 ⇒ 真错误
+        let e4 = ev.evalOne("@js:result.a", base: .json(.object(["a": .int(1)])), ctx: ctx)
+        XCTAssertTrue(e4.isHardFailure)
+        XCTAssertEqual(e4.conclusion, .unsupported)
+
+        // ⑤ 正则语法错 ⇒ 真错误
+        let e5 = ev.evalOne("##([unclosed##", base: .page("abc"), ctx: ctx)
+        XCTAssertTrue(e5.isHardFailure)
+    }
+
+    /// ⭐ 诊断**永远在**（不是可选附件）⇒ 不可能「静默」
+    func testDiagnosticIsAlwaysPresent() throws {
+        let ev = Evaluator()
+        let base = RuleBase.page("<html><body><p>x</p></body></html>")
+        let ctx = EvalContext(base: base, baseUrl: "https://x/")
+        let e = ev.evalOne("div.nope", base: base, ctx: ctx)
+        XCTAssertNotNil(e.diagnostic.failure, "失败必须带原因")
+        XCTAssertFalse(e.diagnostic.summary.isEmpty, "诊断必须能说清发生了什么")
+    }
+
+    /// 成功的求值 ⇒ 诊断里**没有** failure
+    func testSuccessfulEvaluationHasNoFailure() throws {
+        let ev = Evaluator()
+        let doc = try SwiftSoupDocument(html: "<html><body><h1>标题</h1></body></html>",
+                                       baseURL: "https://x/")
+        var ctx = EvalContext(base: .page("<html><body><h1>标题</h1></body></html>"), baseUrl: "https://x/")
+        ctx.document = doc.document
+        let e = ev.evalOne("tag.h1@text", base: ctx.base, ctx: ctx)
+        XCTAssertNil(e.diagnostic.failure, "成功不该有 failure")
+        XCTAssertEqual(e.value.text, "标题")
+        XCTAssertEqual(e.conclusion, .ok)
+    }
+
     // MARK: - fixture
 
     private func loadFixture() throws -> [String: Any] {

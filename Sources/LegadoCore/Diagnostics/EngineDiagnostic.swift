@@ -15,9 +15,9 @@ public struct EngineDiagnostic: Sendable {
     /// 规则原文
     public let rule: String
     /// 解析出的模式
-    public let mode: String?
+    public var mode: String?
     /// 走了哪个分支（页面级 / 条目级 / JSONPath / 选择器 / JS …）
-    public let branch: String?
+    public var branch: String?
     /// 每一步的中间值（出问题时**不用猜**）
     public var steps: [Step] = []
     /// 失败原因 —— **必须有**，不许静默返回空
@@ -41,12 +41,30 @@ public struct EngineDiagnostic: Sendable {
         case noMatch(reason: String)
         /// 宿主对象没传（book/source 缺失）
         case missingHostObject(String)
+        /// 基准类型不对（例：响应是 HTML，规则却是 JSONPath）
+        case baseTypeMismatch(expected: String, actual: String)
         /// JS 执行失败
         case jsError(String)
         /// 网络失败
         case network(String)
         /// 其它
         case other(String)
+
+        /// ⭐ **「这是不是真错误」** —— 真错误 ⇒ 宿主该报错；没匹配 ⇒ 正常结果。
+        ///
+        /// ⚠️ 区分这两个是**诊断的核心价值**：
+        /// 「规则没命中」和「规则写错了/后端没接」在界面上必须显示不同的提示。
+        public var isHardFailure: Bool {
+            switch self {
+            case .noMatch:           return false
+            case .unsupportedSyntax: return true
+            case .missingHostObject: return true
+            case .baseTypeMismatch:  return true
+            case .jsError:           return true
+            case .network:           return true
+            case .other:             return true
+            }
+        }
     }
 
     public init(rule: String, mode: String? = nil, branch: String? = nil) {
@@ -79,8 +97,46 @@ public enum DiagnosisConclusion: String, Sendable {
     case placeholderOnly = "placeholder-only"
     /// 宿主侧没传必需对象
     case hostMissing = "host-missing"
-    /// 规则不支持
+    /// 规则不支持 / 后端没接
     case unsupported = "unsupported"
     /// 一切正常
     case ok = "ok"
+
+    /// 从诊断推出结论
+    public static func from(_ d: EngineDiagnostic) -> DiagnosisConclusion {
+        guard let f = d.failure else { return .ok }
+        switch f {
+        case .noMatch:                      return .ruleNotMatched
+        case .missingHostObject:            return .hostMissing
+        case .unsupportedSyntax, .jsError:  return .unsupported
+        case .baseTypeMismatch:             return .unsupported
+        case .network:                      return .serverEmpty
+        case .other:                        return .ruleNotMatched
+        }
+    }
+}
+
+/// ⭐ **求值结果** —— 值 + 诊断（诊断**永远在**，不是可选附件）。
+///
+/// 设计取舍：
+/// - 「规则没命中」**不是错误**（兜底链里第一段没命中是正常的）⇒ 诊断的 failure = `.noMatch`
+/// - 「真错误」（XPath 没实现 / 响应类型不对 / JS 后端缺失）⇒ failure 非 nil 且 `isHardFailure == true`
+/// - ⇒ 调用方**必须**显式看诊断，不能只看值 —— 这是"不许静默失效"的落地方式
+public struct Evaluation: Sendable {
+    /// 求值结果
+    public var value: RuleValue
+    /// 诊断（永远有）
+    public var diagnostic: EngineDiagnostic
+
+    public init(value: RuleValue, diagnostic: EngineDiagnostic) {
+        self.value = value
+        self.diagnostic = diagnostic
+    }
+
+    /// 值是不是「空」
+    public var isEmpty: Bool { value.isEmpty }
+    /// 是不是**真错误**（区别于「没命中」）
+    public var isHardFailure: Bool { diagnostic.failure?.isHardFailure ?? false }
+    /// 结论分级（给 UI）
+    public var conclusion: DiagnosisConclusion { DiagnosisConclusion.from(diagnostic) }
 }

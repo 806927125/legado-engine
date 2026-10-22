@@ -81,6 +81,8 @@ public enum LegadoSelector {
                 // 链尾的属性后缀 ⇒ 取值模式
                 mode = ValueMode.fromAttributeName(name)
                 // ⚠️ 属性后缀是**终点**：不再往下走链
+                //    （不 break 的话 mode 会被后面的 attr 步覆盖 ⇒ 语义错）
+                break
             }
         }
 

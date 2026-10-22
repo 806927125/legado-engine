@@ -158,6 +158,10 @@ function jsonAny(v) {
     const ctxSpec = c.ctx || {};
 
     // ⭐ **requires 门槛**：需要 JS 后端的用例 ⇒ 两边都跳过（Swift 侧 Phase 3 才接 JSC）
+    if (c.requires === 'swift-only') {
+      emit(c.id, kind, 'SKIPPED', 'SKIPPED');
+      continue;
+    }
     if (c.requires === 'js') {
       emit(c.id, kind, 'SKIPPED', 'SKIPPED');
       continue;

@@ -1474,6 +1474,88 @@
           "第一章 风起"
         ]
       }
+    },
+    {
+      "id": "diag-01",
+      "semantic": "S-DIA-07",
+      "title": "响应是 HTML，规则却是 JSONPath ⇒ 真错误（基准类型不符），不是「没命中」",
+      "kind": "diagnose",
+      "requires": "swift-only",
+      "base": {
+        "type": "html",
+        "value": "<html><body><h1>标题</h1></body></html>"
+      },
+      "rule": "$.title",
+      "expect": {
+        "conclusion": "unsupported",
+        "hard": "1"
+      }
+    },
+    {
+      "id": "diag-02",
+      "semantic": "S-DIA-07",
+      "title": "XPath 尚未实现 ⇒ 真错误（不支持），不是「没命中」",
+      "kind": "diagnose",
+      "requires": "swift-only",
+      "base": {
+        "type": "html",
+        "value": "<html><body><div>x</div></body></html>"
+      },
+      "rule": "@XPath://div",
+      "expect": {
+        "conclusion": "unsupported",
+        "hard": "1"
+      }
+    },
+    {
+      "id": "diag-03",
+      "semantic": "S-DIA-07",
+      "title": "选择器没匹配上 ⇒ 「规则没命中」（不是真错误）",
+      "kind": "diagnose",
+      "requires": "swift-only",
+      "base": {
+        "type": "html",
+        "value": "<html><body><p class='x'>A</p></body></html>"
+      },
+      "rule": "div.nope",
+      "expect": {
+        "conclusion": "rule-not-matched",
+        "hard": "0"
+      }
+    },
+    {
+      "id": "diag-04",
+      "semantic": "S-DIA-07",
+      "title": "JS 后端未接 ⇒ 真错误（不支持）",
+      "kind": "diagnose",
+      "requires": "swift-only",
+      "base": {
+        "type": "json",
+        "value": {
+          "a": 1
+        }
+      },
+      "rule": "@js:result.a",
+      "expect": {
+        "conclusion": "unsupported",
+        "hard": "1"
+      }
+    },
+    {
+      "id": "diag-05",
+      "semantic": "S-DIA-07",
+      "title": "正则语法错 ⇒ 真错误（规则写错了）",
+      "kind": "diagnose",
+      "requires": "swift-only",
+      "base": {
+        "type": "text",
+        "value": "abc"
+      },
+      "rule": "##([unclosed##",
+      "expect": {
+        "conclusion": "unsupported",
+        "hard": "1"
+      }
     }
   ]
 }

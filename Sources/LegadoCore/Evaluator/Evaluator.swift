@@ -40,30 +40,35 @@ public struct JSContext {
     }
 }
 
-/// **求值器** —— 规则 + 基准 + 上下文 ⇒ 值。
+/// **求值器** —— 规则 + 基准 + 上下文 ⇒ **值 + 诊断**。
 ///
-/// 规格：`docs/legado-semantics.md`。
+/// 规格：`docs/legado-semantics.md` §S-EVAL / §S-DIA。
 ///
 /// ⭐ **全同步**（引擎内部全同步，见 docs/architecture.md）⇒ 不需要两遍跑。
+///
+/// ⭐ **「不许静默失败」是本文件的硬约束**：
+/// 每一条返回空的路径**都必须**在诊断里写明原因；
+/// 「真错误」（XPath 没实现 / 响应类型不对 / JS 后端缺失）还要能跟「规则没命中」区分开。
 public struct Evaluator {
 
-    /// JS 后端（Phase 3 接 JSC；本轮为 nil ⇒ JS 规则返回 .void + 诊断）
+    /// JS 后端（Phase 3 接 JSC；本轮为 nil ⇒ JS 规则报「后端未接」而不是静默空）
     public var js: JSExecutor?
 
     public init(js: JSExecutor? = nil) { self.js = js }
 
     // MARK: - 入口
 
-    /// **单条规则**求值（不含 `||` / `&&` / `,` 兜底链的拆分——但 AST 里已经拆了）
+    /// **单条规则**求值
     ///
     /// 流程（照轻阅 `evalOne` 的顺序）：
     /// ① `@put:` / `@get:` 内嵌处理（会改 `vars`）
     /// ② **模板插值**（⚠️ **JS 模式不插值**，§S-TPL-04）
     /// ③ 解析成 AST
     /// ④ 按 AST 求值
-    public func evalOne(_ rule: String, base: RuleBase, ctx ctxIn: EvalContext) -> RuleValue {
+    public func evalOne(_ rule: String, base: RuleBase, ctx ctxIn: EvalContext) -> Evaluation {
         var ctx = ctxIn
         var r = rule
+        var diag = EngineDiagnostic(rule: rule)
 
         // ① @put / @get
         r = VarStore.apply(r, ctx: &ctx)
@@ -71,6 +76,7 @@ public struct Evaluator {
         // ② 插值 —— ⚠️ JS 模式**不插值**（build202 定的）
         let rawRule = r
         let mode = RuleClassifier.classify(r, isJSON: ctx.isJSON)
+        diag.mode = mode.rawValue
         if mode != .js {
             r = TemplateEngine.render(r, ctx: ctx)
         }
@@ -79,7 +85,13 @@ public struct Evaluator {
         //     规格 §S-TPL-02。轻阅口径：判「原规则」而不是插值后的规则。
         if r != rawRule, RuleParser.isWholeTemplate(rawRule) {
             let whole = r.trimmingCharacters(in: .whitespaces)
-            return whole.isEmpty ? .void : .string(whole)
+            if whole.isEmpty {
+                diag.failure = .noMatch(reason: "模板插值后为空")
+                diag.scope = "整条 {{}} 模板"
+                return Evaluation(value: .void, diagnostic: diag)
+            }
+            diag.branch = "整条 {{}} 模板"
+            return Evaluation(value: .string(whole), diagnostic: diag)
         }
 
         // ②'' ⭐ **规则本身就是一个字面 URL ⇒ 原样返回**
@@ -88,31 +100,37 @@ public struct Evaluator {
         let literal = r.trimmingCharacters(in: .whitespaces)
         if literal.hasPrefix("http://") || literal.hasPrefix("https://"),
            !literal.contains(where: { $0.isWhitespace }) {
-            return .string(literal)
+            diag.branch = "字面 URL"
+            return Evaluation(value: .string(literal), diagnostic: diag)
         }
 
         // ③ 解析
         let ast = RuleParser().parse(r, isJSON: ctx.isJSON)
 
         // ④ 求值
-        return evaluate(ast, base: base, ctx: ctx)
+        let value = evaluate(ast, base: base, ctx: ctx, diag: &diag)
+        if diag.failure == nil, value.isEmpty {
+            diag.failure = .noMatch(reason: "规则求值为空")
+        }
+        return Evaluation(value: value, diagnostic: diag)
     }
 
     /// **列表求值**（含 `||` / `&&` / `,` 兜底链）
-    ///
-    /// 轻阅的 `getElements` 返回 `[{values:[...], rule:'...'}]`；
-    /// 本实现直接返回**拍平的 `[RuleValue]`**。
-    public func getElements(_ rule: String, base: RuleBase, ctx: EvalContext) -> [RuleValue] {
-        let v = evalOne(rule, base: base, ctx: ctx)
-        if v == .void { return [] }
-        return v.items
+    public func getElements(_ rule: String, base: RuleBase, ctx: EvalContext) -> Evaluation {
+        let e = evalOne(rule, base: base, ctx: ctx)
+        if e.value.isEmpty {
+            return Evaluation(value: .void, diagnostic: e.diagnostic)
+        }
+        return Evaluation(value: .list(e.value.items), diagnostic: e.diagnostic)
     }
 
     // MARK: - AST 求值
 
-    public func evaluate(_ node: RuleNode, base: RuleBase, ctx: EvalContext) -> RuleValue {
+    public func evaluate(_ node: RuleNode, base: RuleBase, ctx: EvalContext,
+                          diag: inout EngineDiagnostic) -> RuleValue {
         switch node {
         case .empty:
+            diag.failure = .noMatch(reason: "空规则")
             return .void
 
         case .literal(let s):
@@ -124,85 +142,136 @@ public struct Evaluator {
         // ① `||` 择一 —— 第一个非空胜出（§S-FBK-01）
         case .fallback(let xs):
             for x in xs {
-                let v = evaluate(x, base: base, ctx: ctx)
-                if !v.isEmpty { return v }
+                var sub = diag
+                let v = evaluate(x, base: base, ctx: ctx, diag: &sub)
+                if !v.isEmpty { diag = sub; return v }
             }
+            diag.failure = .noMatch(reason: "|| 兜底链全部未命中")
+            diag.branch = "|| 兜底链"
             return .void
 
         // ② `&&` 串接 —— 依次求值并拼接（§S-FBK-02）
         case .concat(let xs):
-            let parts = xs.map { evaluate($0, base: base, ctx: ctx).text }
+            let parts = xs.map { evaluate($0, base: base, ctx: ctx, diag: &diag).text }
             let joined = parts.joined()
-            return joined.isEmpty ? .void : .string(joined)
+            if joined.isEmpty {
+                diag.failure = .noMatch(reason: "&& 串接结果为空")
+                diag.branch = "&& 串接"
+                return .void
+            }
+            diag.branch = "&& 串接"
+            return .string(joined)
 
         // ③ 逗号分隔 —— 第一个非空胜出（§S-FBK-03）
         case .alternatives(let xs):
             for x in xs {
-                let v = evaluate(x, base: base, ctx: ctx)
-                if !v.isEmpty { return v }
+                var sub = diag
+                let v = evaluate(x, base: base, ctx: ctx, diag: &sub)
+                if !v.isEmpty { diag = sub; return v }
             }
+            diag.failure = .noMatch(reason: "逗号多规则全部未命中")
+            diag.branch = "逗号多规则"
             return .void
 
         // ④ `@@` 二次解析
         case .reparse(let inner):
-            return evaluate(inner, base: base, ctx: ctx)
+            return evaluate(inner, base: base, ctx: ctx, diag: &diag)
 
         // ⑤ 尾部后处理
         case .post(let inner, let post):
-            let v = evaluate(inner, base: base, ctx: ctx)
-            return applyPost(v, post, base: base, ctx: ctx)
+            let v = evaluate(inner, base: base, ctx: ctx, diag: &diag)
+            return applyPost(v, post, base: base, ctx: ctx, diag: &diag)
 
         // ⑥ 正则（对基准的文本）
         case .regex(let pattern, let replacements):
             let text = baseText(base)
-            return applyRegex(text, pattern: pattern, replacements: replacements, baseURL: ctx.baseUrl)
+            return applyRegex(text, pattern: pattern, replacements: replacements,
+                              baseURL: ctx.baseUrl, diag: &diag)
 
         // ⑦ JSONPath
         case .jsonPath(let path):
-            guard let j = baseJSON(base) else { return .void }
-            guard let hits = JSONPath.select(j, path) else { return .void }
-            if hits.isEmpty { return .void }
+            // ⚠️ **基准类型不对 ⇒ 真错误**（例：响应是 HTML，规则却是 JSONPath）
+            //    以前这里是静默 .void ⇒ 宿主以为「没命中」，实际是「响应类型不对」⭐
+            guard let j = baseJSON(base, ctx: ctx) else {
+                diag.failure = .baseTypeMismatch(expected: "JSON", actual: baseTypeName(base))
+                diag.branch = "JSONPath"
+                return .void
+            }
+            guard let hits = JSONPath.select(j, path) else {
+                diag.failure = .unsupportedSyntax("JSONPath 语法不支持：\(path)")
+                diag.branch = "JSONPath"
+                return .void
+            }
+            if hits.isEmpty {
+                diag.failure = .noMatch(reason: "JSONPath 未命中：\(path)")
+                diag.branch = "JSONPath"
+                return .void
+            }
+            diag.branch = "JSONPath"
             if hits.count == 1 { return .json(hits[0]) }
             return .list(hits.map { RuleValue.json($0) })
 
-        // ⑧ XPath —— Phase 2b 后半（子集未做 ⇒ 明确失败，不静默空）
-        case .xpath:
+        // ⑧ XPath —— ⬜ **未实现**（Phase 2b 之后）⇒ 明确报「不支持」，不是静默空
+        case .xpath(let expr):
+            diag.failure = .unsupportedSyntax("XPath 尚未实现：\(expr)")
+            diag.branch = "XPath"
             return .void
 
         // ⑨ CSS / 默认规则链
         case .css(let sel):
-            return selectDOM(sel, base: base, ctx: ctx)
+            return selectDOM(sel, base: base, ctx: ctx, diag: &diag)
 
         case .chain(let head, let headIndex, let steps):
-            return selectDOMChain(head: head, headIndex: headIndex, steps: steps, base: base, ctx: ctx)
+            return selectDOMChain(head: head, headIndex: headIndex, steps: steps,
+                                  base: base, ctx: ctx, diag: &diag)
 
         // ⑩ JS
         case .js(let code):
-            return runJS(code, base: base, ctx: ctx)
+            return runJS(code, base: base, ctx: ctx, diag: &diag)
 
         case .jsWithTail(let code, let tail):
-            let v = runJS(code, base: base, ctx: ctx)
+            let v = runJS(code, base: base, ctx: ctx, diag: &diag)
             guard let tail, !tail.isEmpty else { return v }
-            return applyTail(v, tail, base: base, ctx: ctx)
+            return applyTail(v, tail, base: base, ctx: ctx, diag: &diag)
         }
     }
 
     // MARK: - DOM
 
     /// CSS 选择器（`@css:` 显式形态）
-    private func selectDOM(_ sel: String, base: RuleBase, ctx: EvalContext) -> RuleValue {
-        guard let node = baseNode(base, ctx: ctx) else { return .void }
+    private func selectDOM(_ sel: String, base: RuleBase, ctx: EvalContext,
+                           diag: inout EngineDiagnostic) -> RuleValue {
+        guard let node = baseNode(base, ctx: ctx) else {
+            diag.failure = .baseTypeMismatch(expected: "DOM", actual: baseTypeName(base))
+            diag.branch = "CSS"
+            return .void
+        }
         let found = node.queryAll(sel)
-        guard !found.isEmpty else { return .void }
+        guard !found.isEmpty else {
+            diag.failure = .noMatch(reason: "CSS 未命中：\(sel)")
+            diag.branch = "CSS"
+            return .void
+        }
+        diag.branch = "CSS"
         return .list(found.map { RuleValue.node(DOMNodeRef($0)) })
     }
 
     /// 默认规则语法链
     private func selectDOMChain(head: String, headIndex: Int?, steps: [ChainStep],
-                                base: RuleBase, ctx: EvalContext) -> RuleValue {
-        guard let node = baseNode(base, ctx: ctx) else { return .void }
+                                base: RuleBase, ctx: EvalContext,
+                                diag: inout EngineDiagnostic) -> RuleValue {
+        guard let node = baseNode(base, ctx: ctx) else {
+            diag.failure = .baseTypeMismatch(expected: "DOM", actual: baseTypeName(base))
+            diag.branch = "默认规则链"
+            return .void
+        }
         let resolved = LegadoSelector.resolve(root: node, head: head, headIndex: headIndex, steps: steps)
-        guard !resolved.nodes.isEmpty else { return .void }
+        guard !resolved.nodes.isEmpty else {
+            diag.failure = .noMatch(reason: "默认规则链未命中：\(head)")
+            diag.branch = "默认规则链"
+            return .void
+        }
+        diag.branch = "默认规则链"
         // 取值模式：属性后缀 ⇒ 取值；没有 ⇒ 完整文本
         let values = resolved.nodes.map { n -> RuleValue in
             if let mode = resolved.mode {
@@ -215,16 +284,18 @@ public struct Evaluator {
 
     // MARK: - 后处理
 
-    private func applyPost(_ value: RuleValue, _ post: RuleNode.PostProcess, base: RuleBase, ctx: EvalContext) -> RuleValue {
+    private func applyPost(_ value: RuleValue, _ post: RuleNode.PostProcess, base: RuleBase,
+                           ctx: EvalContext, diag: inout EngineDiagnostic) -> RuleValue {
         switch post {
         case .regex(let spec):
             let (pattern, replacements) = parseRegexSpec(spec)
-            return applyRegex(value.text, pattern: pattern, replacements: replacements, baseURL: ctx.baseUrl)
+            return applyRegex(value.text, pattern: pattern, replacements: replacements,
+                              baseURL: ctx.baseUrl, diag: &diag)
         case .js(let code):
             // 尾部 `@js:`：以主体结果为 `result`
             var sub = ctx
             sub.base = .page(value.text)
-            return runJS(code, base: .page(value.text), ctx: sub)
+            return runJS(code, base: .page(value.text), ctx: sub, diag: &diag)
         }
     }
 
@@ -241,14 +312,22 @@ public struct Evaluator {
         return (ops.first ?? "", ops.count > 1 ? Array(ops.dropFirst()) : [])
     }
 
-    private func applyRegex(_ text: String, pattern: String, replacements: [String], baseURL: String) -> RuleValue {
-        guard !pattern.isEmpty else { return .void }
-        guard let re = try? NSRegularExpression(pattern: pattern) else { return .void }
+    private func applyRegex(_ text: String, pattern: String, replacements: [String],
+                            baseURL: String, diag: inout EngineDiagnostic) -> RuleValue {
+        guard !pattern.isEmpty else {
+            diag.failure = .unsupportedSyntax("正则规则为空")
+            return .void
+        }
+        guard let re = try? NSRegularExpression(pattern: pattern) else {
+            // ⚠️ 正则语法错 = **真错误**（规则写错了，不是「没匹配」）
+            diag.failure = .unsupportedSyntax("正则语法错误：\(pattern)")
+            return .void
+        }
         let ns = text as NSString
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         var out: [String] = []
         for m in re.matches(in: text, options: [], range: range) {
-            // ⚠️ 零宽匹配要跳过并推进，否则会死循环
+            // ⚠️ 零宽匹配要跳过（否则死循环）
             if m.range.length == 0 { continue }
             let matched = ns.substring(with: m.range)
             if replacements.isEmpty {
@@ -265,7 +344,10 @@ public struct Evaluator {
             }
             if out.count > 20000 { break }
         }
-        guard !out.isEmpty else { return .void }
+        guard !out.isEmpty else {
+            diag.failure = .noMatch(reason: "正则未命中：\(pattern)")
+            return .void
+        }
         return .list(out.map { RuleValue.string($0) })
     }
 
@@ -302,7 +384,8 @@ public struct Evaluator {
     }
 
     /// 复合规则的尾部选择器（`<js>代码</js>$.data`）
-    private func applyTail(_ value: RuleValue, _ tail: String, base: RuleBase, ctx: EvalContext) -> RuleValue {
+    private func applyTail(_ value: RuleValue, _ tail: String, base: RuleBase, ctx: EvalContext,
+                           diag: inout EngineDiagnostic) -> RuleValue {
         let sel = tail.trimmingCharacters(in: .whitespaces)
         guard !sel.isEmpty else { return value }
         // JSONPath 尾部（最常见）
@@ -311,9 +394,18 @@ public struct Evaluator {
             switch value {
             case .json(let j): json = j
             case .string(let s): json = JSONValue.from(s)
-            default: return value
+            default:
+                diag.failure = .baseTypeMismatch(expected: "JSON", actual: "字符串")
+                return .void
             }
-            guard let hits = JSONPath.select(json, sel), !hits.isEmpty else { return .void }
+            guard let hits = JSONPath.select(json, sel) else {
+                diag.failure = .unsupportedSyntax("JSONPath 语法不支持：\(sel)")
+                return .void
+            }
+            guard !hits.isEmpty else {
+                diag.failure = .noMatch(reason: "复合规则尾部未命中：\(sel)")
+                return .void
+            }
             // ⚠️ 命中数组 ⇒ **摊平一层**（§S-JSON-01）
             if hits.count == 1, case .array(let a) = hits[0] {
                 return .list(a.map { RuleValue.json($0) })
@@ -322,22 +414,44 @@ public struct Evaluator {
             return .list(hits.map { RuleValue.json($0) })
         }
         // CSS 尾部：把结果当 HTML 解析再选
-        guard case .string(let html) = value else { return value }
-        guard let doc = try? SwiftSoupDocument(html: html, baseURL: ctx.baseUrl) else { return .void }
+        guard case .string(let html) = value else {
+            diag.failure = .baseTypeMismatch(expected: "HTML 字符串", actual: "其它")
+            return .void
+        }
+        guard let doc = try? SwiftSoupDocument(html: html, baseURL: ctx.baseUrl) else {
+            diag.failure = .other("复合规则尾部：HTML 解析失败")
+            return .void
+        }
         let nodes = doc.document.queryAll(sel)
-        guard !nodes.isEmpty else { return .void }
+        guard !nodes.isEmpty else {
+            diag.failure = .noMatch(reason: "复合规则尾部未命中：\(sel)")
+            return .void
+        }
         return .list(nodes.map { RuleValue.node(DOMNodeRef($0)) })
     }
 
     // MARK: - JS
 
-    private func runJS(_ code: String, base: RuleBase, ctx: EvalContext) -> RuleValue {
-        guard let js else { return .void }
+    private func runJS(_ code: String, base: RuleBase, ctx: EvalContext,
+                       diag: inout EngineDiagnostic) -> RuleValue {
+        guard let js else {
+            // ⚠️ **JS 后端没接** = 真错误（不是「没命中」）
+            diag.failure = .unsupportedSyntax("JS 后端未接（Phase 3）")
+            diag.branch = "JS"
+            return .void
+        }
         let jctx = JSContext(base: base, baseUrl: ctx.baseUrl, raw: ctx.raw,
                              book: ctx.book, source: ctx.source, chapter: ctx.chapter,
                              vars: ctx.vars, key: ctx.key, page: ctx.page, document: ctx.document)
-        guard let out = try? js.run(code, context: jctx) else { return .void }
-        return RuleValue.json(out)
+        do {
+            let out = try js.run(code, context: jctx)
+            diag.branch = "JS"
+            return RuleValue.json(out)
+        } catch {
+            diag.failure = .jsError(String(describing: error))
+            diag.branch = "JS"
+            return .void
+        }
     }
 
     // MARK: - 基准取用
@@ -358,11 +472,26 @@ public struct Evaluator {
         }
     }
 
-    private func baseJSON(_ base: RuleBase) -> JSONValue? {
+    private func baseJSON(_ base: RuleBase, ctx: EvalContext) -> JSONValue? {
         switch base {
         case .json(let j):        return j
-        case .page(let raw):      return JSONValue.from(raw)
+        case .page(let raw):
+            // ⭐ 只有响应**确实是 JSON**（ctx.isJSON）时才当 JSON 基准
+            //    否则 ⇒ 返回 nil ⇒ 触发「基准类型不符」的真错误诊断
+            //    （以前这里直接 JSONValue.from(HTML) ⇒ 静默「没命中」⭐）
+            guard ctx.isJSON else { return nil }
+            return JSONValue.from(raw)
         case .element, .node:     return nil
+        }
+    }
+
+    /// 基准的类型名（诊断用）
+    private func baseTypeName(_ base: RuleBase) -> String {
+        switch base {
+        case .page:      return "HTML/文本"
+        case .element:   return "DOM 元素"
+        case .node:      return "DOM 节点"
+        case .json:      return "JSON"
         }
     }
 }
@@ -377,9 +506,9 @@ extension RuleValue {
         case .json(let j):
             // ⚠️ JSON 的**空字符串**也要算空（`||` 兜底链的判空依据）
             switch j {
-            case .null:      return true
+            case .null:          return true
             case .string(let s): return s.isEmpty
-            default:         return false
+            default:             return false
             }
         case .node:              return false
         }

@@ -6,9 +6,9 @@
 
 | 指标 | 值 |
 |---|---|
-| 用例总数 | 99 |
+| 用例总数 | 104 |
 | 两边一致 | **81** |
-| 存在差异 | **18** |
+| 存在差异 | **23** |
 
 ## 差异明细
 
@@ -23,6 +23,11 @@
 | `chain-20` | `sub,attr` | `sub,attr` | `attr,attr` | **轻阅的 bug**（自研已按规格修对） |
 | `chain-22` | `sub,attr` | `sub,attr` | `attr,attr` | **轻阅的 bug**（自研已按规格修对） |
 | `chain-30` | `sub,sub,attr` | `sub,sub,attr` | `attr,attr,attr` | **轻阅的 bug**（自研已按规格修对） |
+| `diag-01` | `{"conclusion":"unsupported","hard":"1"}` | `{"conclusion":"unsupported","hard":"1"}` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `diag-02` | `{"conclusion":"unsupported","hard":"1"}` | `{"conclusion":"unsupported","hard":"1"}` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `diag-03` | `{"conclusion":"rule-not-matched","hard":"0"}` | `{"conclusion":"rule-not-matched","hard":"0"}` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `diag-04` | `{"conclusion":"unsupported","hard":"1"}` | `{"conclusion":"unsupported","hard":"1"}` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `diag-05` | `{"conclusion":"unsupported","hard":"1"}` | `{"conclusion":"unsupported","hard":"1"}` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
 | `dom-01` | `{"count":2,"texts":["第一章 风起","第二章 云涌"]}` | `{"count":2,"texts":["第一章 风起","第二章 云涌"]}` | `{"count":1,"texts":["第一章 风起第二章 云涌"]}` | **轻阅的 bug**（自研已按规格修对） |
 | `dom-05` | `{"count":1,"texts":["第二章 云涌"]}` | `{"count":1,"texts":["第二章 云涌"]}` | `{"count":1,"texts":["第一章 风起第二章 云涌"]}` | **轻阅的 bug**（自研已按规格修对） |
 | `dom-06` | `{"count":0,"texts":[]}` | `{"count":0,"texts":[]}` | `{"count":1,"texts":["第一章 风起第二章 云涌"]}` | **轻阅的 bug**（自研已按规格修对） |

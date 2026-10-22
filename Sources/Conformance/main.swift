@@ -82,6 +82,23 @@ for c in cases {
         let node = parser.parse(rule, isJSON: isJSON)
         emit(id, kind, expect["ast"] as? String ?? "", describe(node))
 
+    case "diagnose":
+        // 诊断对拍：规则 + 基准 ⇒ 结论分级 + 是不是真错误
+        let rule = c["rule"] as? String ?? ""
+        let base = buildRuleBase(c["base"], ctxSpec: c["ctx"] as? [String: Any] ?? [:])
+        let ctx = buildEvalContext(c["ctx"] as? [String: Any] ?? [:], base: base)
+        let ev = Evaluator()
+        let e = ev.evalOne(rule, base: base, ctx: ctx)
+        let expObj: [String: Any] = [
+            "conclusion": expect["conclusion"] ?? "",
+            "hard": expect["hard"] ?? false,
+        ]
+        let actObj: [String: Any] = [
+            "conclusion": e.conclusion.rawValue,
+            "hard": e.isHardFailure ? "1" : "0",
+        ]
+        emit(id, kind, jsonString(expObj), jsonString(actObj))
+
     case "evalOne", "getElements":
         // 求值对拍：规则 + 基准 + 上下文 ⇒ 值
         let rule = c["rule"] as? String ?? ""
@@ -93,9 +110,9 @@ for c in cases {
         let ev = Evaluator()
         let items: [RuleValue]
         if kind == "evalOne" {
-            items = ev.evalOne(rule, base: base, ctx: ctx).items
+            items = ev.evalOne(rule, base: base, ctx: ctx).value.items
         } else {
-            items = ev.getElements(rule, base: base, ctx: ctx)
+            items = ev.getElements(rule, base: base, ctx: ctx).value.items
         }
         let texts = items.map { describeValue($0) }
         emit(id, kind, comparePayload(expect: expect, texts: texts), actualPayload(expect: expect, texts: texts))
@@ -290,6 +307,8 @@ func actualPayload(expect: [String: Any], texts: [String]) -> String {
 /// 任意 JSON 值的字符串形式
 func jsonAnyString(_ v: Any) -> String {
     switch v {
+    // ⚠️ **不要在这里加 Bool 分支** —— JSONSerialization 给的是 NSNumber，
+    //    它既能 cast 成 Bool 又能 cast 成 Int ⇒ Bool 分支会抢走 Int 的值（count 变成 true）
     case let n as Int:    return String(n)
     case let b as Bool:   return b ? "true" : "false"
     case let s as String: return quoted(s)
