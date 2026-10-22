@@ -56,6 +56,17 @@ legado-engine/
 
 ---
 
+## CI
+
+每次 push 到 `main` 自动跑：**编译 → `swift test` → 双实现对拍** ⇒ 绿/红一眼可见。
+
+> 第一次跑会拉 Swift 工具链（877MB），之后有缓存。
+> 报告在 Actions 的 **Artifacts → conformance-report**。
+
+⚠️ Actions **只认默认分支上的 workflow** —— 改默认分支前，workflow 也要同步过去。
+
+---
+
 ## ⭐ 核心工作流：规格 → 双实现 → 对拍
 
 ```
