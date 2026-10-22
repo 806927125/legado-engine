@@ -34,7 +34,7 @@ public protocol DOMNode: AnyObject {
 ///
 /// ⚠️ DOM 节点本身**不是线程安全的**，所以这里用 `@unchecked Sendable`。
 /// 引擎是**单线程同步**跑的（见 docs/architecture.md），不构成实际风险。
-public final class DOMNodeRef: @unchecked Sendable {
+public final class DOMNodeRef: @unchecked Sendable, Equatable {
     public let node: DOMNode
     public init(_ node: DOMNode) { self.node = node }
 
@@ -47,6 +47,8 @@ public final class DOMNodeRef: @unchecked Sendable {
     public static func == (lhs: DOMNodeRef, rhs: DOMNodeRef) -> Bool {
         lhs.node.domID == rhs.node.domID
     }
+
+    public func hash(into hasher: inout Hasher) { hasher.combine(node.domID) }
 }
 
 /// DOM 文档 —— 求值的**页面级**基准。

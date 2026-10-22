@@ -15,11 +15,11 @@ public enum RuleBase: Sendable {
     /// **页面级**：当前页的**原始内容**（HTML 源码，不是 `textContent` 纯文本）
     case page(String)
     /// **条目级**：列表里的一项（DOM 节点）
-    case element(DOMRef)
+    case element(DOMNodeRef)
     /// **init 输出级 / JSON 对象级**：一个结构化对象
     case json(JSONValue)
     /// **元素级**：DOM 节点（与 `.element` 区分：后者是列表项）
-    case node(DOMRef)
+    case node(DOMNodeRef)
 
     /// `result` 的值 —— **由基准决定，不由调用方决定**。
     public var resultValue: RuleValue {
@@ -40,7 +40,7 @@ public enum RuleBase: Sendable {
 /// ⚠️ **只传得进来的东西**：`book` / `source` 这些宿主对象**必须真的传进来**。
 /// 轻阅 build161 的教训：站方 `ruleToc.chapterList` 第一句就 `book.getVariable('custom')`
 /// ⇒ 不给 book 就抛 `Cannot read properties of undefined` ⇒ **整条规则静默失效**。
-public struct EvalContext: Sendable {
+public struct EvalContext: @unchecked Sendable {
     /// 当前基准
     public var base: RuleBase
     /// 当前页 URL（**不是**书源首页）—— 站方靠 `baseUrl.indexOf("aaccoo.com")` 判断平台
@@ -61,6 +61,12 @@ public struct EvalContext: Sendable {
     public var key: String
     /// 响应体是不是 JSON —— 会影响模式判定（§S-CLS-08）
     public var isJSON: Bool
+    /// 当前页的 DOM（页面级基准）—— 选择器规则要靠它
+    ///
+    /// ⚠️ 为什么要单独放 ctx 而不是 base：
+    /// `base` 的**文本**是页原文（`.page(raw)`），
+    /// 但**选择器**需要一个已解析的 DOM ⇒ 两者分开，DOM 由宿主注入。
+    public var document: DOMNode?
 
     public init(base: RuleBase,
                 baseUrl: String = "",
@@ -71,7 +77,8 @@ public struct EvalContext: Sendable {
                 vars: [String: String] = [:],
                 page: Int = 1,
                 key: String = "",
-                isJSON: Bool = false) {
+                isJSON: Bool = false,
+                document: DOMNode? = nil) {
         self.base = base
         self.baseUrl = baseUrl
         self.raw = raw
@@ -82,6 +89,7 @@ public struct EvalContext: Sendable {
         self.page = page
         self.key = key
         self.isJSON = isJSON
+        self.document = document
     }
 }
 

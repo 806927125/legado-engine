@@ -1,6 +1,23 @@
 import XCTest
 @testable import LegadoCore
 
+/// 假的 DOM 节点（测试用，不依赖 SwiftSoup）
+final class FakeNode: DOMNode {
+    let domID: String
+    let textContent: String
+    let ownTextContent: String
+    let outerHTML: String
+    let tagName: String
+    init(id: String, text: String) {
+        self.domID = id; self.textContent = text; self.ownTextContent = text
+        self.outerHTML = "<x>\(text)</x>"; self.tagName = "x"
+    }
+    func attribute(_ name: String) -> String? { nil }
+    func queryAll(_ css: String) -> [DOMNode] { [] }
+    func matchesCSS(_ css: String) -> Bool { false }
+    func descendants() -> [DOMNode] { [] }
+}
+
 /// 语义规格的**可执行**版本。
 ///
 /// ⭐ **这份测试的断言对象是「从 fixture 解析出来的规则」，不是复述实现意图。**
@@ -42,7 +59,7 @@ final class SemanticsConformanceTests: XCTestCase {
                   let expect = (c["expect"] as? [String: Any])?["steps"] as? String else { continue }
             let node = parser.parse(rule)
             var steps: [String] = []
-            if case .chain(_, let cs) = node {
+            if case .chain(_, _, let cs) = node {
                 steps = cs.map { s in
                     if case .sub = s { return "sub" } else { return "attr" }
                 }
@@ -88,7 +105,7 @@ final class SemanticsConformanceTests: XCTestCase {
         let obj = JSONValue.object(["book_id": .string("MTgzNTEy")])
         XCTAssertEqual(RuleBase.json(obj).resultValue, .json(obj))
         // 元素级 ⇒ 节点
-        let node = DOMRef(id: "n1", text: "查看目录")
+        let node = DOMNodeRef(FakeNode(id: "n1", text: "查看目录"))
         XCTAssertEqual(RuleBase.element(node).resultValue, .node(node))
     }
 
@@ -110,7 +127,7 @@ final class SemanticsConformanceTests: XCTestCase {
     func testExclusionIsIndexNotCount() {
         // `!0` = 排除**第 0 个**（不是「排除前 0 个」）
         let node = RuleParser().parse("id.list@tag.li!0:1")
-        guard case .chain(_, let steps) = node else { return XCTFail("应是链") }
+        guard case .chain(_, _, let steps) = node else { return XCTFail("应是链") }
         guard case .sub(_, _, let excl) = steps.last! else { return XCTFail("最后一段应是子选择器") }
         XCTAssertEqual(excl, [0, 1], "`!0:1` = 排除第 0、1 个")
     }

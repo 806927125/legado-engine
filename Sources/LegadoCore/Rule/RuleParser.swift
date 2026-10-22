@@ -129,7 +129,8 @@ public struct RuleParser {
         }
 
         let segs = r.components(separatedBy: "@")
-        let head = segs.first ?? ""
+        // ⭐ 头段也可能带索引（`tag.li.0` 整条就是头段）⇒ 拆出来
+        let (head, headIndex) = ChainSegmentClassifier.splitIndex(segs.first ?? "")
         var steps: [ChainStep] = []
 
         for rawSeg in segs.dropFirst() {
@@ -147,7 +148,7 @@ public struct RuleParser {
             if seg.isEmpty { continue }
             steps.append(ChainSegmentClassifier.classify(segment: seg, exclusion: exclusion))
         }
-        return .chain(head: head, steps: steps)
+        return .chain(head: head, headIndex: headIndex, steps: steps)
     }
 
     // MARK: - 工具

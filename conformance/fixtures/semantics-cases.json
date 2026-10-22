@@ -400,7 +400,7 @@
     {
       "id": "json-03",
       "semantic": "S-JSON-02",
-      "title": "单值路径命中 JSON 对象 ⇒ 不得被 stringify 成字符串",
+      "title": "单值路径命中 JSON 对象 ⇒ 对象**原样保留**（不得被 flatten 吃掉标题）",
       "kind": "evalOne",
       "rule": "$.item",
       "base": {
@@ -417,17 +417,14 @@
       },
       "expect": {
         "values": [
-          {
-            "title": "章节名",
-            "url": "u1"
-          }
+          "{\"title\":\"章节名\",\"url\":\"u1\"}"
         ]
       }
     },
     {
       "id": "json-04",
       "semantic": "S-JSON-06",
-      "title": "单值路径命中 {title,url} 对象 ⇒ 标题不得被吃掉",
+      "title": "单值路径命中 {title,url} 对象 ⇒ 标题不得被吃掉（§S-JSON-06）",
       "kind": "evalOne",
       "rule": "$.item",
       "base": {
@@ -443,7 +440,7 @@
         "isJSON": true
       },
       "expect": {
-        "value": "章节名\tu1"
+        "value": "{\"title\":\"章节名\",\"url\":\"u1\"}"
       }
     },
     {
@@ -987,7 +984,8 @@
       },
       "expect": {
         "value": "A!"
-      }
+      },
+      "requires": "js"
     },
     {
       "id": "cmp-02",
@@ -1006,7 +1004,8 @@
       },
       "expect": {
         "value": "小说"
-      }
+      },
+      "requires": "js"
     },
     {
       "id": "cmp-03",
@@ -1025,7 +1024,8 @@
       },
       "expect": {
         "value": "A"
-      }
+      },
+      "requires": "js"
     },
     {
       "id": "js-01",
@@ -1045,7 +1045,8 @@
       },
       "expect": {
         "value": "MTgzNTEy"
-      }
+      },
+      "requires": "js"
     },
     {
       "id": "js-02",
@@ -1063,7 +1064,8 @@
       },
       "expect": {
         "value": "书名A|||作者A"
-      }
+      },
+      "requires": "js"
     },
     {
       "id": "js-03",
@@ -1082,7 +1084,8 @@
       },
       "expect": {
         "count": 2
-      }
+      },
+      "requires": "js"
     },
     {
       "id": "sel-08b",

@@ -48,7 +48,8 @@ public indirect enum RuleNode: Sendable, Equatable {
     /// ⭐ **头段保留原文** —— 因为头段和链段的翻译规则**不一样**：
     /// 头段走 `prefixToCss`（无前缀就原样当纯 CSS），链段走 KW 分类。
     /// 混成一个分类器 ⇒ 纯 CSS 的 `dl.B dd` 会被误判成属性名。
-    case chain(head: String, steps: [ChainStep])
+    /// - Parameter headIndex: **头段**的索引（`tag.li.0` ⇒ 头段 "tag.li" + 索引 0）
+    case chain(head: String, headIndex: Int?, steps: [ChainStep])
     /// 尾部后处理（`##正则##` 或 `@js:` 后缀）作用在主体上
     case post(RuleNode, PostProcess)
 

@@ -13,9 +13,11 @@
 │    产物：RuleNode                                                  │
 │    ✅ 已完成（Phase 1）                                             │
 ├─ ② 求值器 (Evaluator) ─────────── 纯 Swift ──────────────────────┤
-│    RuleNode + EvalContext(base/book/source/vars) → RuleValue      │
+│    ✅ RuleNode + EvalContext(base/book/source/vars) → RuleValue     │
+│    ✅ JSONPath + 模板插值 + @put/@get + 正则净化                    │
+│    ✅ 值系统两种出口统一（字段→String / 列表→[RuleValue]）          │
 │    ⭐ result 语义由「基准」决定，不由调用方决定                    │
-│    ⬜ 未开始                                                        │
+│    ⬜ JS 规则求值（等 Phase 3 接 JSC）                             │
 ├─ ③ DOM 层 ────────────────────── 纯 Swift ──────────────────────┤
 │    ✅ SwiftSoup 后端（HTML5 容错 + Jsoup 兼容选择器）              │
 │    ✅ Legado 方言（class./tag./id./text. 前缀 + 裸标签名）          │

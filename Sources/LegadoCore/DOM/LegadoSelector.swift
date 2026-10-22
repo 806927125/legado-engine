@@ -29,6 +29,7 @@ public enum LegadoSelector {
     ///   - steps: 链段 —— 走 **KW 分类** 语义
     public static func resolve(root: DOMNode,
                                head: String,
+                               headIndex: Int? = nil,
                                steps: [ChainStep]) -> Resolved {
         var nodes: [DOMNode] = []
         var mode: ValueMode?
@@ -36,6 +37,12 @@ public enum LegadoSelector {
         // ① 头段（走 prefixToCss 语义；头部排除也在这里生效）
         let (headSpec, headExclusion) = HeadTranslator.translate(head)
         nodes = query(root: root, spec: headSpec)
+        // ⭐ 头段索引（`tag.li.0`）：选完之后再取第 N 个
+        if let idx = headIndex {
+            nodes = idx < 0
+                ? (idx + nodes.count >= 0 ? [nodes[idx + nodes.count]] : [])
+                : (idx < nodes.count ? [nodes[idx]] : [])
+        }
         if !headExclusion.isEmpty {
             nodes = nodes.enumerated()
                 .filter { !headExclusion.contains($0.offset) }
@@ -85,8 +92,8 @@ public enum LegadoSelector {
     /// - 规则先过 `RuleParser`（拿到 AST）⇒ 只有 `.chain` 走 DOM 通路
     public static func select(root: DOMNode, rule: String) -> [DOMNode] {
         let ast = RuleParser().parse(rule)
-        if case .chain(let head, let steps) = ast {
-            return resolve(root: root, head: head, steps: steps).nodes
+        if case .chain(let head, let headIndex, let steps) = ast {
+            return resolve(root: root, head: head, headIndex: headIndex, steps: steps).nodes
         }
         return []
     }

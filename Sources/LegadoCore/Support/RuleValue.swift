@@ -17,7 +17,7 @@ public indirect enum RuleValue: Sendable, Equatable {
     case list([RuleValue])
     case json(JSONValue)
     /// DOM 节点（由 DOM 层提供；核心层只认它的身份，不认它的实现）
-    case node(DOMRef)
+    case node(DOMNodeRef)
 
     /// 出口 1：字段规则 —— 一律转成字符串。
     public var text: String {
@@ -53,25 +53,4 @@ public indirect enum RuleValue: Sendable, Equatable {
         }
         return String(d)
     }
-}
-
-/// DOM 节点引用 —— 核心层**只认身份和文本**，不认识实现。
-///
-/// 这样核心层能编在 Linux 沙盒里（不依赖 WebKit / jsdom），
-/// 而 DOM 的具体实现（SwiftSoup / jsoup / WKWebView document）由宿主注入。
-public struct DOMRef: Sendable, Equatable {
-    /// 宿主给的唯一标识（调试用）
-    public let id: String
-    /// 节点的文本内容
-    public let text: String
-    /// 节点的 HTML（`@html` 模式用）
-    public let html: String?
-
-    public init(id: String, text: String, html: String? = nil) {
-        self.id = id
-        self.text = text
-        self.html = html
-    }
-
-    public static func == (lhs: DOMRef, rhs: DOMRef) -> Bool { lhs.id == rhs.id }
 }
