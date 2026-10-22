@@ -1,5 +1,6 @@
 import Foundation
 import LegadoCore
+import Foundation
 
 // ===============================================================
 // **双实现对拍运行器**（Swift 侧）
@@ -56,18 +57,41 @@ for c in cases {
         let rule = c["rule"] as? String ?? ""
         let node = parser.parse(rule, isJSON: isJSON)
         var steps: [String] = []
-        if case .chain(let cs) = node {
+        if case .chain(_, let cs) = node {
             steps = cs.map { s -> String in
                 if case .sub = s { return "sub" } else { return "attr" }
             }
         }
         emit(id, kind, expect["steps"] as? String ?? "", steps.joined(separator: ","))
 
+    case "headCss":
+        // 头段翻译结果（prefixToCss 语义）
+        let rule = c["rule"] as? String ?? ""
+        let (spec, _) = HeadTranslator.translate(rule)
+        emit(id, kind, expect["css"] as? String ?? "", spec.cssLike)
+
     case "parse":
         // 整条规则解析成什么 AST（快照式比对）
         let rule = c["rule"] as? String ?? ""
         let node = parser.parse(rule, isJSON: isJSON)
         emit(id, kind, expect["ast"] as? String ?? "", describe(node))
+
+    case "domSelect":
+        // 行为对拍：HTML + 规则 ⇒ 节点数 + 每个节点的文本
+        let html = c["html"] as? String ?? ""
+        let rule = c["rule"] as? String ?? ""
+        let baseUrl = (c["baseUrl"] as? String) ?? "https://book.example.com/"
+        var texts: [String] = []
+        if let doc = try? SwiftSoupDocument(html: html, baseURL: baseUrl) {
+            let nodes = LegadoSelector.select(root: doc.document, rule: rule)
+            texts = nodes.map { $0.textContent }
+        }
+        let expObj: [String: Any] = [
+            "count": expect["count"] ?? NSNull(),
+            "texts": expect["texts"] as? [String] ?? [],
+        ]
+        let actObj: [String: Any] = ["count": texts.count, "texts": texts]
+        emit(id, kind, jsonString(expObj), jsonString(actObj))
 
     default:
         // 其余 kind（evalOne / getElements / jsScope / parse）需要 DOM / JS 后端，
@@ -96,7 +120,7 @@ func describe(_ n: RuleNode) -> String {
     case .fallback(let xs): return "fallback[\(xs.map(describe).joined(separator: ","))]"
     case .concat(let xs): return "concat[\(xs.map(describe).joined(separator: ","))]"
     case .alternatives(let xs): return "alternatives[\(xs.map(describe).joined(separator: ","))]"
-    case .chain(let steps): return "chain[" + steps.map(describeStep).joined(separator: ",") + "]"
+    case .chain(let head, let steps): return "chain[" + head + "|" + steps.map(describeStep).joined(separator: ",") + "]"
     case .post(let inner, let pst): return "post(\(describe(inner))|\(pst))"
     }
 }
@@ -109,5 +133,27 @@ func describeStep(_ s: ChainStep) -> String {
         return "sub:" + sel + ":idx=" + (idx.map(String.init) ?? "-") + ":excl=" + String(excl.count)
     case .attr(let n):
         return "attr:" + n
+    }
+}
+
+
+// MARK: - 极简 JSON 序列化（Swift on Linux 没有 `JSON`）
+
+/// 把 `[String: Any]`（值只可能是 Int / String / [String] / NSNull）序列化成 JSON 文本。
+/// ⚠️ **只给对拍用** —— 键按字典序输出，保证两边逐字节可比。
+func jsonString(_ obj: [String: Any]) -> String {
+    let keys = obj.keys.sorted()
+    let body = keys.map { "\"\($0)\":" + jsonValue(obj[$0]!) }.joined(separator: ",")
+    return "{" + body + "}"
+}
+
+private func jsonValue(_ v: Any) -> String {
+    switch v {
+    case let n as Int: return String(n)
+    case let s as String: return "\"" + s.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"") + "\""
+    case let a as [String]: return "[" + a.map { jsonValue($0) }.joined(separator: ",") + "]"
+    case is NSNull: return "null"
+    default: return "\"\"\""
     }
 }

@@ -25,7 +25,7 @@ public indirect enum RuleNode: Sendable, Equatable {
     case jsonPath(String)
     /// 正则：`##pattern##replace1##replace2##`
     case regex(pattern: String, replacements: [String])
-    /// 站方 JS（`@js:` 或 `<js>…</js>`）
+    /// 站方 JS（`@js:`）
     case js(String)
     /// **复合规则**：站方 JS 跑完后，用尾部选择器再取一次值
     ///
@@ -43,8 +43,12 @@ public indirect enum RuleNode: Sendable, Equatable {
     case concat([RuleNode])
     /// 逗号分隔多规则回退 —— 第一个非空胜出（§S-FBK-03）
     case alternatives([RuleNode])
-    /// 默认规则语法链（`class.x@tag.y@ownText`）
-    case chain([ChainStep])
+    /// 默认规则语法链（`class.book@tag.a@ownText`）
+    ///
+    /// ⭐ **头段保留原文** —— 因为头段和链段的翻译规则**不一样**：
+    /// 头段走 `prefixToCss`（无前缀就原样当纯 CSS），链段走 KW 分类。
+    /// 混成一个分类器 ⇒ 纯 CSS 的 `dl.B dd` 会被误判成属性名。
+    case chain(head: String, steps: [ChainStep])
     /// 尾部后处理（`##正则##` 或 `@js:` 后缀）作用在主体上
     case post(RuleNode, PostProcess)
 
@@ -61,13 +65,15 @@ public indirect enum RuleNode: Sendable, Equatable {
 ///
 /// 规格 §S-SEL-03 ~ §S-SEL-06 ⭐（**S-SEL-06 是重量级债**）。
 public enum ChainStep: Sendable, Equatable {
-    /// 子元素选择器（`tag.li` / `class.book` / `id.x` / **裸标签名 `li`**）
+    /// 子元素选择器
+    /// - Parameter selector: `"tag:li"` / `"class:x y"` / `"id:x"`（由 `ChainSegmentClassifier` 产出）
+    /// - Parameter exclusion: **排除第 N 个**（0-based，§S-EXCL-01）
     case sub(selector: String, index: Int?, exclusion: [Int])
     /// 属性后缀（`text` / `html` / `href` / `src` / …）
     case attr(String)
 }
 
-/// ⭐ **链段的分类**（这是本项目最关键的一条判定）。
+/// ⭐ **链段的分类**（本项目最关键的一条判定）。
 ///
 /// 规格 §S-SEL-06：
 /// 链段是**裸 HTML 标签名**（`li` / `a` / `img` / `span` / `p` / `dd` / `h2` / `ul` / `tr` …）
@@ -84,27 +90,11 @@ public enum ChainSegmentClassifier {
     /// ⚠️ 这个白名单必须**最小且明确** —— 名单外的裸名一律当子选择器。
     /// 125 源实测的属性后缀用法：`text` `html` `href` `src` `content` `ownText` `outerHtml` `all`。
     public static let attributeNames: Set<String> = [
-        "text", "html", "outerhtml", "owntext", "all", "content",
+        "text", "html", "outerhtml", "innerhtml", "owntext", "all",
         "href", "src", "title", "value", "class", "id", "alt", "name", "type",
     ]
 
-    /// 常见 HTML 标签（用于判断裸名是不是标签名）。
-    public static let htmlTags: Set<String> = [
-        "a","abbr","address","area","article","aside","audio","b","base","bdi","bdo",
-        "blockquote","body","br","button","canvas","caption","cite","code","col",
-        "colgroup","data","datalist","dd","del","details","dfn","dialog","div","dl",
-        "dt","em","embed","fieldset","figcaption","figure","footer","form","h1","h2",
-        "h3","h4","h5","h6","head","header","hgroup","hr","html","i","iframe","img",
-        "input","ins","kbd","label","legend","li","link","main","map","mark","menu",
-        "meta","meter","nav","noscript","object","ol","optgroup","option","output",
-        "p","param","picture","pre","progress","q","rp","rt","ruby","s","samp",
-        "script","section","select","slot","small","source","span","strong","style",
-        "sub","summary","sup","table","tbody","td","template","textarea","tfoot",
-        "th","thead","time","title","tr","track","u","ul","var","video","wbr",
-    ]
-
     /// 判定一个链段（已剥掉 `!N` 排除后缀）是什么。
-    /// - Returns: `.sub(selector, index, exclusion)` 或 `.attr(name)`
     public static func classify(segment raw: String, exclusion: [Int] = []) -> ChainStep {
         let s = raw.trimmingCharacters(in: .whitespaces)
         guard !s.isEmpty else { return .attr(raw) }
@@ -129,7 +119,8 @@ public enum ChainSegmentClassifier {
             case "tag":   return .sub(selector: "tag:\(val2)", index: index, exclusion: exclusion)
             case "class": return .sub(selector: "class:\(val2)", index: index, exclusion: exclusion)
             case "id":    return .sub(selector: "id:\(val2)", index: index, exclusion: exclusion)
-            case "text":  return .attr("text")
+            case "text":  return .sub(selector: "text:\(val2)", index: index, exclusion: exclusion)
+            case "owntext": return .sub(selector: "owntext:\(val2)", index: index, exclusion: exclusion)
             default:      break
             }
         }
@@ -139,14 +130,14 @@ public enum ChainSegmentClassifier {
         if attributeNames.contains(lower) { return .attr(lower) }
 
         // ③ ⭐ 裸 HTML 标签名 ⇒ **子元素选择器**（§S-SEL-06）
-        if htmlTags.contains(lower) { return .sub(selector: "tag:\(s)", index: nil, exclusion: exclusion) }
+        if HTMLTagNames.contains(lower) { return .sub(selector: "tag:\(s)", index: nil, exclusion: exclusion) }
 
         // ④ 其它裸名（`data-src` / `data-origin` 之类）⇒ 属性后缀
         return .attr(s)
     }
 
     /// `tag.div.0` ⇒ 去掉末尾的 `.0`（索引），`tag.div[-1]` 同理
-    private static func splitIndex(_ val: String) -> (String, Int?) {
+    static func splitIndex(_ val: String) -> (String, Int?) {
         if let dot = val.lastIndex(of: ".") {
             let tail = String(val[val.index(after: dot)...])
             if let n = Int(tail) { return (String(val[..<dot]), n) }

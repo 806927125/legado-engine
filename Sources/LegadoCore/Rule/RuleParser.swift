@@ -112,13 +112,29 @@ public struct RuleParser {
     // MARK: - 默认规则语法链
 
     /// 解析 `class.book@tag.a@ownText` 这种链。
+    ///
+    /// ⭐ **头段保留原文**（`head`），链段才做 KW 分类（`steps`）——
+    /// 因为两者的翻译规则不同（见 `HeadTranslator` / `SegmentTranslator`）。
     private func parseSelectorChain(_ s: String) -> RuleNode {
-        let segs = s.components(separatedBy: "@")
+        var r = s.trimmingCharacters(in: .whitespaces)
+
+        // 站方有时多写一个 `@`：`@a.2@text` / `@class.book` —— 前面这个 @ 只是习惯性前缀
+        // ⚠️ 只放过「带尾 @」的别名/变量形式（`@text@` / `@get:{k}`）
+        if r.hasPrefix("@"), r.count > 1, r[r.index(r.startIndex, offsetBy: 1)] != "@",
+           !r.hasPrefix("@get:"), !r.hasPrefix("@put:"), !r.hasPrefix("@getString:"),
+           !r.hasPrefix("@getInt:"), !r.hasPrefix("@text@"), !r.hasPrefix("@html@"),
+           !r.hasPrefix("@ownText@"), !r.hasPrefix("@href@"), !r.hasPrefix("@src@"),
+           !r.hasPrefix("@tag@"), !r.hasPrefix("@js@") {
+            r = String(r.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+
+        let segs = r.components(separatedBy: "@")
+        let head = segs.first ?? ""
         var steps: [ChainStep] = []
 
-        for (i, rawSeg) in segs.enumerated() {
+        for rawSeg in segs.dropFirst() {
             var seg = rawSeg
-            // 剥掉排除后缀 `!0:1:2`
+            // 剥掉排除后缀 `!0:1:2`（§S-EXCL-01：排除**第 N 个**，0-based）
             var exclusion: [Int] = []
             if let bang = seg.lastIndex(of: "!") {
                 let tail = String(seg[seg.index(after: bang)...])
@@ -129,12 +145,9 @@ public struct RuleParser {
                 }
             }
             if seg.isEmpty { continue }
-
-            let step = ChainSegmentClassifier.classify(segment: seg, exclusion: exclusion)
-            _ = i
-            steps.append(step)
+            steps.append(ChainSegmentClassifier.classify(segment: seg, exclusion: exclusion))
         }
-        return .chain(steps)
+        return .chain(head: head, steps: steps)
     }
 
     // MARK: - 工具

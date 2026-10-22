@@ -42,7 +42,7 @@ final class SemanticsConformanceTests: XCTestCase {
                   let expect = (c["expect"] as? [String: Any])?["steps"] as? String else { continue }
             let node = parser.parse(rule)
             var steps: [String] = []
-            if case .chain(let cs) = node {
+            if case .chain(_, let cs) = node {
                 steps = cs.map { s in
                     if case .sub = s { return "sub" } else { return "attr" }
                 }
@@ -110,7 +110,7 @@ final class SemanticsConformanceTests: XCTestCase {
     func testExclusionIsIndexNotCount() {
         // `!0` = 排除**第 0 个**（不是「排除前 0 个」）
         let node = RuleParser().parse("id.list@tag.li!0:1")
-        guard case .chain(let steps) = node else { return XCTFail("应是链") }
+        guard case .chain(_, let steps) = node else { return XCTFail("应是链") }
         guard case .sub(_, _, let excl) = steps.last! else { return XCTFail("最后一段应是子选择器") }
         XCTAssertEqual(excl, [0, 1], "`!0:1` = 排除第 0、1 个")
     }

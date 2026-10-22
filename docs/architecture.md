@@ -17,9 +17,11 @@
 │    ⭐ result 语义由「基准」决定，不由调用方决定                    │
 │    ⬜ 未开始                                                        │
 ├─ ③ DOM 层 ────────────────────── 纯 Swift ──────────────────────┤
-│    HTMLParser → NodeTree → CSS 选择器 + XPath 子集                │
-│    同步 document 代理（喂给 JS）                                   │
-│    ⬜ 未开始                                                        │
+│    ✅ SwiftSoup 后端（HTML5 容错 + Jsoup 兼容选择器）              │
+│    ✅ Legado 方言（class./tag./id./text. 前缀 + 裸标签名）          │
+│    ✅ 排除语法 `!N` + `:textEquals` 后置过滤                       │
+│    ⬜ XPath 子集（待做）                                            │
+│    ⬜ 同步 document 代理（喂给 JS）                                 │
 ├─ ④ JS 运行时 ────────────────── JSC / QuickJS ───────────────────┤
 │    沙箱：受限全局 + 注入宿主绑定（**同步**）                       │
 │    ⬜ 未开始                                                        │
@@ -99,14 +101,17 @@ JS 是唯一不可控的部分 ⇒ 它的接口面必须**窄到能在 Node 里 
 - **验收**：`RuleValue` 两种出口（字段→String / 列表→[RuleValue]）不许各调用点各转各的；
   JSON 对象**不得**被隐式 stringify（§S-JSON-02）；`{title,url}` 形状的对象**标题不得被吃掉**（§S-JSON-06）
 
-### ③ DOM 层 ⬜
+### ③ DOM 层 ✅ 部分（2026-10-23）
 
-- **选型**：
-  - HTML 解析 ⇒ **SwiftSoup**（HTML5 容错 + Scrapy 风格选择器）—— **不自研**（未闭合标签、`<p>` 自动闭合、表格 foster parenting，自研是无底洞）
-  - XPath ⇒ **自研"够用"子集**（`//tag`、`//tag[@a='v']`、`//tag[n]`、`//*[@id="x"]`）
-    - 理由：可控 + 沙盒可验 + **不支持的语法要明确报错**（比静默给错结果值钱得多）
-    - 风险：碰到冷门 XPath 会失败 ⇒ **必须有回落路径**
-  - **Legado 方言前缀**（`class.x` / `tag.x` / `id.x`）+ 裸标签名 ⇒ 必须支持（§S-SEL-03/06）
+- **已做**：
+  - `DOMNode` 协议 + `SwiftSoupNode` 实现（核心层纯 Foundation，实现可换）
+  - `HeadTranslator`（`prefixToCss` 语义）+ `SegmentTranslator`（KW 分类）**分流**
+  - `LegadoSelector`（链求值）+ `PseudoFilter`（后置伪类）
+  - 排除语法 `!N`、索引 `:0` / `[-1]`、`text.` 完全相等
+- **HTML 解析 ⇒ SwiftSoup**（HTML5 容错 + Jsoup 兼容选择器）—— **不自研**
+- **XPath ⇒ 自研"够用"子集**（`//tag`、`//tag[@a='v']`、`//tag[n]`）—— **待做**
+  - 理由：可控 + 沙盒可验 + **不支持的语法要明确报错**（比静默给错结果值钱得多）
+  - 风险：碰到冷门 XPath 会失败 ⇒ **必须有回落路径**
 
 ### ④ JS 运行时 ⬜
 

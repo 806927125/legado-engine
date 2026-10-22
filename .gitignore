@@ -13,3 +13,7 @@ conformance/out/*.err
 
 # 系统
 .DS_Store
+
+# SPM
+.swiftpm/
+Package.resolved

@@ -289,7 +289,20 @@ if (v.text !== undefined || v.title !== undefined) {
 ### S-JSON-04 JSONPath 列表支持 `a||b` 兜底
 **规范**：`jsonPathListOf` 支持用 `||` 给 JSONPath 列表加兜底。
 **依据**：🟢 build214 顺带修的。
-**现状**：✅。
+**现状**：✅（链结构本身）。
+
+⚠️ **已知差异（待定项）**：`@html` 的语义
+| | `@html` | `@outerHtml` |
+|---|---|---|
+| Legado / Jsoup | **innerHTML** | outerHTML |
+| 轻阅 `valueOf` | **outerHTML** ❗ | outerHTML |
+| 本项目 | **innerHTML**（按 Legado） | outerHTML |
+
+⇒ 轻阅把 `html` 和 `outerhtml` **都映射成 outerHTML** ⇒ 与 Legado 不一致。
+⇒ 本项目按 **Legado 语义**实现（`html` = innerHTML）；对拍时会标出这条差异。
+
+⚠️ **另**：`text` / `ownText` / `html` / `outerHtml` / `all` / `content` / `href` / `src` 是**取值模式**，
+**不是属性名**；`href/src/action/data-src/poster` 虽是属性，但取值时要**绝对化**。
 
 ### S-JSON-05 列表规则的复合形态
 **规范**：列表规则可以写成 `<js>…</js>$.data.books`。
@@ -374,11 +387,24 @@ if (v.text !== undefined || v.title !== undefined) {
 **依据**：🟡 build214 第六项（`text.查看目录` 曾匹配到 `<title>`，因为标题里也含这四个字 ⇒ 抓到 11 个元素 ⇒ 目录只有 1 章）。
 **现状**：✅ build214 修（新增 `:textEquals` 伪类）。
 
+⚠️ **「完全相等」比的是元素的【完整文本】（含所有后代）** ⇒ **祖先元素也可能命中**：
+`<body>里只有一个 <a>查看目录</a></body>` ⇒ `<a>`、`<body>`、`<html>` 的完整文本都等于「查看目录」⇒ **三个都命中**。
+⇒ 真实页面里通常有兄弟节点，祖先文本 ≠ 目标值 ⇒ 只有目标元素命中（125 源实测符合预期）。
+⇒ 但**这是「静默多命中」的来源** —— 用 `text.` 的规则要意识到可能拿到祖先。
+
 ### S-SEL-02 class 的值可以带空格
 **规范**：`class.clearfix chapter-list` ⇒ 匹配**同时**有 `clearfix` 和 `chapter-list` 两个 class 的元素。
 **依据**：🟡 125 源实测（40 处）。
 **现状**：✅ build214 修（空格一律当**并列的 class** `.a.b`）。
 ⚠️ 以前把空格当**后代选择器** ⇒ 0 命中。
+
+⭐ **零误伤已用 125 源实测坐实**（2026-10-23）：
+- 「`class.X 空格 Y`」（并列 class）**40 处** ⇒ 全部要求**并列**语义
+- 「`tag.cls 空格 tag`」（纯 CSS 后代，如 `dl.B dd` / `ul.MLlist li` / `a.book-cover img`）**50 处**
+  ⇒ 仍要求**后代**语义
+⇒ 判据 = **有没有 `kw.` 前缀**：带前缀 ⇒ 空格当并列 class；不带 ⇒ 空格保持标准 CSS 后代。
+⇒ 实现见 `HeadTranslator`（`prefixToCss` 语义）：**真实标签当前缀时，值整体当类名**
+（`dl` + `.` + `B dd` ⇒ `dl.B dd` ⇒ 后代语义保住了）。
 
 ### S-SEL-03 Legado 方言前缀
 **规范**：支持 `class.X` / `tag.X` / `id.X` 三种前缀。
@@ -735,6 +761,51 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 
 ---
 
+## 17.5 S-DOM DOM 层语义（Phase 2 新增）
+
+> 实现：`Sources/LegadoCore/DOM/`（SwiftSoup 后端 + 协议化）
+> 对拍：`conformance/fixtures/semantics-cases.json` 的 `domSelect` 用例（12 条，真 HTML + 125 源真规则）
+
+### S-DOM-01 头段与链段的翻译规则**不同**
+**规范**：
+- **头段**（第一个 `@` 之前）走 `prefixToCss` 语义 —— **没有 `kw.` 前缀就原样当纯 CSS**
+- **链段**（`@` 后面）走 KW 分类 —— 裸标签名当**子选择器**（§S-SEL-06）
+**依据**：🟢 轻阅 `jsoup-compat.js` 的 `parseChain`（头段 `prefixToCss(head)`，链段 KW 分类）。
+**现状**：✅ 自研已按此实现。
+⚠️ **我早先把两者混成一个分类器** ⇒ 纯 CSS 的 `dl.B dd` 被误判成属性名 ⇒ **已修**。
+
+### S-DOM-02 真实标签当前缀时，值整体当**类名**
+**规范**：头段里 `ul.MLlist li` ⇒ 翻译成 `ul.MLlist li`（标签 `ul` + 类名 `MLlist li`）
+⇒ 标准的**后代选择器**语义保住。
+**依据**：🟢 轻阅 `prefixToCss` 的 `marks[i].raw` 分支。
+**现状**：✅ 两边一致（`head-08` 用例）。
+
+### S-DOM-03 空 CSS（纯后置伪类）的候选集 = **root + 所有后代**
+**规范**：`text.查看目录` 这种「无 CSS、只有后置过滤」的规则 ⇒ 候选是**整个文档的所有元素**，
+不是只有 root。
+**依据**：🟢 轻阅 `queryOne` 的 `!clean || clean === '*'` 分支。
+**现状**：✅ 自研已按此实现。
+⚠️ **我早先只返回 `[root]` ⇒ 后置过滤被跳过** ⇒ 命中的是 document 自己（文本是整页）⇒ **已修**。
+
+### S-DOM-04 选择器查询**含元素自身**
+**规范**：`element.select("div.c")` 在 `div.c` 内部查询时，**要能命中它自己**（Jsoup 语义）。
+**依据**：🟢 轻阅 `jsoup-compat.js` 的注释明确写了这点（Jsoup 的 `select()` 含自身）。
+**现状**：✅ SwiftSoup **原生就是这个语义**（实测 `div.c` 内查 `div.c` = 1）⇒ 零适配成本。
+
+### S-DOM-05 SwiftSoup 缺 `:textEquals` ⇒ 自己用后置过滤补
+**规范**：`:textEquals` / `:containsOwn` 等 SwiftSoup 不支持的伪类 ⇒ **查完再过滤**。
+**依据**：🟢 实测 SwiftSoup 支持 `:contains` `:containsOwn` `:matches` `:matchesOwn` `:not` `:nth-child` `+` `~` `[attr^=]`；
+**不支持** `:textEquals` `:hasText` `:containsWholeText` `:matchesWholeText`。
+**现状**：✅ `PseudoFilter` 实现。
+⚠️ **对拍时要比「最终行为」（节点数/文本），不要比中间 CSS 串** —— 轻阅把伪类留在串里再摘，
+本实现直接摘 ⇒ 字符串不同但行为等价 ⇒ 用 `SelectorSpec.cssLike` 归一化。
+
+### S-DOM-06 选 DOM 实现 = **SwiftSoup**
+**规范**：HTML 解析 + CSS 选择器用 SwiftSoup；XPath 另做子集。
+**依据**：🟢 SwiftSoup 的 HTML5 容错 + Jsoup 兼容的选择器语义（自身包含、并列 class、`:contains`）。
+**现状**：✅ 已接入（`Package.swift` 的 SPM 依赖）。
+⚠️ **SPM 拉依赖会被沙盒的 CA 问题卡住** ⇒ 需 `git config --global http.sslCAInfo <ca>` + `http.version HTTP/1.1`。
+
 ## 18. 尚未覆盖 / 已知缺口
 
 | # | 缺口 | 状态 | 备注 |
@@ -760,4 +831,5 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 | 日期 | 变更 |
 |---|---|
 | 2026-10-23 | 初版。从 build214 源码 + 125 源活体体检 + 栖阅反推材料反推成规范。共 17 域 / 81 条。 |
+| 2026-10-23 | **Phase 2（DOM 层）后修订**：<br>① 新增 **§17.5 S-DOM**（DOM 层 6 条：头段/链段分流、隐式标签前缀、空 CSS 候选集、含自身、`:textEquals` 后置过滤、SwiftSoup 选型）<br>② S-SEL-01 补「完全相等比的是**完整文本** ⇒ 祖先元素也可能命中」<br>③ S-SEL-02 补「**零误伤已坐实**」（125 源：并列 class 40 处 + 纯 CSS 后代 50 处，两种都对）<br>④ S-SEL-04 记 **`@html` 语义差异**（Legado innerHTML vs 轻阅 outerHTML）—— 本项目按 Legado 语义<br>⑤ 记我自己的两个实现 bug：头段/链段混用分类器、空 CSS 候选集漏了后代（**均已修**） |
 | 2026-10-23 | **符合度体检后修订**（改了 5 条，其中 2 条是我自己写错的）：<br>① **S-EXCL-01 语义改写**——`!N` 是「排除**第 N 个**（0-based）」，不是「排除前 N 个」（错在印象，已按 125 源实际用法 + 实测定准）<br>② **S-EXCL-02 撤回**——我先写「链中段排除不生效 = 债」，逐位置实测后证明**排除语法本身没问题**，不生效的是「裸标签名」那一段 ⇒ 归 S-SEL-06<br>③ 新增 **S-SEL-06**（链段里的**裸标签名**被当属性名 ⇒ 链断 ⇒ **125 源里 279 处、60 个源**）⭐ 重量级<br>④ 新增 **S-JSON-06**（`flatten()` 吃 `{title,url}` 对象的标题 = 债）<br>⑤ S-JSON-02 状态从「✅ 修好」改为「⚠️ 部分修复」 |

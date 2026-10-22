@@ -13,8 +13,14 @@ let package = Package(
         .library(name: "LegadoCore", targets: ["LegadoCore"]),
         .executable(name: "conformance", targets: ["Conformance"]),
     ],
+    dependencies: [
+        // HTML 解析 + CSS 选择器（Jsoup 兼容语义）
+        .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.6.0"),
+    ],
     targets: [
-        .target(name: "LegadoCore"),
+        .target(name: "LegadoCore", dependencies: [
+            .product(name: "SwiftSoup", package: "SwiftSoup")
+        ]),
         .executableTarget(name: "Conformance", dependencies: ["LegadoCore"]),
         .testTarget(name: "LegadoCoreTests", dependencies: ["LegadoCore"]),
     ]

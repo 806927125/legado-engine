@@ -1108,7 +1108,7 @@
       "kind": "chainSegment",
       "rule": "class.catalog_ls@li",
       "expect": {
-        "steps": "sub,sub"
+        "steps": "sub"
       }
     },
     {
@@ -1118,7 +1118,7 @@
       "kind": "chainSegment",
       "rule": "class.searchList@li",
       "expect": {
-        "steps": "sub,sub"
+        "steps": "sub"
       }
     },
     {
@@ -1128,7 +1128,7 @@
       "kind": "chainSegment",
       "rule": ".sidebar@img@src",
       "expect": {
-        "steps": "sub,sub,attr"
+        "steps": "sub,attr"
       }
     },
     {
@@ -1138,7 +1138,7 @@
       "kind": "chainSegment",
       "rule": "class.c_subject@a@text",
       "expect": {
-        "steps": "sub,sub,attr"
+        "steps": "sub,attr"
       }
     },
     {
@@ -1148,7 +1148,7 @@
       "kind": "chainSegment",
       "rule": "class.book_about@dd@text",
       "expect": {
-        "steps": "sub,sub,attr"
+        "steps": "sub,attr"
       }
     },
     {
@@ -1158,7 +1158,7 @@
       "kind": "chainSegment",
       "rule": ".show@li",
       "expect": {
-        "steps": "sub,sub"
+        "steps": "sub"
       }
     },
     {
@@ -1168,7 +1168,7 @@
       "kind": "chainSegment",
       "rule": "class.catalog_ls@tag.li",
       "expect": {
-        "steps": "sub,sub"
+        "steps": "sub"
       }
     },
     {
@@ -1178,7 +1178,7 @@
       "kind": "chainSegment",
       "rule": "class.book_about@tag.dd@text",
       "expect": {
-        "steps": "sub,sub,attr"
+        "steps": "sub,attr"
       }
     },
     {
@@ -1188,7 +1188,7 @@
       "kind": "chainSegment",
       "rule": "class.c_subject@a@text",
       "expect": {
-        "steps": "sub,sub,attr"
+        "steps": "sub,attr"
       }
     },
     {
@@ -1198,7 +1198,7 @@
       "kind": "chainSegment",
       "rule": "div@html",
       "expect": {
-        "steps": "sub,attr"
+        "steps": "attr"
       }
     },
     {
@@ -1208,7 +1208,7 @@
       "kind": "chainSegment",
       "rule": "div@a@href",
       "expect": {
-        "steps": "sub,sub,attr"
+        "steps": "sub,attr"
       }
     },
     {
@@ -1218,7 +1218,258 @@
       "kind": "chainSegment",
       "rule": "header@h2@h4@text",
       "expect": {
-        "steps": "sub,sub,sub,attr"
+        "steps": "sub,sub,attr"
+      }
+    },
+    {
+      "id": "head-01",
+      "semantic": "S-SEL-02",
+      "title": "头段 class.X Y ⇒ 并列 class（.clearfix.chapter-list）",
+      "kind": "headCss",
+      "rule": "class.clearfix chapter-list",
+      "expect": {
+        "css": ".clearfix.chapter-list"
+      }
+    },
+    {
+      "id": "head-02",
+      "semantic": "S-SEL-04",
+      "title": "头段纯 CSS 后代 ⇒ 原样（dl.B dd，五八书阁）",
+      "kind": "headCss",
+      "rule": "dl.B dd",
+      "expect": {
+        "css": "dl.B dd"
+      }
+    },
+    {
+      "id": "head-03",
+      "semantic": "S-SEL-04",
+      "title": "头段纯 CSS 后代 ⇒ 原样（ul.MLlist li）",
+      "kind": "headCss",
+      "rule": "ul.MLlist li",
+      "expect": {
+        "css": "ul.MLlist li"
+      }
+    },
+    {
+      "id": "head-04",
+      "semantic": "S-SEL-04",
+      "title": "头段纯 CSS 后代 ⇒ 原样（a.book-cover img，QQ阅读）",
+      "kind": "headCss",
+      "rule": "a.book-cover img",
+      "expect": {
+        "css": "a.book-cover img"
+      }
+    },
+    {
+      "id": "head-05",
+      "semantic": "S-SEL-01",
+      "title": "头段 text.X ⇒ 翻译成 :textEquals(X)",
+      "kind": "headCss",
+      "rule": "text.查看目录",
+      "expect": {
+        "css": ":textEquals(查看目录)"
+      }
+    },
+    {
+      "id": "head-06",
+      "semantic": "S-SEL-03",
+      "title": "头段 tag.X ⇒ 翻译成标签",
+      "kind": "headCss",
+      "rule": "tag.h2",
+      "expect": {
+        "css": "h2"
+      }
+    },
+    {
+      "id": "head-07",
+      "semantic": "S-SEL-03",
+      "title": "头段 id.X ⇒ 翻译成 #X",
+      "kind": "headCss",
+      "rule": "id.main",
+      "expect": {
+        "css": "#main"
+      }
+    },
+    {
+      "id": "head-08",
+      "semantic": "S-SEL-04",
+      "title": "头段隐式标签前缀 ⇒ 值当类名（ul.MLlist）",
+      "kind": "headCss",
+      "rule": "ul.MLlist",
+      "expect": {
+        "css": "ul.MLlist"
+      }
+    },
+    {
+      "id": "dom-01",
+      "semantic": "S-SEL-06",
+      "title": "裸标签名 @li ⇒ 子选择器（神马小说 class.catalog_ls@li）",
+      "kind": "domSelect",
+      "html": "<html><body><ul class=\"catalog_ls\"><li>第一章 风起</li><li>第二章 云涌</li></ul></body></html>",
+      "rule": "class.catalog_ls@li",
+      "expect": {
+        "count": 2,
+        "texts": [
+          "第一章 风起",
+          "第二章 云涌"
+        ]
+      }
+    },
+    {
+      "id": "dom-02",
+      "semantic": "S-SEL-02",
+      "title": "class 值带空格 ⇒ 并列 class（啃书阁 class.clearfix chapter-list@tag.li）",
+      "kind": "domSelect",
+      "html": "<html><body><ul class=\"clearfix chapter-list\"><li>第1章 开端</li><li>第2章 发展</li></ul></body></html>",
+      "rule": "class.clearfix chapter-list@tag.li",
+      "expect": {
+        "count": 2,
+        "texts": [
+          "第1章 开端",
+          "第2章 发展"
+        ]
+      }
+    },
+    {
+      "id": "dom-03",
+      "semantic": "S-SEL-04",
+      "title": "纯 CSS 后代选择器（dl.B dt，五八书阁）",
+      "kind": "domSelect",
+      "html": "<html><body><dl class=\"B\"><dt>书名在此</dt><dd class=\"imgB\"><img src=\"/c.jpg\"></dd></dl></body></html>",
+      "rule": "dl.B dt",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "书名在此"
+        ]
+      }
+    },
+    {
+      "id": "dom-04",
+      "semantic": "S-SEL-01",
+      "title": "text. 前缀 = 文本完全相等（不含 title 里的同名文字）",
+      "kind": "domSelect",
+      "html": "<html><head><title>查看目录 - 肉文屋</title></head><body><a>查看目录</a><a>查看目录2</a></body></html>",
+      "rule": "text.查看目录",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "查看目录"
+        ]
+      }
+    },
+    {
+      "id": "dom-05",
+      "semantic": "S-EXCL-01",
+      "title": "排除第 0 个（!0）",
+      "kind": "domSelect",
+      "html": "<html><body><ul class=\"catalog_ls\"><li>第一章 风起</li><li>第二章 云涌</li></ul></body></html>",
+      "rule": "class.catalog_ls@li!0",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "第二章 云涌"
+        ]
+      }
+    },
+    {
+      "id": "dom-06",
+      "semantic": "S-EXCL-01",
+      "title": "排除第 0、1 个（!0:1）",
+      "kind": "domSelect",
+      "html": "<html><body><ul class=\"catalog_ls\"><li>第一章 风起</li><li>第二章 云涌</li></ul></body></html>",
+      "rule": "class.catalog_ls@li!0:1",
+      "expect": {
+        "count": 0,
+        "texts": []
+      }
+    },
+    {
+      "id": "dom-07",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @dd（读读小说 class.book_about@dd@text）",
+      "kind": "domSelect",
+      "html": "<html><body><div class=\"book_about\"><dd>简介内容</dd></div></body></html>",
+      "rule": "class.book_about@dd@text",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "简介内容"
+        ]
+      }
+    },
+    {
+      "id": "dom-08",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @a（去读书 class.c_subject@a@text）",
+      "kind": "domSelect",
+      "html": "<html><body><div class=\"c_subject\"><a>斗破苍穹</a></div></body></html>",
+      "rule": "class.c_subject@a@text",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "斗破苍穹"
+        ]
+      }
+    },
+    {
+      "id": "dom-09",
+      "semantic": "S-SEL-04",
+      "title": "纯 CSS 后代（ul.dx-novel-list li，禁漫天堂）",
+      "kind": "domSelect",
+      "html": "<html><body><ul class=\"dx-novel-list\"><li>书一</li><li>书二</li></ul></body></html>",
+      "rule": "ul.dx-novel-list li",
+      "expect": {
+        "count": 2,
+        "texts": [
+          "书一",
+          "书二"
+        ]
+      }
+    },
+    {
+      "id": "dom-10",
+      "semantic": "S-SEL-04",
+      "title": "隐式标签前缀（ul.MLlist li，五八书阁）",
+      "kind": "domSelect",
+      "html": "<html><body><ul class=\"MLlist\"><li>甲</li></ul></body></html>",
+      "rule": "ul.MLlist li",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "甲"
+        ]
+      }
+    },
+    {
+      "id": "dom-11",
+      "semantic": "S-SEL-03",
+      "title": "id. 前缀（id.list@tag.li）",
+      "kind": "domSelect",
+      "html": "<html><body><ul id=\"list\"><li>一</li><li>二</li><li>三</li></ul></body></html>",
+      "rule": "id.list@tag.li",
+      "expect": {
+        "count": 3,
+        "texts": [
+          "一",
+          "二",
+          "三"
+        ]
+      }
+    },
+    {
+      "id": "dom-12",
+      "semantic": "S-SEL-05",
+      "title": "索引（class.catalog_ls@tag.li.0）",
+      "kind": "domSelect",
+      "html": "<html><body><ul class=\"catalog_ls\"><li>第一章 风起</li><li>第二章 云涌</li></ul></body></html>",
+      "rule": "class.catalog_ls@tag.li.0",
+      "expect": {
+        "count": 1,
+        "texts": [
+          "第一章 风起"
+        ]
       }
     }
   ]

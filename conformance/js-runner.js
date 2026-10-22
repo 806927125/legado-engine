@@ -81,10 +81,26 @@ for (const c of fixture.cases) {
     if (kind === 'classify') {
       emit(c.id, kind, expect.kind || '', QR.rule.classify(c.rule || '', { isJSON }));
     } else if (kind === 'chainSegment') {
-      // 链段分类：head 视作一个子选择器，链步按 parseChain 的 kind
+      // 链段分类：**只比链步**（头段走另一套翻译规则，见 headCss）
       const parsed = QR.dom.parseChain(c.rule || '');
-      const steps = ['sub'].concat((parsed.chain || []).map(x => x.kind));
+      const steps = (parsed.chain || []).map(x => x.kind);
       emit(c.id, kind, expect.steps || '', steps.join(','));
+    } else if (kind === 'headCss') {
+      // 头段翻译结果（prefixToCss 语义）
+      const parsed = QR.dom.parseChain(c.rule || '');
+      emit(c.id, kind, expect.css || '', parsed.selector || '');
+    } else if (kind === 'domSelect') {
+      // 行为对拍：HTML + 规则 ⇒ 节点数 + 每个节点的文本
+      const html = c.html || '';
+      const rule = c.rule || '';
+      const doc = QR.dom.parseHTML(html, c.baseUrl || 'https://book.example.com/');
+      let nodes = [];
+      try { nodes = QR.dom.selectAll(doc, rule) || []; } catch (e) { nodes = []; }
+      const texts = nodes.map(n => QR.dom.textOf(n));
+      emit(c.id, kind,
+        JSON.stringify({ count: expect.count, texts: expect.texts || [] }),
+        JSON.stringify({ count: texts.length, texts }));
+
     } else if (kind === 'parse') {
       // 整条规则解析 —— 参考实现没有暴露 AST ⇒ 标记为不支持
       emit(c.id, kind, expect.ast || '', 'NO_AST');
