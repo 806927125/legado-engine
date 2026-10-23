@@ -54,6 +54,8 @@ public final class SourceEngine {
     public let notifier: Notifier?
     /// 引擎日志
     public let logger: EngineLogger?
+    /// ⭐⭐ **cookie 服务**（站方 `cookie.*` —— 真实语料 **205 处**）
+    public let cookies: CookieService?
 
     // MARK: - ⭐⭐ 站方 JS 的宿主对象（book / source / chapter）
 
@@ -65,13 +67,15 @@ public final class SourceEngine {
     public var bookObject: HostObject?
     /// ⭐⭐ **当前章节对象**（站方 JS 里的 `chapter`）
     public var chapterObject: HostObject?
+    /// ⭐⭐ **cookie 宿主对象**（站方 `cookie.*` —— 真实语料 **205 处**）
+    public var cookieObject: HostObject?
     /// ⭐⭐ **书源对象**（站方 JS 里的 `source`）
     public var sourceObject: HostObject?
 
     public init(source: BookSource, fetcher: PageFetcher, js: JSExecutor? = nil,
                 storage: KeyValueStorage? = nil, files: FileStorage? = nil,
                 browser: BrowserProvider? = nil, notifier: Notifier? = nil,
-                logger: EngineLogger? = nil) {
+                logger: EngineLogger? = nil, cookies: CookieService? = nil) {
         self.source = source
         self.fetcher = fetcher
         // ⭐⭐ **源级请求头**（54 个源在用 ⇒ 缺了就 403 / 空页）
@@ -86,6 +90,9 @@ public final class SourceEngine {
         self.browser = browser
         self.notifier = notifier
         self.logger = logger
+        self.cookies = cookies
+        // ⭐⭐ cookie 宿主对象（站方 `cookie.getCookie(url)` 等 —— 205 处真实用法）
+        if let cookies { self.cookieObject = Self.makeCookieObject(cookies) }
         // ⭐⭐ **让引擎接管 `java.ajax`**（站方 JS 抓页面用 —— 125 源里 22 处 / 12 个源）
         //
         // ⭐ 引擎**全同步** ⇒ 这里可以**同步发请求**并直接返回正文
@@ -430,7 +437,8 @@ public final class SourceEngine {
         // ⭐ 站方 JS 里的 `book` 对象（`book.getVariable('custom')`）
         bookObject = Self.makeBookObject(book, variables: variables)
         sourceObject = Self.makeSourceObject(source, varBox: varBox,
-                                              loginInfo: loadLoginInfo())
+                                              loginInfo: loadLoginInfo(),
+                                              storage: storage)
 
         info.name = value(rules?.name, in: nil, page: p, base: base)
         info.author = value(rules?.author, in: nil, page: p, base: base)
@@ -914,9 +922,7 @@ public final class SourceEngine {
     }
 
     // MARK: - 登录信息（`loginInfo`）—— 站方 `source.getLoginInfoMap()` 读它
-
-    /// ⭐ **登录信息**的存储键（宿主 `KeyValueStorage`）
-    public static let loginInfoKey = "loginInfo"
+    //    （键的定义在上面：`makeSourceObject` 旁边）
 
     /// ⭐ **保存登录信息**（⇒ 存进宿主的 `KeyValueStorage`）
     public func saveLoginInfo(_ info: [String: String]) {
@@ -962,31 +968,178 @@ public final class SourceEngine {
         return HostObject(name: "book", methods: methods, properties: properties)
     }
 
-    /// ⭐⭐ **书源对象**（站方 JS 里的 `source`）
+    /// ⭐⭐⭐ **书源对象**（站方 JS 里的 `source`）—— **照抄老引擎 `source-api.js` 的语义**
+    ///
+    /// 📌 **真实用量**（125 源包 + 大灰狼 + NovelHub 实测）：
+    /// | API | 处数 |
+    /// |---|---|
+    /// | `source.get/put`（**单项**变量） | **127** |
+    /// | `source.getKey` | **42** |
+    /// | `source.get/putLoginHeader` | 3+ |
+    ///
+    /// ⚠️⚠️ **`source.get/put` 没实现 ⇒ 静默失效 + 假成功**（老引擎踩过的坑）：
+    ///   站方（🍒NovelHub）`source.get("nhAuthed")` ⇒ TypeError ⇒ 被站方 try/catch 吞掉
+    ///   ⇒ ① `nhAuth()` 恒 false ⇒ **所有规则字段直接 return ""** ⇒ 发现页空白
+    ///   ⇒ ② `source.put(...)` 抛 ⇒ 解锁状态没存下来 ⇒ 站方照样弹「已解锁」⇒ **假成功** ⭐
+    ///
+    /// ⚠️ **`get` 不能实现成「返回整份 vars」** —— 站方是
+    ///   `String(source.get("nhAuthed") || "")` 这样比对的 ⇒ 拿到整份 JSON 哈希对不上。
     public static func makeSourceObject(_ source: BookSource, varBox: VarBox,
-                                        loginInfo: [String: String] = [:]) -> HostObject {
+                                        loginInfo: [String: String] = [:],
+                                        loginHeader: String = "",
+                                        storage: KeyValueStorage? = nil) -> HostObject {
         var methods: [String: HostMethod] = [:]
-        methods["getVariable"] = { args in
+
+        // ── 整份变量 ────────────────────────────────────────────
+        methods["getVariable"] = { _ in .string(Self.varsJSON(varBox)) }
+        methods["setVariable"] = { args in
+            let a = args.first
+            // ① 传对象 ⇒ 整份替换
+            if case .object(let o)? = a {
+                var flat: [String: String] = [:]
+                for (k, v) in o { flat[k] = v.scalarString }
+                for (k, v) in flat { varBox.set(k, v) }
+            } else if args.count > 1 {
+                // ② `setVariable(key, value)` ⇒ 改一项
+                let k = args[0].scalarString
+                if !k.isEmpty { varBox.set(k, args[1].scalarString) }
+            } else {
+                // ③ `setVariable(jsonString)` ⇒ 整份替换
+                let text = a?.scalarString ?? ""
+                if let data = text.data(using: .utf8),
+                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    for (k, v) in obj {
+                        varBox.set(k, (v as? String) ?? String(describing: v))
+                    }
+                }
+            }
+            return .string("")
+        }
+
+        // ── ⭐⭐ 单项变量（真实语料 127 处）──────────────────────
+        methods["get"] = { args in
             let key = args.first?.scalarString ?? ""
             guard !key.isEmpty else { return .string("") }
+            // ⚠️ 没有该项 ⇒ **空串**（站方都按「空串 = 没设置」处理）
             return .string(varBox.get(key) ?? "")
         }
-        methods["setVariable"] = { args in
+        methods["put"] = { args in
             let key = args.first?.scalarString ?? ""
             let value = args.count > 1 ? args[1].scalarString : ""
             if !key.isEmpty { varBox.set(key, value) }
             return .string("")
         }
+
+        // ── ⭐ `getKey`（真实语料 42 处）─────────────────────────
+        // Legado：给缓存当 key 用 ⇒ **稳定的源标识**即可
+        methods["getKey"] = { _ in .string(source.bookSourceUrl) }
+
+        // ── 登录信息 ────────────────────────────────────────────
         methods["getLoginInfoMap"] = { _ in
             var out: [String: JSONValue] = [:]
-            for (k, v) in loginInfo { out[k] = .string(v) }
+            for (k, v) in Self.currentLoginInfo(loginInfo, storage: storage) { out[k] = .string(v) }
             return .object(out)
         }
+        methods["getLoginInfo"] = { _ in
+            let info = Self.currentLoginInfo(loginInfo, storage: storage)
+            guard let data = try? JSONSerialization.data(withJSONObject: info),
+                  let text = String(data: data, encoding: .utf8) else { return .string("{}") }
+            return .string(text)
+        }
+        methods["putLoginInfo"] = { args in
+            var info = Self.currentLoginInfo(loginInfo, storage: storage)
+            let a = args.first
+            if let a, case .object(let o) = a {
+                info = [:]
+                for (k, v) in o { info[k] = v.scalarString }
+            } else if args.count > 1 {
+                let k = args[0].scalarString
+                if !k.isEmpty { info[k] = args[1].scalarString }
+            } else {
+                let text = a?.scalarString ?? ""
+                info = [:]
+                if let data = text.data(using: .utf8),
+                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+                    info = obj
+                }
+            }
+            // ⭐ 落盘（宿主给的 storage ⇒ 轻阅那边就是 UserDefaults）
+            if let data = try? JSONSerialization.data(withJSONObject: info),
+               let text = String(data: data, encoding: .utf8) {
+                storage?.setString(text, forKey: SourceEngine.loginInfoKey)
+            }
+            return .string("")
+        }
+
+        // ── 登录头（栖阅机制：自动注入到每次请求头）───────────────
+        methods["getLoginHeader"] = { _ in .string(Self.currentLoginHeader(loginHeader, storage: storage)) }
+        methods["putLoginHeader"] = { args in
+            let v = args.first?.scalarString ?? ""
+            storage?.setString(v, forKey: SourceEngine.loginHeaderKey)
+            return .string("")
+        }
+
         var properties: [String: JSONValue] = [:]
         properties["bookSourceUrl"] = .string(source.bookSourceUrl)
         properties["bookSourceName"] = .string(source.bookSourceName)
         properties["bookSourceGroup"] = .string(source.bookSourceGroup ?? "")
         return HostObject(name: "source", methods: methods, properties: properties)
+    }
+
+    /// ⭐ **登录信息的键**（宿主存储用）
+    public static let loginInfoKey = "loginInfo"
+    /// ⭐ **登录头的键**（宿主存储用）
+    public static let loginHeaderKey = "loginHeader"
+
+    /// 当前登录信息（优先读宿主存储 ⇒ 站方改了立刻生效）
+    static func currentLoginInfo(_ fallback: [String: String],
+                                 storage: KeyValueStorage?) -> [String: String] {
+        if let text = storage?.string(forKey: Self.loginInfoKey),
+           let data = text.data(using: .utf8),
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+            return obj
+        }
+        return fallback
+    }
+
+    /// 当前登录头（优先读宿主存储）
+    static func currentLoginHeader(_ fallback: String, storage: KeyValueStorage?) -> String {
+        storage?.string(forKey: Self.loginHeaderKey) ?? fallback
+    }
+
+    /// ⭐ **源级变量 → JSON 串**（`getVariable` 的返回）
+    public static func varsJSON(_ box: VarBox) -> String {
+        let all = box.all
+        guard !all.isEmpty,
+              let data = try? JSONSerialization.data(withJSONObject: all),
+              let text = String(data: data, encoding: .utf8) else { return "" }
+        return text
+    }
+
+    /// ⭐⭐ **cookie 宿主对象**（站方 `cookie.*` —— 真实语料 **205 处**）
+    public static func makeCookieObject(_ service: CookieService) -> HostObject {
+        var methods: [String: HostMethod] = [:]
+        methods["getCookie"] = { args in
+            .string(service.cookieHeader(for: args.first?.scalarString ?? ""))
+        }
+        methods["setCookie"] = { args in
+            let url = args.first?.scalarString ?? ""
+            let value = args.count > 1 ? args[1].scalarString : ""
+            if !url.isEmpty { service.setCookie(value, for: url) }
+            return .string("")
+        }
+        methods["removeCookie"] = { args in
+            let url = args.first?.scalarString ?? ""
+            if !url.isEmpty { service.removeCookie(for: url) }
+            return .string("")
+        }
+        methods["replaceCookie"] = { args in
+            let url = args.first?.scalarString ?? ""
+            let value = args.count > 1 ? args[1].scalarString : ""
+            if !url.isEmpty { service.replaceCookie(value, for: url) }
+            return .string("")
+        }
+        return HostObject(name: "cookie", methods: methods, properties: [:])
     }
 
     /// ⭐⭐ **章节对象**（站方 JS 里的 `chapter`）

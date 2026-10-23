@@ -199,7 +199,13 @@ final class JsonSourceSupportTests: XCTestCase {
         XCTAssertEqual(obj.property("book_id")?.scalarString, "77")
     }
 
-    /// ⭐⭐ **书源对象**：`source.getVariable` / `source.bookSourceUrl`
+    /// ⭐⭐⭐ **书源对象**：`getVariable()` / `get` / `put` / `getKey` / 登录信息
+    ///
+    /// ⚠️ **语义照抄老引擎 `source-api.js`**（事实标准）：
+    /// - `source.getVariable()` ⇒ **整份变量串**（**无参**！185 处真实用法）
+    /// - `source.get(key)` ⇒ **变量的某一项**（**127 处**真实用法 ⇒ 少了就静默失效 + 假成功）⭐
+    /// - `source.put(key, value)` ⇒ 写某一项
+    /// - `source.getKey()` ⇒ 稳定的源标识（42 处真实用法）
     func testSourceHostObjectReadsVarBox() throws {
         let source = try JSONDecoder().decode(BookSource.self, from: Data("""
         {"bookSourceName":"某源","bookSourceUrl":"https://src.example.com"}
@@ -208,10 +214,49 @@ final class JsonSourceSupportTests: XCTestCase {
         box.set("server", "https://fast.example.com")
         let obj = SourceEngine.makeSourceObject(source, varBox: box,
                                                 loginInfo: ["uid": "42"])
-        XCTAssertEqual(obj.call("getVariable", [.string("server")])?.scalarString,
+
+        // ① `getVariable()` = **整份**（无参）
+        let whole = obj.call("getVariable", [])?.scalarString ?? ""
+        XCTAssertTrue(whole.contains("server"), "getVariable() 要返回整份变量串：\(whole)")
+        XCTAssertTrue(whole.contains("fast.example.com"))
+
+        // ② ⭐ `get(key)` = **某一项**（没有 ⇒ 空串）
+        XCTAssertEqual(obj.call("get", [.string("server")])?.scalarString,
                        "https://fast.example.com")
+        XCTAssertEqual(obj.call("get", [.string("没设置")])?.scalarString, "",
+                       "没这一项要返回空串（站方按「空串=没设置」处理）")
+
+        // ③ ⭐ `put(key, value)` = 写一项（**不能**返回整份 ⇒ 站方哈希对不上）
+        _ = obj.call("put", [.string("nhAuthed"), .string("HASH-1")])
+        XCTAssertEqual(box.get("nhAuthed"), "HASH-1", "put 要写进共享存储")
+        XCTAssertEqual(obj.call("get", [.string("nhAuthed")])?.scalarString, "HASH-1")
+
+        // ④ `getKey()` = 稳定的源标识
+        XCTAssertEqual(obj.call("getKey", [])?.scalarString, "https://src.example.com")
+
         XCTAssertEqual(obj.property("bookSourceUrl")?.scalarString, "https://src.example.com")
         let info = obj.call("getLoginInfoMap", [])
         XCTAssertEqual(info?["uid"]?.scalarString, "42")
+    }
+
+    /// ⭐⭐ **cookie 宿主对象**（站方 `cookie.*` —— 真实语料 **205 处**）
+    func testCookieHostObjectDelegatesToService() {
+        let service = MemoryCookieService()
+        let obj = SourceEngine.makeCookieObject(service)
+        XCTAssertEqual(obj.call("getCookie", [.string("https://x.example.com/")])?.scalarString, "")
+        _ = obj.call("setCookie", [.string("https://x.example.com/"), .string("a=1")])
+        XCTAssertEqual(obj.call("getCookie", [.string("https://x.example.com/")])?.scalarString, "a=1")
+        _ = obj.call("replaceCookie", [.string("https://x.example.com/"), .string("b=2")])
+        XCTAssertEqual(obj.call("getCookie", [.string("https://x.example.com/")])?.scalarString, "b=2")
+        _ = obj.call("removeCookie", [.string("https://x.example.com/")])
+        XCTAssertEqual(obj.call("getCookie", [.string("https://x.example.com/")])?.scalarString, "")
+    }
+
+    /// ⭐ **书籍对象**：`book.getVariable('custom')` = 书籍变量的某一项（30 处真实用法）
+    func testBookHostObjectGetVariableSingleItem() {
+        let book = Book(name: "书名", bookUrl: "https://x.example.com/1")
+        let obj = SourceEngine.makeBookObject(book, variables: ["custom": "站方要的变量"])
+        XCTAssertEqual(obj.call("getVariable", [.string("custom")])?.scalarString, "站方要的变量")
+        XCTAssertEqual(obj.call("getVariable", [.string("没有")])?.scalarString, "")
     }
 }

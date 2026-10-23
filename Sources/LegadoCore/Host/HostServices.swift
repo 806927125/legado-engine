@@ -91,6 +91,47 @@ public final class MemoryFileStorage: FileStorage, @unchecked Sendable {
     }
 }
 
+// MARK: - ② 之二 cookie 服务（站方 `cookie.*` 契约）
+
+/// ⭐⭐ **cookie 服务** —— 站方 JS 的 `cookie.getCookie(url)` / `setCookie` / `removeCookie` / `replaceCookie`
+///
+/// ⚠️ **为什么归宿主**：cookie 罐是**设备状态**（iOS = `HTTPCookieStorage`）
+/// ⇒ 引擎核心层不能碰 ⇒ 只定契约，宿主实现。
+///
+/// 📌 **真实用量**（125 源包 + 大灰狼 + NovelHub 实测）：**205 处** `cookie.*` 调用。
+public protocol CookieService: Sendable {
+    /// 取某个 URL 的 cookie 串（`k=v; k2=v2`）
+    func cookieHeader(for url: String) -> String
+    /// 写 cookie（`Set-Cookie` 的完整值）
+    func setCookie(_ value: String, for url: String)
+    /// 删某个站点下的 cookie（站方的「退出登录」用）
+    func removeCookie(for url: String)
+    /// 替换（先删后写）
+    func replaceCookie(_ value: String, for url: String)
+}
+
+/// **内存实现**（沙盒 / 测试用；真机由宿主接到 `HTTPCookieStorage`）
+public final class MemoryCookieService: CookieService, @unchecked Sendable {
+    private let lock = NSLock()
+    private var store: [String: String] = [:]
+
+    public init(_ initial: [String: String] = [:]) { store = initial }
+
+    public func cookieHeader(for url: String) -> String {
+        lock.lock(); defer { lock.unlock() }
+        return store[url] ?? ""
+    }
+    public func setCookie(_ value: String, for url: String) {
+        lock.lock(); store[url] = value; lock.unlock()
+    }
+    public func removeCookie(for url: String) {
+        lock.lock(); store.removeValue(forKey: url); lock.unlock()
+    }
+    public func replaceCookie(_ value: String, for url: String) {
+        lock.lock(); store[url] = value; lock.unlock()
+    }
+}
+
 // MARK: - ③ 浏览器（登录交接）
 
 /// **浏览器能力** —— 站方登录要开浏览器、拿回页面。
