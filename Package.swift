@@ -17,6 +17,7 @@ let package = Package(
     platforms: [.macOS(.v12), .iOS(.v15)],
     products: [
         .library(name: "LegadoCore", targets: ["LegadoCore"]),
+        .library(name: "LegadoHostApple", targets: ["LegadoHostApple"]),
         .executable(name: "conformance", targets: ["Conformance"]),
     ],
     dependencies: [
@@ -29,7 +30,14 @@ let package = Package(
         ]),
         // ⭐ 参考实现（轻阅的 AnalyzeUrl.swift）—— 只读，用于 URL 规则对拍
         .target(name: "AnalyzeUrlReference", path: "reference/swift"),
+        // ⭐⭐ **宿主层参考实现**（UserDefaults / FileManager / 日志 / 提示 / 同步加载器）
+        //   —— 核心层保持纯 Foundation ⇒ 这些放**宿主层 target** ⇒ 引擎不污染
+        //   ⚠️ 纯 Foundation 部分（UserDefaults / FileManager / PrintLogger）
+        //      **Linux 沙盒也能编真跑** ⇒ 跨平台门禁免费获得 ⭐
+        //   ⚠️ UIKit / WebKit 部分用 `#if canImport` 包 ⇒ 非 Apple 平台自动跳过
+        .target(name: "LegadoHostApple", dependencies: ["LegadoCore"]),
         .executableTarget(name: "Conformance", dependencies: ["LegadoCore", "AnalyzeUrlReference"]),
         .testTarget(name: "LegadoCoreTests", dependencies: ["LegadoCore", "AnalyzeUrlReference"]),
+        .testTarget(name: "LegadoHostAppleTests", dependencies: ["LegadoHostApple", "LegadoCore"]),
     ]
 )
