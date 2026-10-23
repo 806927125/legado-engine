@@ -62,7 +62,7 @@ jobs:
         run: set -o pipefail; swift build 2>&1 | tee jsc-build.log
 
       - name: JSC 门禁（Linux 上这些用例会被跳过 ⇒ 只能在这里跑）
-        run: set -o pipefail; swift test --filter JSCExecutorTests 2>&1 | tee jsc-test.log
+        run: set -o pipefail; swift test --filter JSC 2>&1 | tee jsc-test.log
 
       - name: 归档 JSC 编译日志（排查用）
         if: always()
