@@ -242,8 +242,11 @@ public final class JSCExecutor: JSExecutor {
     /// ⇒ `for...in` + `hasOwnProperty` ⇒ 能拿到全局的**自有可枚举属性**
     /// ⇒ 正好就是 `var` / `function` 声明留下的那些（站方 jsLib 的污染源）⭐
     private static func currentGlobals(in js: JavaScriptCore.JSContext) -> Set<String> {
+        // ⚠️⚠️ **必须用 `Object.getOwnPropertyNames`，不能用 `for...in`**
+        //   ⇒ 全局代码里的 `var` 声明创建的属性是**【不可枚举】**的
+        //   ⇒ `for...in` **枚举不到** ⇒ 全局清理形同虚设（门禁红出来的）⭐
         let src = """
-        (function(){var o=[];for(var k in this){if(Object.prototype.hasOwnProperty.call(this,k)){o.push(k);}}return o.join(String.fromCharCode(1));})()
+        (function(){var o=Object.getOwnPropertyNames(this);return o.join(String.fromCharCode(1));})()
         """
         guard let v = js.evaluateScript(src) else { return [] }
         let text = v.toString() ?? ""
