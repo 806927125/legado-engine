@@ -1358,3 +1358,38 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 **现状**：✅。
 
 ⚠️ 以前**模型里有字段、编排层一次都没求值** ⇒ 字数恒空、付费标记恒 false。
+
+## 25. S-JS-AJAX `java.ajax` 的引擎侧实现
+
+### S-JS-14 ⭐ `java.ajax` 归**引擎**做，宿主不用实现
+**规范**：站方 JS 的 `java.ajax(url[, options])` ⇒ 引擎**同步**发请求 ⇒ 返回响应正文。
+**依据**：🟢 125 源实测 —— **22 处 / 12 个源**在用（`java.md5` 23 处 / `java.getString` 22 处 /
+`java.toast` 21 处 / `java.get` 18 处 / `org.jsoup` 6 处 / **`document.` 只有 1 处**）。
+**现状**：✅（2026-10-23 补）。
+
+⭐⭐ **为什么归引擎**：引擎自己就有 `HTTPTransport` + `CookieJar` + 源级 header
+⇒ **天然能做** ⇒ 宿主**不用实现**这一条（`java.getString` / `java.get` / `java.toast`
+才是宿主的事：读文件 / 读配置 / 弹提示）。
+
+⭐⭐ **因为引擎内部全同步 ⇒ 这里能同步发请求并直接返回正文**
+⇒ **不需要「两遍跑」机制**（那是 WKWebView 异步桥的补丁）⭐
+⇒ ⇒ 这正是自研引擎相对 WKWebView 宿主的结构性优势。
+
+⚠️ **站方的 `options` 转成 URL 规则后缀**（`url,{"method":…,"body":…,"headers":…}`）
+⇒ **完整复用 `URLBuilder` 的编码语义**（query 重编码 / `+`→`%2B` / 绝对化）
+⇒ ⚠️ **不要自己手搓请求构造** —— 那四条 URL 语义踩过坑 ⭐
+⚠️ `body` 是**对象**时要 JSON 化。
+⚠️ `java.post(url, body)` 的第二参数是 **body 字符串**（语义不同）⇒ **不接管**，留给宿主。
+
+### S-JS-15 ⭐ `data:` 伪 URL 绝不能真去 fetch
+**规范**：`data:` URL ⇒ **载荷当响应体**返回，**一个请求都不发**。
+**依据**：🟢 站方聚合源用它装载荷（`data:;base64,<载荷>,{"type":"qingtian"}`）。
+**现状**：✅。
+
+⚠️ **标准 `data:` 格式**：`data:[<mediatype>][;base64],<data>`
+⇒ **第一个逗号前 = mediatype**（可能含 `;base64`），**逗号后 = data**
+⇒ ⚠️ 站方在 data 后面**又接了自己的尾巴**（`,{"type":…}`）
+⇒ base64 时载荷到**下一个逗号**为止；明文时**整个 data 都是载荷**（明文里可能有逗号）。
+
+⚠️⚠️ **解不了 base64 ⇒ 明确失败（nil）**，不许返回乱码
+（乱码 ⇒ 站方 `JSON.parse` 炸 ⇒ 整条规则挂掉）⭐

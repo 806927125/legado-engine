@@ -7,6 +7,28 @@ import Foundation
 public protocol JSExecutor {
     /// 执行站方 JS，返回值（转换后的 JSON 形态）
     func run(_ code: String, context: JSRunContext) throws -> JSONValue
+
+    /// ⭐⭐ **引擎侧的 `java.ajax`**（可选）—— 宿主**不用实现**。
+    ///
+    /// 站方 JS 调 `java.ajax(url)` 抓页面（**125 源里 22 处 / 12 个源**）
+    /// ⇒ 引擎自己就有 `HTTPTransport` + `CookieJar` + 源级 header ⇒ **天然能做**
+    ///
+    /// ⭐⭐ **因为引擎内部全同步** ⇒ 这里可以**同步发请求**并直接返回正文
+    /// ⇒ **不需要「两遍跑」机制**（那是 WKWebView 异步桥的补丁）⭐
+    ///
+    /// - Parameters:
+    ///   - url: 站方给的 URL
+    ///   - options: 第二个参数（`{method, body, headers}`），可为 nil
+    /// - Returns: 响应正文；失败返回 nil
+    func setEngineAjax(_ handler: JSAjaxHandler?)
+}
+
+/// ⭐ **`java.ajax` 的引擎侧实现签名**
+public typealias JSAjaxHandler = (String, JSONValue?) -> String?
+
+extension JSExecutor {
+    /// 默认实现 = **不接管**（宿主自己实现 `java.ajax`）
+    public func setEngineAjax(_ handler: JSAjaxHandler?) {}
 }
 
 /// JS 执行的上下文（**同步**）

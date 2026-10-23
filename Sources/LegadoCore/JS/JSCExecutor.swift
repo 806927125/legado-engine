@@ -24,8 +24,16 @@ public final class JSCExecutor: JSExecutor {
     /// 宿主 API 提供者（`java.*` 与宿主对象的实现）
     private let api: JSHostAPIProvider
 
+    /// ⭐⭐ **引擎侧的 `java.ajax`**（可选）—— 宿主不用实现
+    private var engineAjax: JSAjaxHandler?
+
     public init(api: JSHostAPIProvider) {
         self.api = api
+    }
+
+    /// ⭐⭐ 让引擎接管 `java.ajax`（站方 JS 抓页面用）
+    public func setEngineAjax(_ handler: JSAjaxHandler?) {
+        self.engineAjax = handler
     }
 
     public func run(_ code: String, context: JSRunContext) throws -> JSONValue {
@@ -148,11 +156,28 @@ public final class JSCExecutor: JSExecutor {
     private func makeHostBlock(in js: JavaScriptCore.JSContext)
         -> (@convention(block) (String, String, String) -> String)? {
         let provider = self.api
+        // ⭐⭐ **引擎侧优先接管 `java.ajax`**（宿主不用实现）
+        let engineAjax = self.engineAjax
         let block: @convention(block) (String, String, String) -> String = { object, method, argsJSON in
             var args: [JSONValue] = []
             if let data = argsJSON.data(using: .utf8),
                let arr = try? JSONSerialization.jsonObject(with: data) as? [Any] {
                 args = arr.map { JSONValue.from($0) }
+            }
+            // ⭐⭐ `java.ajax` / `java.post` ⇒ **引擎侧同步发请求**
+            //   （引擎有 transport + cookie jar + 源级 header ⇒ 天然能做）
+            // ⚠️ 只接管 `ajax` —— `java.post(url, body)` 的第二参数是 **body 字符串**，
+            //    语义与 options 不同 ⇒ 留给宿主实现（125 源里只有 2 处）
+            if method == "ajax", let engineAjax {
+                let url = args.first?.scalarString ?? ""
+                let options = args.count > 1 ? args[1] : nil
+                if let body = engineAjax(url, options) {
+                    // ⚠️ 顶层标量不能 JSON 序列化 ⇒ 统一包一层数组（JS 侧取 `[0]`）
+                    guard let data = try? JSONSerialization.data(withJSONObject: [body]),
+                          let text = String(data: data, encoding: .utf8) else { return "null" }
+                    return text
+                }
+                return "null"
             }
             let result: JSONValue?
             if object == "java" {
@@ -172,20 +197,8 @@ public final class JSCExecutor: JSExecutor {
     }
 
     /// JSONValue → Foundation 值（要能过 `JSONSerialization`）
-    static func toFoundation(_ v: JSONValue) -> Any {
-        switch v {
-        case .null:      return NSNull()
-        case .bool(let b): return b
-        case .int(let i):  return i
-        case .double(let d): return d
-        case .string(let s): return s
-        case .array(let a): return a.map { toFoundation($0) }
-        case .object(let o):
-            var out: [String: Any] = [:]
-            for (k, val) in o { out[k] = toFoundation(val) }
-            return out
-        }
-    }
+    /// ⚠️ 实现搬到核心层（`JSONValue.foundationValue`）⇒ 平台无关
+    static func toFoundation(_ v: JSONValue) -> Any { v.foundationValue }
 
     // MARK: - 值转换
 

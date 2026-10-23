@@ -65,6 +65,14 @@ public final class SourceEngine {
         self.browser = browser
         self.notifier = notifier
         self.logger = logger
+        // ⭐⭐ **让引擎接管 `java.ajax`**（站方 JS 抓页面用 —— 125 源里 22 处 / 12 个源）
+        //
+        // ⭐ 引擎**全同步** ⇒ 这里可以**同步发请求**并直接返回正文
+        // ⇒ **不需要「两遍跑」机制**（那是 WKWebView 异步桥的补丁）⭐
+        js?.setEngineAjax { [weak self] url, options in
+            guard let self else { return nil }
+            return self.ajax(url: url, options: options)
+        }
     }
 
     // MARK: - ① 分类
@@ -326,6 +334,104 @@ public final class SourceEngine {
             if !k.isEmpty { out[k] = v }
         }
         return out
+    }
+
+    // MARK: - ⭐⭐ `java.ajax`（引擎侧）
+
+    /// ⭐⭐ **`java.ajax(url[, options])` 的引擎侧实现**。
+    ///
+    /// **为什么归引擎**：站方 JS 靠它抓页面（**125 源里 22 处 / 12 个源**）
+    /// ⇒ 而引擎自己就有 `HTTPTransport` + `CookieJar` + 源级 header ⇒ **天然能做**
+    /// ⇒ 宿主**不用实现**这一条。
+    ///
+    /// ⚠️ **站方的 `options` 转成 URL 规则后缀**（`url,{"method":…,"body":…}`）
+    /// ⇒ **完整复用 `URLBuilder` 的编码语义**（query 重编码 / `+`→`%2B` / 绝对化）
+    /// ⇒ ⚠️ **不要自己手搓请求构造** —— 那四条 URL 语义踩过坑 ⭐
+    public func ajax(url: String, options: JSONValue?) -> String? {
+        let u = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !u.isEmpty else { return nil }
+
+        // ① ⚠️⚠️ **`data:` 伪 URL 绝不能真去 fetch**
+        //    （站方聚合源用它装载荷 ⇒ 载荷就是「页面内容」⇒ 当响应体返回）
+        if u.lowercased().hasPrefix("data:") {
+            return Self.dataPayload(u)
+        }
+
+        // ② 站方 options ⇒ URL 规则后缀
+        var rule = u
+        var opts: [String: Any] = [:]
+        if case .object(let o)? = options {
+            if let m = o["method"]?.scalarString, !m.isEmpty { opts["method"] = m }
+            if let b = o["body"], !b.isNull {
+                // ⚠️ body 可能是**字符串**，也可能是**对象**（对象 ⇒ JSON 化）
+                switch b {
+                case .string(let s): opts["body"] = s
+                case .object, .array: opts["body"] = Self.jsonText(b)
+                default: opts["body"] = b.scalarString
+                }
+            }
+            if let h = o["headers"], case .object(let hh) = h, !hh.isEmpty {
+                var hs: [String: String] = [:]
+                for (k, v) in hh { hs[k] = v.scalarString }
+                opts["headers"] = hs
+            }
+        }
+        if !opts.isEmpty {
+            guard let data = try? JSONSerialization.data(withJSONObject: opts),
+                  let text = String(data: data, encoding: .utf8) else { return nil }
+            rule = u + "," + text
+        }
+
+        // ③ 发请求（走 `PageFetcher` ⇒ 带上源级 header + CookieJar）
+        do {
+            let resp = try fetcher.fetch(rule: rule, baseUrl: source.bookSourceUrl,
+                                        headers: sourceHeaders)
+            guard resp.isSuccess else { return nil }
+            return resp.text
+        } catch {
+            // ⚠️ 失败**不抛**（JS 侧拿 undefined ⇒ 站方自己判空）
+            //    ⇒ 但要把失败记进诊断（不许静默）
+            let d = EngineDiagnostic(rule: "java.ajax", branch: "java.ajax")
+            diagnostics.append(d)
+            return nil
+        }
+    }
+
+    /// ⚠️ **`data:` 伪 URL 的载荷**（站方聚合源用它装页面内容）。
+    ///
+    /// 格式：`data:;base64,<载荷>,{"type":"qingtian2"}`
+    /// ⇒ 载荷在 `;base64,` 之后、`,` 之前。
+    ///
+    /// ⚠️ **解不了要明确失败（返回 nil）**，不许返回乱码
+    /// （乱码 ⇒ 站方 `JSON.parse` 炸 ⇒ 整条规则挂掉）⭐
+    public static func dataPayload(_ raw: String) -> String? {
+        let rest = String(raw.dropFirst("data:".count))
+        // ⭐ **标准 `data:` 格式**：`data:[<mediatype>][;base64],<data>`
+        //   ⇒ **第一个逗号前 = mediatype**（可能含 `;base64`），**逗号后 = data**
+        guard let firstComma = rest.firstIndex(of: ",") else { return rest }
+        let mediatype = rest[rest.startIndex..<firstComma]
+        let isBase64 = mediatype.lowercased().contains("base64")
+        let data = String(rest[rest.index(after: firstComma)...])
+        // ⚠️⚠️ **站方在 data 后面又接了自己的尾巴**：`,{"type":"qingtian"}`
+        //   ⇒ base64 时载荷到**下一个逗号**为止；明文时**整个 data 都是载荷**（明文里可能有逗号）
+        var payload = data
+        if isBase64, let comma = data.firstIndex(of: ",") {
+            payload = String(data[data.startIndex..<comma])
+        }
+        if isBase64 {
+            // ⚠️ `Data(base64Encoded:)` **默认严格**（非法字符 ⇒ nil）⇒ 正好「明确失败」
+            guard let data = Data(base64Encoded: payload, options: []) else { return nil }
+            return String(data: data, encoding: .utf8)
+        }
+        return payload
+    }
+
+    /// JSON 值 → 文本（`body` 是对象时用）
+    static func jsonText(_ v: JSONValue) -> String {
+        let any = v.foundationValue
+        guard let data = try? JSONSerialization.data(withJSONObject: any),
+              let text = String(data: data, encoding: .utf8) else { return v.scalarString }
+        return text
     }
 
     // MARK: - 内部

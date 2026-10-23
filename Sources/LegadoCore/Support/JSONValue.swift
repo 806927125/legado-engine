@@ -93,3 +93,24 @@ public indirect enum JSONValue: Sendable, Equatable {
         return nil
     }
 }
+
+extension JSONValue {
+    /// ⭐ **JSONValue → Foundation 值**（要能过 `JSONSerialization`）。
+    ///
+    /// ⚠️ 放在核心层（不放在 JSCExecutor）⇒ **平台无关** ⇒ 编排层也能用
+    /// （如 `java.ajax` 的 body 是对象时要 JSON 化）。
+    public var foundationValue: Any {
+        switch self {
+        case .null:        return NSNull()
+        case .bool(let b): return b
+        case .int(let i):  return i
+        case .double(let d): return d
+        case .string(let s): return s
+        case .array(let a): return a.map { $0.foundationValue }
+        case .object(let o):
+            var out: [String: Any] = [:]
+            for (k, val) in o { out[k] = val.foundationValue }
+            return out
+        }
+    }
+}
