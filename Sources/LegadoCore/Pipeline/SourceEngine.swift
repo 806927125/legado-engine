@@ -91,13 +91,226 @@ public final class SourceEngine {
     /// - 老式：每行 `标题::URL`（**URL 可相对**，相对书源首页）
     /// - 新式：JSON 数组 `[{"title":…,"url":…,"style":…}]`
     public func categories() throws -> [SourceCategory] {
+        try exploreKinds().kinds
+    }
+
+    /// ⭐⭐⭐ **发现页的分类 + 筛选栏**（栖阅契约 · 站方真实形态）
+    ///
+    /// **`exploreUrl` 有三种形态**（125 源实测）：
+    /// ① **静态 JSON 数组**：`[{title,url,style}, …]`
+    /// ② **静态纯文本**：`标题::URL` 每行一条（**`&&` 也是分隔符**）
+    /// ③ ⭐ **JS**（`@js:` 或 `<js>…</js>`）⇒ **跑 JS 才拿得到分类**
+    ///    （全免小说 / 免费追书 ⇒ 活体验证暴露的缺口）
+    ///
+    /// **JS 的返回值有四种形态**（照抄轻阅 `exploreKinds`）：
+    /// - 数组 ⇒ 直接用
+    /// - JSON 字符串（以 `[` / `{` 开头）⇒ `JSON.parse`
+    /// - 纯文本（`玄幻::/type/xh`）⇒ 按 `&&`/换行切
+    /// - 对象带 `exploreKind` ⇒ 取它
+    ///
+    /// ⚠️⚠️ **`@js:` 里不做 `{{}}` 插值**（Legado / 栖阅语义）
+    ///   （`{{...}}` 是 JS 展开语法 ⇒ 插值会吃成空串 ⇒ **整个 JS 语法坏掉**）
+    public func exploreKinds() throws -> (kinds: [SourceCategory], filters: [SourceFilter]) {
         guard let exploreUrl = source.exploreUrl,
               !exploreUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw SourceError.ruleMissing("exploreUrl")
         }
-        let cats = Self.parseExploreUrl(exploreUrl, base: source.bookSourceUrl)
-        guard !cats.isEmpty else { throw SourceError.emptyResult("exploreUrl") }
-        return cats
+        let spec = exploreUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // ① JS 形态 ⇒ 跑 JS 拿分类数组
+        var rawItems: [JSONValue] = []
+        var isJS = false
+        var jsCode = ""
+        if spec.hasPrefix("@js:") || spec.hasPrefix("@JS:") {
+            isJS = true; jsCode = String(spec.dropFirst(4))
+        } else if spec.hasPrefix("<js>") || spec.hasPrefix("<JS>") {
+            isJS = true
+            jsCode = String(spec.dropFirst(4))
+            if jsCode.hasSuffix("</js>") { jsCode = String(jsCode.dropLast(5)) }
+        }
+
+        if isJS {
+            guard let js = evaluator.js else {
+                throw SourceError.unsupported("exploreUrl 是 JS，但 JS 后端未接")
+            }
+            let out = try js.run(jsCode, context: JSRunContext(base: .page(""),
+                                                                 baseUrl: source.bookSourceUrl,
+                                                                 varBox: varBox))
+            rawItems = Self.exploreItems(from: out)
+        } else {
+            // ② 静态形态
+            if spec.hasPrefix("[") {
+                // ⭐⭐ **容错解析**（站方 JSON 里常有裸换行 ⇒ 不是合法 JSON）
+                if let obj = Self.lenientJSONObject(spec), let arr = obj as? [Any] {
+                    rawItems = arr.map { JSONValue.from($0) }
+                }
+            } else {
+                rawItems = Self.exploreItems(from: .string(spec))
+            }
+        }
+
+        var (kinds, filters) = Self.splitExploreItems(rawItems, base: source.bookSourceUrl)
+
+        // ⭐⭐ **分类项的 url 可能是 `@js:` 脚本** ⇒ 跑 JS 得真实 URL
+        //   （全免小说 ⇒ 活体验证暴露的缺口；**轻阅也没有这条** ⇒ 全新能力）
+        if kinds.contains(where: { $0.url.hasPrefix("@js:") || $0.url.hasPrefix("@JS:") }) {
+            guard let js = evaluator.js else {
+                throw SourceError.unsupported("分类 url 是 JS，但 JS 后端未接")
+            }
+            for i in kinds.indices {
+                let u = kinds[i].url
+                if u.hasPrefix("@js:") || u.hasPrefix("@JS:") {
+                    let code = String(u.dropFirst(4))
+                    let out = try js.run(code, context: JSRunContext(base: .page(""),
+                                                                     baseUrl: source.bookSourceUrl,
+                                                                     varBox: varBox))
+                    let real = out.scalarString.trimmingCharacters(in: .whitespacesAndNewlines)
+                    kinds[i].url = real.isEmpty ? "" : Self.absolute(real, base: source.bookSourceUrl)
+                }
+            }
+        }
+        guard !kinds.isEmpty else { throw SourceError.emptyResult("exploreUrl") }
+        return (kinds, filters)
+    }
+
+    /// ⭐⭐ **容错 JSON 解析**（站方的 `exploreUrl` 里 `@js:` 后面常有**真换行**）
+    ///
+    /// ⚠️ **JSON 字符串里不能有裸换行** ⇒ 站方写成多行 JSON 时**根本不是合法 JSON**
+    ///   （全免小说 ⇒ `exploreUrl` 解析失败 ⇒ 分类全空）
+    /// ⇒ 把**字符串内**的真控制字符转义掉（字符串外的换行只是空白 ⇒ 不动）⇒ 再解析 ⭐
+    public static func lenientJSONObject(_ text: String) -> Any? {
+        var out = ""
+        out.reserveCapacity(text.count + 32)
+        var inString = false
+        var escaped = false
+        for ch in text {
+            if escaped { out.append(ch); escaped = false; continue }
+            if ch == "\\" { out.append(ch); escaped = true; continue }
+            if ch == "\"" { inString.toggle(); out.append(ch); continue }
+            if inString {
+                switch ch {
+                case "\n": out.append("\\n")
+                case "\r": out.append("\\r")
+                case "\t": out.append("\\t")
+                default: out.append(ch)
+                }
+            } else {
+                out.append(ch)
+            }
+        }
+        guard let data = out.data(using: .utf8) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data)
+    }
+
+    /// ⭐ **JS 返回值 ⇒ 分类项数组**（四种形态都认）
+    public static func exploreItems(from v: JSONValue) -> [JSONValue] {
+        switch v {
+        case .array(let a):
+            return a
+        case .string(let s):
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            if t.hasPrefix("[") || t.hasPrefix("{") {
+                guard let data = t.data(using: .utf8),
+                      let obj = try? JSONSerialization.jsonObject(with: data) else { return [] }
+                if let arr = obj as? [Any] { return arr.map { JSONValue.from($0) } }
+                if let d = obj as? [String: Any], let ek = d["exploreKind"],
+                   let arr = ek as? [Any] { return arr.map { JSONValue.from($0) } }
+                return []
+            }
+            // 纯文本：`标题::URL`（`&&` 或换行分隔）
+            return Self.splitPlainKinds(t).map { .string($0) }
+        case .object(let o):
+            if let ek = o["exploreKind"], case .array(let a) = ek { return a }
+            return []
+        default:
+            return []
+        }
+    }
+
+    /// ⭐ **纯文本分类**（`标题::URL`）⇒ 按 `&&` / 换行切
+    public static func splitPlainKinds(_ text: String) -> [String] {
+        var parts: [String] = []
+        var buf = ""
+        for ch in text {
+            if ch == "&" || ch == "\n" || ch == "\r" {
+                let t = buf.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !t.isEmpty { parts.append(t) }
+                buf = ""
+            } else {
+                buf.append(ch)
+            }
+        }
+        let t = buf.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !t.isEmpty { parts.append(t) }
+        return parts
+    }
+
+    /// ⭐⭐ **分类项 ⇒ 分类 + 筛选栏**（照抄轻阅 `normalizeKinds` / 栖阅契约）
+    ///
+    /// - **字符串项**：无 `::` ⇒ **组标题**（剥装饰符号）⇒ 后面项归它
+    /// - **字符串项**：有 `::` ⇒ `标题::URL` ⇒ 分类
+    /// - **对象项**：`type == "select"` ⇒ **筛选栏**（不是分类！）
+    /// - **对象项**：有 url ⇒ 分类
+    public static func splitExploreItems(_ items: [JSONValue], base: String)
+        -> (kinds: [SourceCategory], filters: [SourceFilter]) {
+        var kinds: [SourceCategory] = []
+        var filters: [SourceFilter] = []
+        var group = ""
+        for item in items {
+            switch item {
+            case .string(let raw):
+                let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !t.isEmpty else { continue }
+                guard let sep = t.range(of: "::") else {
+                    // ⭐ 没有 `::` ⇒ **组标题**（装饰符号剥掉，只留文字）
+                    group = t.replacingOccurrences(of: "[*☆○●•·　\\s]+", with: "",
+                                                 options: .regularExpression)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if group.isEmpty { group = t }
+                    continue
+                }
+                let title = String(t[t.startIndex..<sep.lowerBound]).trimmingCharacters(in: .whitespaces)
+                let url = String(t[sep.upperBound...]).trimmingCharacters(in: .whitespaces)
+                guard !title.isEmpty, !url.isEmpty else { continue }
+                kinds.append(SourceCategory(title: title, url: absolute(url, base: base),
+                                            style: nil, group: group.isEmpty ? nil : group))
+            case .object(let o):
+                // ⭐⭐ **筛选栏**（栖阅契约：`{title, type:'select', chars, default, action}`）
+                let ktype = (o["type"]?.scalarString ?? "").lowercased()
+                if ktype == "select" {
+                    var chars: [String] = []
+                    if case .array(let a) = o["chars"] {
+                        chars = a.map { $0.scalarString }
+                    } else if let s = o["chars"]?.scalarString, !s.isEmpty {
+                        chars = s.components(separatedBy: CharacterSet(charactersIn: ",\n"))
+                            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                    }
+                    let ftitle = o["title"]?.scalarString ?? ""
+                    if !ftitle.isEmpty {
+                        var weight: Double? = nil
+                        if case .object(let st) = o["style"],
+                           let w = st["layout_flexBasisPercent"] { weight = Double(w.scalarString) }
+                        filters.append(SourceFilter(title: ftitle, chars: chars,
+                                                   defaultValue: o["default"]?.scalarString,
+                                                   action: o["action"]?.scalarString,
+                                                   weight: weight))
+                    }
+                    continue
+                }
+                let title = o["title"]?.scalarString ?? ""
+                let url = o["url"]?.scalarString ?? ""
+                guard !title.isEmpty, !url.isEmpty else { continue }
+                // ⭐⭐ **`@js:` 前缀必须原样保留**（否则被当相对路径绝对化 ⇒ 前缀丢了 ⇒ JS 分支认不出）
+                let isJSURL = url.hasPrefix("@js:") || url.hasPrefix("@JS:")
+                kinds.append(SourceCategory(title: title,
+                                            url: isJSURL ? url : absolute(url, base: base),
+                                            style: o["style"]?.scalarString,
+                                            group: group.isEmpty ? nil : group))
+            default:
+                continue
+            }
+        }
+        return (kinds, filters)
     }
 
     /// 解析 `exploreUrl`（纯函数，便于单测）

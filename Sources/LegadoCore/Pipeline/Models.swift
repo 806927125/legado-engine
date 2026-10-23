@@ -6,9 +6,43 @@ public struct SourceCategory: Sendable, Equatable {
     public var url: String
     /// Legado 的 `style`（网格/列表），本引擎暂不使用
     public var style: String?
+    /// ⭐⭐ **所属组**（组标题行 ⇒ 后面跟着的分类归它）
+    ///
+    /// 站方（🍅大灰狼）把分类分���组，组标题是**装饰行**（形如 `☆排行榜☆`）
+    /// ⇒ 没有 `::` 的行 = **组标题**，不是分类 ⭐
+    /// ⇒ 栖阅同款契约（`ExploreCategorySplit.groups()`）
+    public var group: String?
 
-    public init(title: String, url: String, style: String? = nil) {
-        self.title = title; self.url = url; self.style = style
+    public init(title: String, url: String, style: String? = nil, group: String? = nil) {
+        self.title = title; self.url = url; self.style = style; self.group = group
+    }
+}
+
+/// ⭐⭐ **发现页的筛选栏项**（栖阅契约 · 站方 `type:"select"`）
+///
+/// ⚠️ 站方（🍅大灰狼）的 `exploreUrl` 返回里混着**筛选栏**（不是分类）：
+/// ```json
+/// { "title": "平台", "type": "select", "chars": ["番茄","七猫"],
+///   "action": "show(infoMap['平台'],'find_source')" }
+/// ```
+/// ⇒ 这些项**没有 url** ⇒ 以前被当成普通分类 ⇒ 「点不动」⭐
+/// ⇒ 现在**单独分流** ⇒ 宿主渲染成筛选栏 ⇒ 选中写源级变量 + 刷新
+public struct SourceFilter: Sendable, Equatable {
+    /// 显示名（「平台」/「模式」/「频道」）
+    public var title: String
+    /// 可选项
+    public var chars: [String]
+    /// 当前值
+    public var defaultValue: String?
+    /// ⭐ **动作**（站方 JS 表达式，宿主在 JS 环境求值）
+    public var action: String?
+    /// 布局权重（站方 `style.layout_flexBasisPercent`）
+    public var weight: Double?
+
+    public init(title: String, chars: [String], defaultValue: String? = nil,
+                action: String? = nil, weight: Double? = nil) {
+        self.title = title; self.chars = chars; self.defaultValue = defaultValue
+        self.action = action; self.weight = weight
     }
 }
 
