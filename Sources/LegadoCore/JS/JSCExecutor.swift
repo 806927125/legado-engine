@@ -58,7 +58,7 @@ public final class JSCExecutor: JSExecutor {
         //   JS 侧：包函数把参数 JSON 化 ⇒ 调 `__hostJSON(obj, method, argsJSON)`
         //   Swift 侧：解析 args ⇒ 调宿主 ⇒ 结果 JSON 化回字符串
         //   JS 侧再 `JSON.parse` 还原 ⇒ 站方拿到原类型
-        if let hostBlock = makeHostBlock(in: js, base: base) {
+        if let hostBlock = makeHostBlock(in: js, base: context.base) {
             js.setObject(unsafeBitCast(hostBlock, to: AnyObject.self),
                           forKeyedSubscript: "__hostJSON" as NSString)
         }
