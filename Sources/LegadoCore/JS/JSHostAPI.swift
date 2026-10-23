@@ -34,6 +34,11 @@ public enum JSHostAPI {
         .init(object: "java", name: "searchBook", kind: .method),
         .init(object: "java", name: "randomUUID", kind: .method),
         .init(object: "java", name: "connect", kind: .method),
+        // ⭐⭐ **2026-10-23 从 125 源自动扫描补齐**（usage.json 里原来漏了这 3 个）
+        //   ⇒ 契约漏 = JS 侧**不生成包装函数** ⇒ 站方调用报「undefined is not a function」⭐
+        .init(object: "java", name: "toNumChapter", kind: .method),
+        .init(object: "java", name: "timeFormatUTC", kind: .method),
+        .init(object: "java", name: "refreshTocUrl", kind: .method),
         .init(object: "java", name: "ajaxAll", kind: .method),
         .init(object: "java", name: "log", kind: .method),
         .init(object: "java", name: "toast", kind: .method),

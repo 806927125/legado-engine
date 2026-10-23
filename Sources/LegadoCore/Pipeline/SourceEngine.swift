@@ -69,9 +69,9 @@ public final class SourceEngine {
         //
         // ⭐ 引擎**全同步** ⇒ 这里可以**同步发请求**并直接返回正文
         // ⇒ **不需要「两遍跑」机制**（那是 WKWebView 异步桥的补丁）⭐
-        js?.setEngineAjax { [weak self] url, options in
+        js?.setEngineAPI { [weak self] method, args in
             guard let self else { return nil }
-            return self.ajax(url: url, options: options)
+            return self.engineJava(method, args)
         }
     }
 
@@ -334,6 +334,46 @@ public final class SourceEngine {
             if !k.isEmpty { out[k] = v }
         }
         return out
+    }
+
+    // MARK: - ⭐⭐ 引擎侧接管的 `java.*`
+
+    /// ⭐⭐ **引擎侧接管的 `java.*`** —— **返回 nil = 「我不接管」⇒ 落回宿主**。
+    ///
+    /// **契约**（125 源真实用量，按处数排序）：
+    /// | API | 处数 | 本轮 |
+    /// |---|---|---|
+    /// | `java.md5Encode` | **233** | ✅ 纯计算 |
+    /// | `java.ajax` | 27 | ✅ 同步发请求 |
+    /// | `java.base64Decode` / `base64Encode` / `hexDecodeToString` | 7/5/3 | ✅ 纯计算 |
+    /// | `java.randomUUID` | 2 | ✅ |
+    /// | `java.toNumChapter` | 1 | ✅ |
+    /// | `java.getString` / `get` / `put` / `timeFormat` | 63/34/23/16 | ⬜ 下一批 |
+    /// | `java.toast` / `log` / `getCookie` / `startBrowser` … | — | **宿主** |
+    public func engineJava(_ method: String, _ args: [JSONValue]) -> JSONValue? {
+        let first = args.first?.scalarString ?? ""
+        switch method {
+        case "ajax":
+            let options = args.count > 1 ? args[1] : nil
+            return ajax(url: first, options: options).map { .string($0) }
+        case "md5Encode":
+            return .string(Crypto.md5Hex(first))
+        case "base64Encode":
+            return .string(Crypto.base64Encode(first))
+        case "base64Decode":
+            // ⚠️ 解不了 ⇒ **空串**（不是 nil）—— nil 表示「不接管」⇒ 会落回宿主
+            return .string(Crypto.base64Decode(first) ?? "")
+        case "hexDecodeToString":
+            // ⚠️ 同上：解不了 ⇒ 空串（**nil = 不接管**，语义不同）
+            return .string(Crypto.hexDecodeToString(first) ?? "")
+        case "randomUUID":
+            return .string(Crypto.randomUUID())
+        case "toNumChapter":
+            return .string(Crypto.convertChineseNumerals(in: first))
+        default:
+            // ⭐ **不接管** ⇒ 落回宿主实现
+            return nil
+        }
     }
 
     // MARK: - ⭐⭐ `java.ajax`（引擎侧）

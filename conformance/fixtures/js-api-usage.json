@@ -38,6 +38,7 @@
     "java.randomUUID",
     "java.reLoginView",
     "java.refreshExplore",
+    "java.refreshTocUrl",
     "java.searchBook",
     "java.setContent",
     "java.showBrowser",
@@ -47,6 +48,8 @@
     "java.startBrowserDp",
     "java.t2s",
     "java.timeFormat",
+    "java.timeFormatUTC",
+    "java.toNumChapter",
     "java.toast",
     "source.getKey",
     "source.getLoginInfo",
@@ -86,5 +89,5 @@
     "java.net",
     "java.util"
   ],
-  "note": "从 🍅大灰狼聚合vip完全版（jsLib 31961B + loginUrl 61678B + 9 处规则级 JS）+ 125 源包 全部 JS 片段扫出（\b 防回溯）"
+  "note": "从 🍅大灰狼聚合vip完全版（jsLib 31961B + loginUrl 61678B + 9 处规则级 JS）+ 125 源包 全部 JS 片段扫出（\b 防回溯） ｜ 2026-10-23：从 125 源自动扫描补齐（真实用量） ｜ java.md5Encode 233 处（最多）· java.getString 63 · java.get 34 · java.put 23 ｜ java.io/lang/util 是 Java 包访问，JS 里不存在，不算 API"
 }

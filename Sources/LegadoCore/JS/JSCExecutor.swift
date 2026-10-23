@@ -24,16 +24,16 @@ public final class JSCExecutor: JSExecutor {
     /// 宿主 API 提供者（`java.*` 与宿主对象的实现）
     private let api: JSHostAPIProvider
 
-    /// ⭐⭐ **引擎侧的 `java.ajax`**（可选）—— 宿主不用实现
-    private var engineAjax: JSAjaxHandler?
+    /// ⭐⭐ **引擎侧接管的 `java.*`**（可选）—— 宿主不用实现引擎能做的那些
+    private var engineAPI: JSEngineAPIHandler?
 
     public init(api: JSHostAPIProvider) {
         self.api = api
     }
 
-    /// ⭐⭐ 让引擎接管 `java.ajax`（站方 JS 抓页面用）
-    public func setEngineAjax(_ handler: JSAjaxHandler?) {
-        self.engineAjax = handler
+    /// ⭐⭐ 让引擎接管 `java.*`（`ajax` / `md5Encode` / `base64*` / …）
+    public func setEngineAPI(_ handler: JSEngineAPIHandler?) {
+        self.engineAPI = handler
     }
 
     public func run(_ code: String, context: JSRunContext) throws -> JSONValue {
@@ -156,28 +156,25 @@ public final class JSCExecutor: JSExecutor {
     private func makeHostBlock(in js: JavaScriptCore.JSContext)
         -> (@convention(block) (String, String, String) -> String)? {
         let provider = self.api
-        // ⭐⭐ **引擎侧优先接管 `java.ajax`**（宿主不用实现）
-        let engineAjax = self.engineAjax
+        // ⭐⭐ **引擎侧优先接管 `java.*`**（宿主不用实现引擎能做的那些）
+        let engineAPI = self.engineAPI
         let block: @convention(block) (String, String, String) -> String = { object, method, argsJSON in
             var args: [JSONValue] = []
             if let data = argsJSON.data(using: .utf8),
                let arr = try? JSONSerialization.jsonObject(with: data) as? [Any] {
                 args = arr.map { JSONValue.from($0) }
             }
-            // ⭐⭐ `java.ajax` / `java.post` ⇒ **引擎侧同步发请求**
-            //   （引擎有 transport + cookie jar + 源级 header ⇒ 天然能做）
-            // ⚠️ 只接管 `ajax` —— `java.post(url, body)` 的第二参数是 **body 字符串**，
-            //    语义与 options 不同 ⇒ 留给宿主实现（125 源里只有 2 处）
-            if method == "ajax", let engineAjax {
-                let url = args.first?.scalarString ?? ""
-                let options = args.count > 1 ? args[1] : nil
-                if let body = engineAjax(url, options) {
-                    // ⚠️ 顶层标量不能 JSON 序列化 ⇒ 统一包一层数组（JS 侧取 `[0]`）
-                    guard let data = try? JSONSerialization.data(withJSONObject: [body]),
-                          let text = String(data: data, encoding: .utf8) else { return "null" }
-                    return text
-                }
-                return "null"
+            // ⭐⭐ **引擎侧接管**（`ajax` / `md5Encode` / `base64*` / …）
+            //   ⇒ 引擎有 transport + cookie jar + 源级 header ⇒ 天然能做
+            //
+            // ⭐ **返回 nil = 「我不接管」** ⇒ 落回宿主实现
+            //   （⇒ 引擎只抢它真做的那几个，其余仍归宿主）
+            if object == "java", let engineAPI, let r = engineAPI(method, args) {
+                // ⚠️ 顶层标量不能 JSON 序列化 ⇒ 统一包一层数组（JS 侧取 `[0]`）
+                let any = Self.toFoundation(r)
+                guard let data = try? JSONSerialization.data(withJSONObject: [any]),
+                      let text = String(data: data, encoding: .utf8) else { return "null" }
+                return text
             }
             let result: JSONValue?
             if object == "java" {

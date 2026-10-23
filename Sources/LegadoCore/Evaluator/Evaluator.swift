@@ -8,27 +8,32 @@ public protocol JSExecutor {
     /// 执行站方 JS，返回值（转换后的 JSON 形态）
     func run(_ code: String, context: JSRunContext) throws -> JSONValue
 
-    /// ⭐⭐ **引擎侧的 `java.ajax`**（可选）—— 宿主**不用实现**。
+    /// ⭐⭐ **引擎侧接管 `java.*`**（可选）—— 宿主**不用实现**引擎能做的那些。
     ///
-    /// 站方 JS 调 `java.ajax(url)` 抓页面（**125 源里 22 处 / 12 个源**）
-    /// ⇒ 引擎自己就有 `HTTPTransport` + `CookieJar` + 源级 header ⇒ **天然能做**
+    /// **契约**（125 源真实用量，按处数排序）：
+    /// | API | 处数 | 归属 |
+    /// |---|---|---|
+    /// | `java.md5Encode` | **233** | ⭐ 引擎（纯计算）|
+    /// | `java.getString` / `get` / `put` | 63/34/23 | 引擎（源级变量）|
+    /// | `java.timeFormat` | 16 | 引擎（纯格式化）|
+    /// | `java.ajax` | 27 | ⭐ 引擎（同步发请求）|
+    /// | `java.base64Decode` / `base64Encode` / `hexDecodeToString` | 7/5/3 | ⭐ 引擎（纯计算）|
+    /// | `java.toast` / `log` / `getCookie` / `startBrowser` … | — | **宿主** |
     ///
-    /// ⭐⭐ **因为引擎内部全同步** ⇒ 这里可以**同步发请求**并直接返回正文
+    /// ⭐⭐ **因为引擎内部全同步** ⇒ `java.ajax` 可以**同步发请求**并直接返回正文
     /// ⇒ **不需要「两遍跑」机制**（那是 WKWebView 异步桥的补丁）⭐
     ///
-    /// - Parameters:
-    ///   - url: 站方给的 URL
-    ///   - options: 第二个参数（`{method, body, headers}`），可为 nil
-    /// - Returns: 响应正文；失败返回 nil
-    func setEngineAjax(_ handler: JSAjaxHandler?)
+    /// - Returns: **返回 nil = 「我不接管」** ⇒ 执行器落回宿主实现
+    ///   （⇒ 引擎只抢它真正实现的那几个，其余仍归宿主）
+    func setEngineAPI(_ handler: JSEngineAPIHandler?)
 }
 
-/// ⭐ **`java.ajax` 的引擎侧实现签名**
-public typealias JSAjaxHandler = (String, JSONValue?) -> String?
+/// ⭐ **引擎侧 `java.*` 的实现签名**
+public typealias JSEngineAPIHandler = (String, [JSONValue]) -> JSONValue?
 
 extension JSExecutor {
-    /// 默认实现 = **不接管**（宿主自己实现 `java.ajax`）
-    public func setEngineAjax(_ handler: JSAjaxHandler?) {}
+    /// 默认实现 = **不接管**（宿主自己实现全部 `java.*`）
+    public func setEngineAPI(_ handler: JSEngineAPIHandler?) {}
 }
 
 /// JS 执行的上下文（**同步**）
