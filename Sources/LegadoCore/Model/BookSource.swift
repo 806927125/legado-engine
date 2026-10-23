@@ -90,6 +90,8 @@ public struct RuleFields: Codable, Sendable {
     public var isVolume: String?
     public var isVip: String?
     public var nextTocUrl: String?
+    /// ⭐ **列表页翻页**（`ruleSearch.nextUrl` / `ruleExplore.nextUrl`）
+    public var nextUrl: String?
     // 正文
     public var content: String?
     public var nextContentUrl: String?
@@ -99,7 +101,7 @@ public struct RuleFields: Codable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case name, author, kind, intro, coverUrl, lastChapter, bookUrl, wordCount
         case searchUrl, bookList, tocUrl
-        case chapterList, chapterName, chapterUrl, isVolume, isVip, nextTocUrl
+        case chapterList, chapterName, chapterUrl, isVolume, isVip, nextTocUrl, nextUrl
         case content, nextContentUrl, replaceRegex, sourceRegex
     }
 
@@ -122,6 +124,7 @@ public struct RuleFields: Codable, Sendable {
         isVolume = try? c.decode(String.self, forKey: .isVolume)
         isVip = try? c.decode(String.self, forKey: .isVip)
         nextTocUrl = try? c.decode(String.self, forKey: .nextTocUrl)
+        nextUrl = try? c.decode(String.self, forKey: .nextUrl)
         content = try? c.decode(String.self, forKey: .content)
         nextContentUrl = try? c.decode(String.self, forKey: .nextContentUrl)
         replaceRegex = try? c.decode(String.self, forKey: .replaceRegex)

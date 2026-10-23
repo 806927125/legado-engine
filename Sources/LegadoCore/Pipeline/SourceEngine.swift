@@ -18,6 +18,11 @@ import Foundation
 /// 3. **空结果要抛错**，不许静默返回空数组 —— 「静默失效」是本项目要消灭的头号敌人
 public final class SourceEngine {
 
+    /// ⭐ **目录翻页上限**（防站方 `nextTocUrl` 成环 / 给无穷数组）
+    public static let maxTocPages = 20
+    /// ⭐ **正文翻页上限**
+    public static let maxContentPages = 20
+
     /// 书源
     public let source: BookSource
     /// 抓页面的入口
@@ -168,30 +173,58 @@ public final class SourceEngine {
         let url = info.tocUrl.isEmpty ? info.bookUrl : info.tocUrl
         guard !url.isEmpty else { throw SourceError.invalidSource("目录 URL 为空") }
         return try notifying {
-        let p = try fetch(url)
-
-        let nodes = try listNodes(listRule, page: p, field: "chapterList")
-        // ⭐ 卷标题判定：**站方给了 `isVolume` 规则就用它**（相对节点求值）
-        //   （真书源：`.catalog-section-title@text||span@text` ⇒ 命中 h2 卷标题）
-        //   没给 ⇒ 退到「没有章节 URL 就是卷标题」
-        let isVolumeRule = rules.isVolume ?? ""
+        // ⭐⭐⭐ **目录翻页**（`ruleToc.nextTocUrl`）—— 125 源里 **24 个**在用
+        //
+        // 以前只抓**第一页** ⇒ 这 24 个源的目录是**残缺的**（红薯小说：50 章 / 实际 274 章）
+        //
+        // ⚠️ 站方的 `nextTocUrl` 有三种给法，**都要认**：
+        //   ① 一个 URL 字符串（最常见）
+        //   ② **一个数组**（站方一次把全量页的 URL 都给出来 ⇒ 当「待抓页队列」）
+        //   ③ 多行文本（每个 URL 一行）
+        //
+        // ⚠️⚠️ **必须去重** —— 站方**每页都会再给一次同样的数组**
+        //   ⇒ 不去重 ⇒ 死循环 + 章节重复
+        var queue = [url]
+        var seen: Set<String> = []
         var out: [Chapter] = []
-        for (i, node) in nodes.enumerated() {
-            let name = value(rules.chapterName, in: node, page: p)
-            let rawURL = value(rules.chapterUrl, in: node, page: p)
-            let chapterURL = rawURL.isEmpty ? "" : Self.absolute(rawURL, base: p.url)
-            let isVolume: Bool
-            if !isVolumeRule.isEmpty {
-                isVolume = !value(isVolumeRule, in: node, page: p).isEmpty
-            } else {
-                isVolume = chapterURL.isEmpty
+        var pages = 0
+        while !queue.isEmpty, pages < Self.maxTocPages {
+            let pageURL = queue.removeFirst()
+            guard !seen.contains(pageURL) else { continue }
+            seen.insert(pageURL)
+            let p = try fetch(pageURL)
+            pages += 1
+
+            // ⚠️ 翻页页**没命中不许炸**（后面某页没内容是常态）⇒ 跳过继续
+            let nodes = try listNodes(listRule, page: p, field: "chapterList", strict: false)
+            if !nodes.isEmpty {
+                // ⭐ 卷标题判定：**站方给了 `isVolume` 规则就用它**（相对节点求值）
+                //   （真书源：`.catalog-section-title@text||span@text` ⇒ 命中 h2 卷标题）
+                //   没给 ⇒ 退到「没有章节 URL 就是卷标题」
+                let isVolumeRule = rules.isVolume ?? ""
+                for node in nodes {
+                    let name = value(rules.chapterName, in: node, page: p)
+                    let rawURL = value(rules.chapterUrl, in: node, page: p)
+                    let chapterURL = rawURL.isEmpty ? "" : Self.absolute(rawURL, base: p.url)
+                    let isVolume: Bool
+                    if !isVolumeRule.isEmpty {
+                        isVolume = !value(isVolumeRule, in: node, page: p).isEmpty
+                    } else {
+                        isVolume = chapterURL.isEmpty
+                    }
+                    out.append(Chapter(
+                        name: name.isEmpty ? node.text : name,
+                        url: chapterURL,
+                        isVolume: isVolume,
+                        index: out.count
+                    ))
+                }
             }
-            out.append(Chapter(
-                name: name.isEmpty ? node.text : name,
-                url: chapterURL,
-                isVolume: isVolume,
-                index: i
-            ))
+
+            // ⭐ 下一批页
+            if let nextRule = rules.nextTocUrl, !nextRule.isEmpty {
+                queue.append(contentsOf: valueURLs(nextRule, page: p))
+            }
         }
         return out
         }
@@ -204,10 +237,31 @@ public final class SourceEngine {
         guard let rules = source.ruleContent else { throw SourceError.ruleMissing("ruleContent") }
         guard !chapter.url.isEmpty else { throw SourceError.invalidSource("章节 URL 为空") }
         return try notifying {
-        let p = try fetch(chapter.url)
         let contentRule = rules.content ?? ""
         guard !contentRule.isEmpty else { throw SourceError.ruleMissing("content") }
-        var text = value(rules.content, in: nil, page: p)
+        // ⭐⭐⭐ **正文翻页**（`ruleContent.nextContentUrl`）—— 125 源里 **28 个**在用
+        //
+        // Legado 语义：`nextContentUrl` = 「**下一段正文**的 URL」⇒ 多页正文要**拼起来**
+        // 以前只抓第一页 ⇒ 这 28 个源的正文是**截断的**
+        var url = chapter.url
+        var seen: Set<String> = []
+        var parts: [String] = []
+        var pages = 0
+        while !url.isEmpty, pages < Self.maxContentPages {
+            guard !seen.contains(url) else { break }   // ⭐ 防死循环
+            seen.insert(url)
+            let p = try fetch(url)
+            pages += 1
+            let piece = value(rules.content, in: nil, page: p)
+            if !piece.isEmpty { parts.append(piece) }
+            // 下一段
+            if let nextRule = rules.nextContentUrl, !nextRule.isEmpty {
+                url = valueURLs(nextRule, page: p).first ?? ""
+            } else {
+                url = ""
+            }
+        }
+        var text = parts.joined(separator: "\n")
         text = Self.clean(text, using: rules.replaceRegex)
         return text
         }
@@ -265,12 +319,62 @@ public final class SourceEngine {
     }
 
     /// 列表规则 → 节点
-    private func listNodes(_ rule: String, page: Page, field: String) throws -> [DOMNodeRef] {
+    private func listNodes(_ rule: String, page: Page, field: String,
+                            strict: Bool = true) throws -> [DOMNodeRef] {
         let ctx = EvalContext(base: .page(page.text), baseUrl: page.url, raw: page.text,
                               isJSON: page.isJSON, document: page.document)
         let nodes = evaluator.evalNodes(rule, base: ctx.base, ctx: ctx)
-        if nodes.isEmpty { throw SourceError.emptyResult(field) }
+        // ⚠️ 翻页时 `strict = false` —— 后面某页没命中是常态，**不许炸掉整个目录**
+        if nodes.isEmpty, strict { throw SourceError.emptyResult(field) }
         return nodes
+    }
+
+    /// ⭐⭐ **`nextUrl` / `nextTocUrl` / `nextContentUrl` 的求值** ⇒ **URL 列表**。
+    ///
+    /// 站方有三种给法，**都要认**：
+    /// - ① 一个 URL 字符串（最常见）
+    /// - ② **一个数组**（站方一次把全量页的 URL 都给出来 ⇒ 当「待抓页队列」）
+    ///   （数组元素是对象时取 `url` / `href` 键）
+    /// - ③ 多行文本（每个 URL 一行）
+    ///
+    /// ⚠️ **基准是当前页**（页面级）⇒ 站方 `@js:` 里的 `result` = **页原文**
+    /// ⇒ 对 JSON 页面来说就是 **JSON 原文** ⇒ 站方 `JSON.parse(result)` 能直接用 ⭐
+    private func valueURLs(_ rule: String?, page: Page) -> [String] {
+        guard let rule, !rule.isEmpty else { return [] }
+        let base: RuleBase = .page(page.text)
+        let ctx = EvalContext(base: base, baseUrl: page.url, raw: page.text,
+                              isJSON: page.isJSON, document: page.document)
+        let e = evaluator.evalOne(rule, base: base, ctx: ctx)
+        diagnostics.append(e.diagnostic)
+        logger?.log(Self.diagnosticLine(e.diagnostic))
+        var out: [String] = []
+        switch e.value {
+        case .json(let j):
+            if case .array(let arr) = j {
+                for it in arr {
+                    if case .object(let o) = it {
+                        if let u = o["url"]?.scalarString { out.append(u) }
+                        else if let u = o["href"]?.scalarString { out.append(u) }
+                        else { out.append(it.scalarString) }
+                    } else {
+                        out.append(it.scalarString)
+                    }
+                }
+            } else {
+                out.append(j.scalarString)
+            }
+        case .list(let items):
+            out.append(contentsOf: items.map { $0.text })
+        case .string(let s):
+            out.append(contentsOf: s.components(separatedBy: .newlines))
+        case .node(let n):
+            out.append(n.text)
+        case .void:
+            break
+        }
+        return out
+            .map { Self.absolute($0.trimmingCharacters(in: .whitespacesAndNewlines), base: page.url) }
+            .filter { !$0.isEmpty }
     }
 
     /// **字段规则求值** —— `scope` 非空 ⇒ 在该节点**内部**相对求值。
