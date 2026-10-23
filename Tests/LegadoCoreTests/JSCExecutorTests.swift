@@ -85,11 +85,11 @@ final class JSCExecutorTests: XCTestCase {
 
     /// ⭐ `java.*` 的方法要能调
     ///
-    /// ⚠️ **已知限制（2026-10-23）**：JSON 通道里 `java.*` 的**参数传递**还有问题
-    /// （宿主收到的第一个参数是空的）⇒ 暂挂 ⇒ **不假装通过**。
-    /// 根因与修法见 `docs/JSC-NOTES.md`。
+    /// ⭐ 曾经的坑：Swift 侧返回**包了一层的数组**，JS 侧却按标量解析
+    /// ⇒ 站方拿到数组 ⇒ `.scalarString` 对数组返回 "" ⇒ **空串**
+    /// ⇒ 根因是 JSC 桥接探针查出来的（`docs/JSC-NOTES.md`）⇒ 现在真跑。
     func testJavaAPIIsInjected() throws {
-        throw XCTSkip("已知限制：java.* 的 JSON 通道参数传递待修（见 docs/JSC-NOTES.md）")
+        // ⭐ 根因已修（口径不一致）⇒ 不再跳过 ⇒ **真跑**
     }
 
 
