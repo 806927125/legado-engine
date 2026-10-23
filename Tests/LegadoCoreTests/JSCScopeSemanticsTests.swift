@@ -64,7 +64,7 @@ final class JSCScopeSemanticsTests: XCTestCase {
     func testScopeVariablesVisible() throws {
         let js = makeExecutor()
         let ctx = JSRunContext(base: .page("<html>整页原文</html>"), baseUrl: "https://x.example.com/")
-        let v = try js.run("String(result).length + '|' + baseUrl", context: ctx)
+        let v = try js.run("String(result) + '|' + baseUrl", context: ctx)
         XCTAssertTrue(v.scalarString.contains("整页原文"), "result 要看得见：\(v.scalarString)")
         XCTAssertTrue(v.scalarString.contains("x.example.com"), "baseUrl 要看得见：\(v.scalarString)")
     }
