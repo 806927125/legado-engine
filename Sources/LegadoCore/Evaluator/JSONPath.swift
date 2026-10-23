@@ -69,6 +69,19 @@ public enum JSONPath {
                     i = s.index(after: j)
                     continue
                 }
+                // ⭐⭐ `.[…]` = **方括号步骤**（`$.[*]` / `$.[-1]` / `$.['x']`）
+                //
+                // ⚠️ 125 源实测：站方**大量**用 `$.[*]`、`$.[-1].title` 这种「点 + 方括号」写法
+                // （体检量到 **16 处**）⇒ 以前这里 name 收不到字符 ⇒ 直接 `return nil`
+                // ⇒ 规则被判成「JSONPath 不支持」⇒ **整条规则静默失效**。
+                //
+                // 语义上 `.[x]` 与 `[x]` 等价 ⇒ 直接走同一个 `readBracket`。
+                if j < s.endIndex, s[j] == "[" {
+                    guard let (step, next) = readBracket(s, from: j) else { return nil }
+                    steps.append(step)
+                    i = next
+                    continue
+                }
                 var name = ""
                 while j < s.endIndex, isNameChar(s[j]) { name.append(s[j]); j = s.index(after: j) }
                 guard !name.isEmpty else { return nil }

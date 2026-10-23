@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 /// 最小 JSON 值类型（纯 Foundation，无第三方依赖）。
 ///
@@ -17,16 +18,35 @@ public indirect enum JSONValue: Sendable, Equatable {
     case object([String: JSONValue])
 
     /// 便捷构造：从任意 Foundation 值转过来（用于把站方 JS 的返回值映射进来）。
+    ///
+    /// ⚠️⚠️ **`NSNumber` 的双重身份**（Foundation 的老坑，也是本项目踩过两次的坑）：
+    /// `NSNumber(value: 1)` **既能** `as? Int`（=1）**又能** `as? Bool`（=true）。
+    /// ⇒ 以前 `case let b as Bool` 排在 Int 前面 ⇒ **所有数字 1 都变成 `true`** ⭐
+    /// ⇒ 表现：JSONPath 取到的 `{"n":1}` 变成 `{"n":true}` ⇒ 站方的数字判断全错。
+    ///
+    /// ⇒ 修法：**用 `CFBooleanGetTypeID()` 精确判别**，且把 NSNumber 单独一条分支处理。
     public static func from(_ any: Any?) -> JSONValue {
         switch any {
-        case nil, is NSNull:            return .null
-        case let b as Bool:            return .bool(b)
-        case let i as Int:             return .int(i)
-        case let d as Double:          return .double(d)
-        case let s as String:          return .string(s)
-        case let a as [Any]:           return .array(a.map { JSONValue.from($0) })
-        case let o as [String: Any]:   return .object(o.mapValues { JSONValue.from($0) })
-        default:                       return .string(String(describing: any!))
+        case nil, is NSNull:
+            return .null
+        case let n as NSNumber:
+            // ⭐ 精确判别「是不是布尔」—— 不能靠 `as? Bool`
+            if CFGetTypeID(n) == CFBooleanGetTypeID() {
+                return .bool(n.boolValue)
+            }
+            let d = n.doubleValue
+            if d == d.rounded(), abs(d) < 9e15, let i = Int(exactly: d) {
+                return .int(i)
+            }
+            return .double(d)
+        case let s as String:
+            return .string(s)
+        case let a as [Any]:
+            return .array(a.map { JSONValue.from($0) })
+        case let o as [String: Any]:
+            return .object(o.mapValues { JSONValue.from($0) })
+        default:
+            return .string(String(describing: any!))
         }
     }
 

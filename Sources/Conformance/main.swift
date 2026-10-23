@@ -39,6 +39,19 @@ if CommandLine.arguments.contains("--bench") {
     exit(0)
 }
 
+// ⭐ `--audit <pack.json>` 模式：125 源规则覆盖体检（用真引擎逐条解析）
+if let idx = CommandLine.arguments.firstIndex(of: "--audit") {
+    let pack = idx + 1 < CommandLine.arguments.count
+        ? CommandLine.arguments[idx + 1]
+        : "/workspace/out/pack125.json"
+    var out: String? = nil
+    if let oi = CommandLine.arguments.firstIndex(of: "--out"), oi + 1 < CommandLine.arguments.count {
+        out = CommandLine.arguments[oi + 1]
+    }
+    RuleAudit.run(packPath: pack, outPath: out)
+    exit(0)
+}
+
 let fixturePath = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
     : "conformance/fixtures/semantics-cases.json"

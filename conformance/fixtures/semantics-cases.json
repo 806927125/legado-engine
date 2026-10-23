@@ -1885,6 +1885,33 @@
         "value": "主标题"
       },
       "requires": "swift-only"
+    },
+    {
+      "id": "json-07",
+      "semantic": "S-JSON-07",
+      "title": "`$.[*]` 取数组全部元素（列表口径）",
+      "kind": "evalOne",
+      "rule": "$.[*]",
+      "base": {
+        "type": "json",
+        "value": [
+          {
+            "n": 1
+          },
+          {
+            "n": 2
+          }
+        ]
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "values": [
+          "{\"n\":1}",
+          "{\"n\":2}"
+        ]
+      }
     }
   ]
 }

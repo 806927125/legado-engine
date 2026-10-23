@@ -166,5 +166,32 @@ final class RuleSemanticsTests: XCTestCase {
         let ctx = makeCtx(page)
         let nodes = ev.evalNodes("tag.zzz || tag.h1, tag.h2", base: ctx.base, ctx: ctx)
         XCTAssertEqual(nodes.count, 2, "`||` 兜底 + 逗号并集都该生效")
+
     }
+// MARK: - ⑦ 125 源体检量出来的真缺口（回归锁）
+
+/// ⭐ **`.[…]` = 方括号步骤**（`$.[*]` / `$.[-1].title`）
+///
+/// 125 源体检量到 **16 处**这种写法 ⇒ 以前 `parse` 直接 return nil
+/// ⇒ 规则被判「JSONPath 不支持」⇒ **整条静默失效**。
+func testBracketAfterDotInJSONPath() {
+    for path in ["$.[*]", "$.[-1].title", "$.data[*]", "$[*]", "$.*", "$..name", "$['x']"] {
+        XCTAssertNotNil(JSONPath.parse(path), "路径应能解析：\(path)")
+    }
+}
+
+/// ⭐ **纯副作用规则**（整条只有 `@put:`）⇒ **不是错误**，也不该报「解析不出内容」
+///
+/// 真书源实测：`ruleExplore.kind = "@put:{bid:$.bookId}"` ⇒ 站方就是要这个副作用
+/// ⇒ 诊断必须说清「不产出值」，而不是「引擎读不懂」（§S-DIA：诊断不许说谎）
+func testSideEffectOnlyRuleIsNotAnError() {
+    let ev = Evaluator()
+    let ctx = makeCtx(page)
+    let e = ev.evalOne("@put:{bid:$.bookId}", base: ctx.base, ctx: ctx)
+    XCTAssertTrue(e.value.isEmpty, "副作用规则本来就不产出值")
+    XCTAssertNil(e.diagnostic.failure, "副作用规则**不是错误** ⇒ 不该有 failure")
+    XCTAssertEqual(e.diagnostic.branch, "副作用规则（不产出值）")
+    XCTAssertFalse(e.isHardFailure, "不能算真错误")
+
+}
 }

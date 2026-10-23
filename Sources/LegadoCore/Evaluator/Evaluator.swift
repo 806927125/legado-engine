@@ -97,6 +97,20 @@ public struct Evaluator {
         // ① @put / @get
         r = VarStore.apply(r, ctx: &ctx)
 
+        // ①' ⭐ **纯副作用规则**（整条只有 `@put:{k:v}` / `@get:{k}`，**不产出值**）
+        //
+        // ⚠️ 真书源实测（125 源体检）：`ruleExplore.kind = "@put:{bid:$.bookId}"`
+        //    这种规则**只做副作用**（把值存进变量），本来就不产出内容。
+        // ⇒ 以前这里 parse 成 `.empty` ⇒ 诊断报「规则解析不出内容」
+        //    ⇒ **诊断在说谎**（§S-DIA：真错误 vs 没命中，必须分开）⭐
+        //
+        // ⇒ 这里明确标成「副作用规则」，**不是错误**，也不当「没命中」。
+        if r.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !rule.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            diag.branch = "副作用规则（不产出值）"
+            return Evaluation(value: .void, diagnostic: diag)
+        }
+
         // ② 插值 —— ⚠️ JS 模式**不插值**（build202 定的）
         let rawRule = r
         let mode = RuleClassifier.classify(r, isJSON: ctx.isJSON)
