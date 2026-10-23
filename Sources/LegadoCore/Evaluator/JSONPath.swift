@@ -30,6 +30,8 @@ public enum JSONPath {
         case wildcard
         /// 递归下降找同名成员
         case recursive(String)
+        /// ⭐ 过滤表达式 `[?(…)]`（栖阅 Sextant 风格）
+        case filter(JSONFilter)
     }
 
     /// 把路径串解析成步骤序列。
@@ -90,6 +92,13 @@ public enum JSONPath {
                 continue
             }
             if c == "[" {
+                // ⭐ `[?(…)]` 过滤表达式（栖阅 Sextant 风格）
+                if s.index(after: i) < s.endIndex, s[s.index(after: i)] == "?" {
+                    guard let (step, next) = readFilter(s, from: i) else { return nil }
+                    steps.append(step)
+                    i = next
+                    continue
+                }
                 // `['name']` / `[0]` / `[-1]` / `[*]`
                 guard let (step, next) = readBracket(s, from: i) else { return nil }
                 steps.append(step)
@@ -125,6 +134,12 @@ public enum JSONPath {
                     else if case .object(let o) = v { next.append(contentsOf: o.values) }
                 case .recursive(let name):
                     collectRecursive(v, name, &next)
+                case .filter(let expr):
+                    // ⭐ 过滤：作用在**当前值的数组元素**上（`@.x` 指数组里的那一项）
+                    //    ⚠️ 不是作用在数组本身 —— 那样 `@.x` 永远取不到
+                    if case .array(let arr) = v {
+                        next.append(contentsOf: JSONFilter.apply(expr, to: arr, root: root))
+                    }
                 }
             }
             current = next
@@ -149,6 +164,43 @@ public enum JSONPath {
     }
 
     // MARK: - 内部解析
+
+    /// 读 `[?(expr)]` ⇒ 解析里面的过滤表达式
+    private static func readFilter(_ s: String, from start: String.Index) -> (Step, String.Index)? {
+        var i = s.index(after: start)   // 跳过 '['
+        guard i < s.endIndex, s[i] == "?" else { return nil }
+        i = s.index(after: i)
+        guard i < s.endIndex, s[i] == "(" else { return nil }
+        i = s.index(after: i)
+        // 找配对的 ')'（**要跳过字符串字面量里的括号**）
+        var depth = 1
+        var inStr: Character? = nil
+        while i < s.endIndex {
+            let ch = s[i]
+            if let q = inStr {
+                if ch == q { inStr = nil }
+            } else if ch == "'" || ch == "\"" {
+                inStr = ch
+            } else if ch == "(" {
+                depth += 1
+            } else if ch == ")" {
+                depth -= 1
+                if depth == 0 { break }
+            }
+            i = s.index(after: i)
+        }
+        guard i < s.endIndex else { return nil }
+        // ⚠️ body 要**从 `[` 开始、到 `)` 结束**（含两端）
+        let body = String(s[start...i])   // `[?(expr)`
+        guard body.hasPrefix("[?("), body.hasSuffix(")") else { return nil }
+        let inner = String(body.dropFirst(3).dropLast())
+        guard let expr = JSONFilterParser.parse(inner) else { return nil }
+        // ⚠️⚠️ **必须把结尾的 `]` 也吃掉** —— 否则下一轮循环拿到 `]`
+        //    ⇒ 走「其它字符」分支 ⇒ 名字收不到字符 ⇒ **整条路径解析失败**
+        var next = s.index(after: i)      // 指向 ']'
+        if next < s.endIndex, s[next] == "]" { next = s.index(after: next) }
+        return (.filter(expr), next)
+    }
 
     private static func readBracket(_ s: String, from start: String.Index) -> (Step, String.Index)? {
         var i = s.index(after: start)   // 跳过 '['

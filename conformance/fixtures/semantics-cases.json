@@ -1912,6 +1912,38 @@
           "{\"n\":2}"
         ]
       }
+    },
+    {
+      "id": "json-08",
+      "semantic": "S-JSON-08",
+      "title": "过滤表达式 `[?(…)]`（栖阅 Sextant 风格）",
+      "kind": "evalOne",
+      "rule": "$.items[?(@.n > 1)].s",
+      "base": {
+        "type": "json",
+        "value": {
+          "items": [
+            {
+              "n": 1,
+              "s": "一"
+            },
+            {
+              "n": 2,
+              "s": "二"
+            },
+            {
+              "n": 3,
+              "s": "三"
+            }
+          ]
+        }
+      },
+      "ctx": {
+        "isJSON": true
+      },
+      "expect": {
+        "value": "二"
+      }
     }
   ]
 }

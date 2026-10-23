@@ -300,6 +300,26 @@ public struct RuleParser {
             let code = String(s[idx.upperBound...])
             if !head.isEmpty { return (head, .js(code)) }
         }
+        // ⭐⭐ `<js>…</js>` **后缀**（站方的「路径 + JS 后处理」复合形态）
+        //
+        // 真书源实测（125 源里 4 处）：
+        //   `$.uptime<js>java.getString('$.last_chapter_name')+' '+…</js>`
+        //   `$.data.chapterList[0].volumeList<js>java.put(…);result</js>`
+        //   `$.chapterArticle\n<js>doc=org.jsoup.Jsoup.parse(result)…</js>`
+        //
+        // ⚠️ 以前这里只认 `@js:` 后缀 ⇒ 这种规则被当**整串 JSONPath** ⇒ 解析失败
+        //    ⇒ 体检报「JSONPath 语法不支持」⇒ **误判成语法问题**（其实是形态不支持）
+        //
+        // 语义：主体（路径）先求值 ⇒ 得到的值作为 `result` 喂给 JS。
+        if let close = s.range(of: "</js>", options: .backwards) {
+            let head = String(s[..<close.lowerBound]).trimmingCharacters(in: .whitespaces)
+            var code = String(s[close.lowerBound...].dropFirst("</js>".count))
+            code = code.trimmingCharacters(in: .whitespaces)
+            if code.hasPrefix("<js>") { code = String(code.dropFirst(4)) }
+            if code.hasSuffix("</js>") { code = String(code.dropLast(5)) }
+            if !head.isEmpty { return (head, .js(code)) }
+        }
+
         // `##正则##替换`
         if let idx = s.range(of: "##") {
             let head = String(s[..<idx.lowerBound]).trimmingCharacters(in: .whitespaces)

@@ -50,6 +50,23 @@ public indirect enum JSONValue: Sendable, Equatable {
         }
     }
 
+    /// 从 **JSON 文本**构造。
+    ///
+    /// ⚠️ **别用 `from(html)` 冒充 JSON** —— 那是静默 bug：
+    /// `JSONValue.from("整页 HTML")` ⇒ 走 `default` 分支 ⇒ 变成一个**字符串**，
+    /// 于是 JSONPath 在它上面查得到「一个字符串」而不是「没命中」⇒ 错误被藏起来。
+    /// （§S-EVAL-09b 就是为这个加的「基准类型不对 = 真错误」）
+    ///
+    /// ⇒ 这里**解析失败就是 `.null`**（明确失败，不是假装有值）。
+    public init(json: String) {
+        guard let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) else {
+            self = .null
+            return
+        }
+        self = JSONValue.from(obj)
+    }
+
     /// 标量取值（JSONPath 取到叶子时的统一出口）。
     public var scalarString: String {
         switch self {
