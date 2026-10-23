@@ -53,8 +53,16 @@ sw, js = load(sw_path), load(js_path)
 ids = sorted(set(sw) | set(js))
 
 rows, diffs, sw_only, js_only = [], [], 0, 0
+one_side = 0
 for i in ids:
     a, b = sw.get(i), js.get(i)
+    a_skip = bool(a) and a.get('actual') == 'SKIPPED'
+    b_skip = bool(b) and b.get('actual') == 'SKIPPED'
+    if a_skip or b_skip:
+        # ⭐ **只有一边能跑**（例：macOS 上 Swift 有 JSC 后端，Linux 上没有）
+        #    ⇒ **不算差异**（否则 Linux 每次都多出一批假差异 ⇒ 看着像回归）
+        one_side += 1
+        continue
     same = a and b and a.get('actual') == b.get('actual')
     if a and not a.get('ok'): sw_only += 1
     if b and not b.get('ok'): js_only += 1
@@ -73,6 +81,7 @@ L.append('|---|---|')
 L.append('| 用例总数 | %d |' % len(ids))
 L.append('| 两边一致 | **%d** |' % (len(ids) - len(diffs)))
 L.append('| 存在差异 | **%d** |' % len(diffs))
+L.append('| 只有一边能跑（不算差异） | %d |' % one_side)
 L.append('')
 L.append('## 差异明细')
 L.append('')
@@ -97,6 +106,7 @@ L.append('## 说明')
 L.append('')
 L.append('- **Swift 侧不符**（%d 条）⇒ 自研实现还没写完 / 写错了。' % sw_only)
 L.append('- **JS 侧不符**（%d 条）⇒ 轻阅现有实现与规格不一致（多数是**已知债**）。' % js_only)
+L.append('- **只有一边能跑**的用例（%d 条）⇒ 例如 macOS 上 Swift 侧有 JSC 后端、Linux 上没有 ⇒ **不算差异**。' % one_side)
 L.append('- 两边都跑不了的用例（`SKIPPED`）⇒ 属于后续切片（需要 DOM / JS 后端）。')
 L.append('')
 open(out_path, 'w', encoding='utf-8').write('\n'.join(L))

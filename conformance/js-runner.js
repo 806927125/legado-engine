@@ -162,6 +162,8 @@ function jsonAny(v) {
       emit(c.id, kind, 'SKIPPED', 'SKIPPED');
       continue;
     }
+    // ⭐ `requires: 'js-pure'` = **纯 JS 计算**（不碰宿主 API）⇒ 照跑（要跟自研的 JSC 对拍）
+    //    ⚠️ `requires: 'js'`（需要宿主 API）⇒ 跳过（宿主还没实现）
     if (c.requires === 'js') {
       emit(c.id, kind, 'SKIPPED', 'SKIPPED');
       continue;

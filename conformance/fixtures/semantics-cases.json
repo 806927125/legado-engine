@@ -1944,6 +1944,86 @@
       "expect": {
         "value": "二"
       }
+    },
+    {
+      "id": "jsp-01",
+      "semantic": "S-JS-09",
+      "title": "纯 JS：末行表达式 = 完成值",
+      "kind": "evalOne",
+      "rule": "@js:1 + 2",
+      "base": {
+        "type": "html",
+        "value": "<html></html>"
+      },
+      "ctx": {},
+      "expect": {
+        "value": "3"
+      },
+      "requires": "js-pure"
+    },
+    {
+      "id": "jsp-02",
+      "semantic": "S-JS-09",
+      "title": "纯 JS：result 赋值后取到赋值",
+      "kind": "evalOne",
+      "rule": "@js:result = '赋值后';",
+      "base": {
+        "type": "html",
+        "value": "<html></html>"
+      },
+      "ctx": {},
+      "expect": {
+        "value": "赋值后"
+      },
+      "requires": "js-pure"
+    },
+    {
+      "id": "jsp-03",
+      "semantic": "S-JS-09",
+      "title": "纯 JS：JSON.parse/stringify 往返",
+      "kind": "evalOne",
+      "rule": "@js:JSON.stringify(JSON.parse('{\"a\":1}').a + 1)",
+      "base": {
+        "type": "html",
+        "value": "<html></html>"
+      },
+      "ctx": {},
+      "expect": {
+        "value": "2"
+      },
+      "requires": "js-pure"
+    },
+    {
+      "id": "jsp-04",
+      "semantic": "S-RES-09",
+      "title": "纯 JS：条目级 result = 那个对象的 JSON 视图",
+      "kind": "evalOne",
+      "rule": "@js:result.bid",
+      "base": {
+        "type": "html",
+        "value": "<html><body><a href=\"/b\" bid=\"BID-7\">书名</a></body></html>"
+      },
+      "ctx": {},
+      "expect": {
+        "value": "BID-7"
+      },
+      "requires": "js-pure"
+    },
+    {
+      "id": "jsp-05",
+      "semantic": "S-JS-09",
+      "title": "纯 JS：数组 map/filter",
+      "kind": "evalOne",
+      "rule": "@js:[1,2,3].filter(function(x){return x>1;}).map(function(x){return x*2;}).join('-')",
+      "base": {
+        "type": "html",
+        "value": "<html></html>"
+      },
+      "ctx": {},
+      "expect": {
+        "value": "4-6"
+      },
+      "requires": "js-pure"
     }
   ]
 }

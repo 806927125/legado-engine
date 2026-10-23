@@ -64,6 +64,17 @@ guard let data = FileManager.default.contents(atPath: fixturePath),
 }
 
 let parser = RuleParser()
+
+// ⭐ **JS 后端**（有 JSC 的平台 = macOS）⇒ `js-pure` 用例能跟轻阅的 JS 引擎逐字对拍
+//    （Linux 上没有 JSC ⇒ nil ⇒ 那类用例跳过）
+let jsBackend: JSExecutor? = {
+    #if canImport(JavaScriptCore)
+    return JSCExecutor(api: MinimalHostAPI())
+    #else
+    return nil
+    #endif
+}()
+
 var out: [String] = []
 var pass = 0, fail = 0
 
@@ -82,8 +93,18 @@ for c in cases {
     let ctx = (c["ctx"] as? [String: Any]) ?? [:]
     let isJSON = (ctx["isJSON"] as? Bool) ?? false
 
-    // ⭐ **requires 门槛**：需要 JS 后端的用例（Phase 3 才接 JSC）⇒ 两边都跳过，不算差异
+    // ⭐ **requires 门槛**
+    // ① `requires: "js"` —— 需要**宿主 API**（`java.*` / `source.*`）的 JS 用例
+    //    ⇒ 宿主还没实现 ⇒ **两边都跳过**，不算差异
     if let req = c["requires"] as? String, req == "js" {
+        emit(id, kind, "SKIPPED", "SKIPPED")
+        continue
+    }
+    // ② ⭐ `requires: "js-pure"` —— **纯 JS 计算**（不碰宿主 API）
+    //    ⇒ JS 侧（轻阅引擎）照跑；Swift 侧在**有 JSC 后端**时（macOS）也跑 ⇒ **逐字对拍**
+    //    ⇒ Linux 上没有 JSC ⇒ 跳过（记进「只有一边能跑」）
+    let isJSPure = (c["requires"] as? String) == "js-pure"
+    if isJSPure && jsBackend == nil {
         emit(id, kind, "SKIPPED", "SKIPPED")
         continue
     }
@@ -181,7 +202,7 @@ for c in cases {
         if let vars = (c["ctx"] as? [String: Any])?["vars"] as? [String: String] {
             ctx.vars = vars
         }
-        let ev = Evaluator()
+        let ev = Evaluator(js: jsBackend)
         let items: [RuleValue]
         if kind == "evalOne" {
             items = ev.evalOne(rule, base: base, ctx: ctx).value.items
