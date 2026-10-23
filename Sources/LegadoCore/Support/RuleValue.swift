@@ -19,6 +19,28 @@ public indirect enum RuleValue: Sendable, Equatable {
     /// DOM 节点（由 DOM 层提供；核心层只认它的身份，不认它的实现）
     case node(DOMNodeRef)
 
+    /// **JSON 视图**（喂给 JS / 序列化用）—— 核心层的**唯一**转换口径。
+    ///
+    /// ⭐⭐ 为什么必须有它：`text` 对 `.json`/`.list` 是**空的或拼起来的**（对象/数组的
+    /// `scalarString` 返回 ""）⇒ 拿 `text` 去喂 JS ⇒ 站方拿到的是**字符串**而不是
+    /// **结构** ⇒ `result.map(...)` / `result.book_id` 全废。
+    ///
+    /// ⭐ 这正是「路径 + 尾部 `<js>` 块」复合形态（§S-CMP-06）以前**求值层没做**的真身。
+    public var jsonValue: JSONValue {
+        switch self {
+        case .void:              return .null
+        case .string(let s):    return .string(s)
+        case .list(let items):  return .array(items.map { $0.jsonValue })
+        case .json(let j):      return j
+        case .node(let n):
+            // 节点 ⇒ 「全部属性 + `_text`」（站方 JS 读节点属性的写法）
+            var obj: [String: JSONValue] = [:]
+            for (k, v) in n.node.attributes { obj[k] = .string(v) }
+            obj["_text"] = .string(n.text)
+            return .object(obj)
+        }
+    }
+
     /// 出口 1：字段规则 —— 一律转成字符串。
     public var text: String {
         switch self {

@@ -300,24 +300,32 @@ public struct RuleParser {
             let code = String(s[idx.upperBound...])
             if !head.isEmpty { return (head, .js(code)) }
         }
-        // ⭐⭐ `<js>…</js>` **后缀**（站方的「路径 + JS 后处理」复合形态）
+        // ⭐⭐ `<js>…</js>` **块**（站方的「路径 + JS 后处理」复合形态）
         //
         // 真书源实测（125 源里 4 处）：
         //   `$.uptime<js>java.getString('$.last_chapter_name')+' '+…</js>`
         //   `$.data.chapterList[0].volumeList<js>java.put(…);result</js>`
         //   `$.chapterArticle\n<js>doc=org.jsoup.Jsoup.parse(result)…</js>`
         //
-        // ⚠️ 以前这里只认 `@js:` 后缀 ⇒ 这种规则被当**整串 JSONPath** ⇒ 解析失败
-        //    ⇒ 体检报「JSONPath 语法不支持」⇒ **误判成语法问题**（其实是形态不支持）
+        // ⚠️⚠️⚠️ **以前这里取错了区间**（注释写着「已支持」，实现其实没支持）：
+        //   旧代码取的是 **`</js>` 之后**的片段 ⇒
+        //     head = `$.data.list<js>result.map(…)`（**把 JS 代码也留在头里**）
+        //     code = `""`（**空的**）
+        //   ⇒ AST 变成 `post(jsonPath("整串"), js(""))`
+        //   ⇒ 主体求值失败（JSONPath 语法不支持）⇒ **静默空**
+        // ⇒ **规格/注释写了 ≠ 实现做了**（又一次现场教学）
         //
-        // 语义：主体（路径）先求值 ⇒ 得到的值作为 `result` 喂给 JS。
-        if let close = s.range(of: "</js>", options: .backwards) {
-            let head = String(s[..<close.lowerBound]).trimmingCharacters(in: .whitespaces)
-            var code = String(s[close.lowerBound...].dropFirst("</js>".count))
-            code = code.trimmingCharacters(in: .whitespaces)
-            if code.hasPrefix("<js>") { code = String(code.dropFirst(4)) }
-            if code.hasSuffix("</js>") { code = String(code.dropLast(5)) }
-            if !head.isEmpty { return (head, .js(code)) }
+        // ✅ 正确切法：head = `<js>` **之前**；code = `<js>` 与 `</js>` **之间**；
+        //             tail = `</js>` **之后**（可空 ⇒ 还能再接尾部选择器）
+        if let open = s.range(of: "<js>", options: .backwards),
+           let close = s.range(of: "</js>", options: .backwards),
+           open.lowerBound < close.lowerBound {
+            let head = String(s[..<open.lowerBound]).trimmingCharacters(in: .whitespaces)
+            let code = String(s[open.upperBound..<close.lowerBound])
+            let tail = String(s[close.upperBound...]).trimmingCharacters(in: .whitespaces)
+            if !head.isEmpty {
+                return (head, .jsWithTail(code: code, tail: tail.isEmpty ? nil : tail))
+            }
         }
 
         // `##正则##替换`

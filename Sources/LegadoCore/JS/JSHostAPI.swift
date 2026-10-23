@@ -54,9 +54,6 @@ public enum JSHostAPI {
         .init(object: "java", name: "digestHex", kind: .method),
         .init(object: "java", name: "timeFormat", kind: .method),
         .init(object: "java", name: "t2s", kind: .method),
-        .init(object: "java", name: "lang", kind: .method),
-        .init(object: "java", name: "util", kind: .method),
-        .init(object: "java", name: "net", kind: .method),
         .init(object: "java", name: "deviceID", kind: .method),
         .init(object: "java", name: "androidId", kind: .method),
         .init(object: "java", name: "getWebViewUA", kind: .method),
@@ -247,17 +244,8 @@ public enum JSScopeBuilder {
     /// ⭐ 条目级基准 ⇒ `result` 是**那个对象**（§S-RES-01）⇒ 站方能读 `result.book_id`
     /// ⇒ 节点 ⇒ `{全部属性 + "_text": 文本}`
     public static func toJSON(_ r: RuleValue) -> JSONValue {
-        switch r {
-        case .json(let j):    return j
-        case .string(let s):  return .string(s)
-        case .void:           return .null
-        case .list(let items): return .array(items.map { toJSON($0) })
-        case .node(let n):
-            var obj: [String: JSONValue] = [:]
-            for (k, v) in n.node.attributes { obj[k] = .string(v) }
-            obj["_text"] = .string(n.text)
-            return .object(obj)
-        }
+        // ⭐ 口径统一到核心层（`RuleValue.jsonValue`）⇒ 免得两处转换慢慢长歪
+        r.jsonValue
     }
 
     /// JSON 值 → JS 字面量

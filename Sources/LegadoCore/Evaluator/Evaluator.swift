@@ -437,10 +437,45 @@ public struct Evaluator {
             return applyRegexReplace(value.text, pattern: pattern, replacements: replacements,
                                      baseURL: ctx.baseUrl, diag: &diag)
         case .js(let code):
-            // 尾部 `@js:`：以主体结果为 `result`
+            // ⭐⭐ **尾部 `<js>` 块 / `@js:` 后缀：以主体结果为 `result`**
+            //
+            // ⚠️⚠️ 以前这里写的是 `sub.base = .page(value.text)` ⇒ **一律压成字符串**
+            // ⇒ 主体是 **JSON 数组/对象** 时，`value.text` 是 **空串**
+            //    （`JSONValue.scalarString` 对对象/数组返回 ""）
+            // ⇒ JS 里的 `result` = `""` ⇒ 站方 `result.map(...)` / `result.book_id` 全废
+            //    ⇒ 这就是「路径 + 尾部 `<js>` 块」复合形态**求值层没做**的真身 ⭐
+            //
+            // ⇒ 修：**按主体的真实类型**造基准（§S-RES-01 的分层语义）
+            //    - 字符串  ⇒ `.page(s)`      ⇒ JS 里 `result` 是字符串
+            //    - 数组    ⇒ `.json(array)` ⇒ JS 里 `result` 是**数组**（能 .map）
+            //    - 对象    ⇒ `.json(obj)`   ⇒ JS 里 `result` 是**对象**（能取键）
+            //    - 节点    ⇒ `.node(n)`     ⇒ JS 里 `result` 是「属性 + _text」
             var sub = ctx
-            sub.base = .page(value.text)
-            return runJS(code, base: .page(value.text), ctx: sub, diag: &diag)
+            let jsBase = Self.jsBase(for: value)
+            sub.base = jsBase
+            return runJS(code, base: jsBase, ctx: sub, diag: &diag)
+        case .jsWithTail(let code, let tail):
+            // ⭐⭐ **「路径 + `<js>` 块」复合形态**（§S-CMP-06）
+            //   `$.data.chapterList[0].volumeList<js>java.put(…);result</js>`
+            //   `$.uptime<js>java.getString('$.last_chapter_name')+' '+…</js>`
+            // ⇒ 主体求值 ⇒ 结果作为 `result`（**保持原类型**）⇒ 跑 JS ⇒ 再走尾部
+            var sub = ctx
+            let jsBase = Self.jsBase(for: value)
+            sub.base = jsBase
+            let v = runJS(code, base: jsBase, ctx: sub, diag: &diag)
+            guard let tail, !tail.isEmpty else { return v }
+            return applyTail(v, tail, base: jsBase, ctx: sub, diag: &diag)
+        }
+    }
+
+    /// **JS 基准构造**（尾部 JS 后处理用）—— 主体结果的类型**要原样传下去**。
+    private static func jsBase(for value: RuleValue) -> RuleBase {
+        switch value {
+        case .json:            return .json(value.jsonValue)
+        case .list:            return .json(value.jsonValue)
+        case .string(let s):   return .page(s)
+        case .node(let n):     return .node(n)
+        case .void:            return .page("")
         }
     }
 

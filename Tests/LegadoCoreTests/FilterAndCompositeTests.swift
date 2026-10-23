@@ -80,13 +80,21 @@ final class FilterAndCompositeTests: XCTestCase {
         let ast = ev.parser.parse("$.a<js>result + 1</js>", isJSON: true)
         // 形态必须是「post(主体, js)」而不是「整串 JSONPath」
         if case .post(let inner, let post) = ast {
-            if case .js = post {
-                XCTAssertTrue(true)
-                return
+            // ⭐⭐ **必须断言 code 的内容** —— 旧实现 code 是**空串**也过（平凡通过）
+            // ⇒ 那正是这个 bug 长期没被门禁抓到的原因
+            guard case .jsWithTail(let code, let tail) = post else {
+                return XCTFail("尾部应是 .jsWithTail 后处理，实际：\(post)")
             }
-            XCTFail("尾部应是 .js 后处理，实际：\(post)")
+            XCTAssertEqual(code.trimmingCharacters(in: .whitespaces), "result + 1")
+            XCTAssertNil(tail)
+            // 主体 = 纯路径（`$.a`），不能把 JS 代码留在主体里
+            guard case .jsonPath(let path) = inner else {
+                return XCTFail("主体应是 .jsonPath，实际：\(inner)")
+            }
+            XCTAssertEqual(path, "$.a")
+            return
         } else {
-            XCTFail("应解析成 .post(主体, .js)，实际：\(ast)")
+            XCTFail("应解析成 .post(主体, .jsWithTail)，实际：\(ast)")
         }
     }
 

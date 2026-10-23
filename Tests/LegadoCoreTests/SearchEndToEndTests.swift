@@ -117,9 +117,12 @@ final class SearchEndToEndTests: XCTestCase {
             return XCTFail("主体应还是 .post（尾部正则），实际：\(inner)")
         }
         // 后处理 = `<js>` 块
-        guard case .js = post else {
-            return XCTFail("后处理应是 .js 块，实际：\(post)")
+        // ⭐⭐ **必须断言 code 的内容**（旧实现 code 是空串也过 ⇒ 平凡通过）
+        guard case .jsWithTail(let code, let tail) = post else {
+            return XCTFail("后处理应是 .jsWithTail 块，实际：\(post)")
         }
+        XCTAssertTrue(code.contains("url=result.replace"), "JS 代码内容不对：\(code)")
+        XCTAssertNil(tail)
     }
 
     // MARK: - ⑥ 诊断不许说谎

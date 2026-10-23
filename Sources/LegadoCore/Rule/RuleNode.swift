@@ -72,6 +72,15 @@ public indirect enum RuleNode: Sendable, Equatable {
         case regex(String)
         /// `@js:代码`（以主体结果为 `result`）
         case js(String)
+        /// ⭐⭐ `<js>代码</js>` **块**（主体结果为 `result`），可再跟一个尾部选择器
+        ///
+        /// 站方真实写法（125 源里 4 处，§S-CMP-06）：
+        /// ```
+        /// $.data.chapterList[0].volumeList<js>java.put(...);result</js>
+        /// $.uptime<js>java.getString('$.last_chapter_name')+' '+…</js>
+        /// $.chapterArticle\n<js>doc=org.jsoup.Jsoup.parse(result)…</js>
+        /// ```
+        case jsWithTail(code: String, tail: String?)
     }
 }
 
