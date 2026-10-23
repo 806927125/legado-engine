@@ -127,6 +127,34 @@ if CommandLine.arguments.contains("--bench-e2e") {
             let parseCost2 = Date().timeIntervalSince(t3) / 200
             print(String(format: "   parse(缓存命中) = %.4f ms / classify = %.4f ms / 再 parse = %.4f ms",
                          parseCost * 1000, classifyCost * 1000, parseCost2 * 1000))
+            // ⭐⭐ **textContent 的成本**（SwiftSoup 的 text() 每次都遍历整棵子树）
+            if let a0 = n.node.queryAll("a").first {
+                var t4 = Date()
+                for _ in 0..<200 { _ = a0.textContent }
+                let textCost = Date().timeIntervalSince(t4) / 200
+                t4 = Date()
+                for _ in 0..<200 { _ = a0.outerHTML }
+                let htmlCost = Date().timeIntervalSince(t4) / 200
+                print(String(format: "   ⭐ textContent = %.4f ms / outerHTML = %.4f ms",
+                             textCost * 1000, htmlCost * 1000))
+            }
+            // ⭐⭐ **逐个测「胶水」**（evalOne 里除 parse/resolve/取值 之外的部分）
+            func cost(_ n: Int, _ label: String, _ f: () -> Void) {
+                let t = Date()
+                for _ in 0..<n { f() }
+                print(String(format: "     %@ = %.4f ms", label, Date().timeIntervalSince(t) / Double(n) * 1000))
+            }
+            var tmpCtx = ctx
+            cost(500, "VarStore.apply", { _ = VarStore.apply("a@text", ctx: &tmpCtx) })
+            cost(500, "splitRuleLines", { _ = Evaluator.splitRuleLines("a@text") })
+            cost(500, "TemplateEngine.render", { _ = TemplateEngine.render("a@text", ctx: ctx) })
+            cost(500, "ValueMode.fromAttributeName", { _ = ValueMode.fromAttributeName("text") })
+            cost(500, "EngineDiagnostic(rule:)", { _ = EngineDiagnostic(rule: "a@text") })
+            let rc = RuleCache()
+            _ = rc.cached(for: RuleCache.Key(rule: "a@text", isJSON: false))
+            cost(500, "cache.cached(for:)", { _ = rc.cached(for: RuleCache.Key(rule: "a@text", isJSON: false)) })
+            let k2 = RuleCache.Key(rule: "a@text", isJSON: false)
+            cost(500, "Key 构造 + cached", { _ = rc.cached(for: RuleCache.Key(rule: "a@text", isJSON: false)) })
             // 链求值（不含取值）
             if case .chain(let h, let hi, let steps) = ast {
                 t3 = Date()

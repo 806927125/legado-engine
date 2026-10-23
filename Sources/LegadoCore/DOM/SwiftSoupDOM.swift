@@ -26,9 +26,32 @@ public final class SwiftSoupNode: DOMNode {
     private static var counter: UInt64 = 0
 
     public var domID: String { identifier }
-    public var textContent: String { (try? element.text()) ?? "" }
-    public var ownTextContent: String { (try? element.ownText()) ?? "" }
-    public var outerHTML: String { (try? element.outerHtml()) ?? "" }
+    // ⭐⭐ **惰性缓存**：SwiftSoup 的 `text()` / `outerHtml()` **每次都重新遍历整棵子树**
+    //   （实测 textContent ≈ 13µs、outerHTML ≈ 45µs，而节点查询只要 5µs）
+    //   ⇒ 同一节点被多次取文本时，缓存能省掉重复遍历 ⭐
+    //   ⚠️ DOM 是**只读**的 ⇒ 缓存安全（节点内容不会变）
+    private var cachedText: String?
+    private var cachedOwnText: String?
+    private var cachedOuterHTML: String?
+
+    public var textContent: String {
+        if let c = cachedText { return c }
+        let v = (try? element.text()) ?? ""
+        cachedText = v
+        return v
+    }
+    public var ownTextContent: String {
+        if let c = cachedOwnText { return c }
+        let v = (try? element.ownText()) ?? ""
+        cachedOwnText = v
+        return v
+    }
+    public var outerHTML: String {
+        if let c = cachedOuterHTML { return c }
+        let v = (try? element.outerHtml()) ?? ""
+        cachedOuterHTML = v
+        return v
+    }
     /// 内层 HTML（Legado 的 `@html` 语义 = Jsoup `html()`）
     public var innerHTML: String { (try? element.html()) ?? "" }
     public var tagName: String { element.tagName().lowercased() }

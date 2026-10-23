@@ -126,3 +126,47 @@ final class PerformanceGatesTests: XCTestCase {
         XCTAssertEqual(inner.count, 2, "⭐ ttl=0 不该缓存")
     }
 }
+
+// MARK: - ⑤ ⭐⭐ AST 缓存**默认必须生效**
+
+/// ⭐⭐⭐ **「规格/文档写了 ≠ 实际生效」的最强案例**
+///
+/// ⚠️ 以前 `Evaluator.init(js:cache:)` 的 `cache` **默认 nil**
+///   ⇒ **AST 缓存默认根本没开** ⇒ 每次求值都重新解析（36~80 µs）
+///   ⇒ 而「显式传 cache」的 bench 测出「加速 85 倍」⇒ **测的路径和生产路径不一致** ⭐
+///
+/// ⇒ 这条门禁钉死「**默认就要有缓存**」。
+final class ASTCacheDefaultTests: XCTestCase {
+
+    /// ⭐ **`Evaluator` 默认就带缓存** ⇒ 同一条规则解析两次 ⇒ 第二次**命中**
+    func testEvaluatorHasASTCacheByDefault() throws {
+        let ev = Evaluator()
+        let html = "<html><body><a href='/x'>书名</a></body></html>"
+        let doc = try SwiftSoupDocument(html: html, baseURL: "https://x.example/").document
+        let ctx = EvalContext(base: .page(html), baseUrl: "https://x.example/", document: doc)
+
+        _ = ev.evalOne("a@text", base: .page(html), ctx: ctx)
+        _ = ev.evalOne("a@text", base: .page(html), ctx: ctx)
+        _ = ev.evalOne("a@text", base: .page(html), ctx: ctx)
+
+        let stats = ev.parser.cacheStats
+        XCTAssertGreaterThan(stats.hits, 0,
+                             "⭐⭐ Evaluator 默认必须带 AST 缓存（以前默认 nil ⇒ 缓存根本没开）")
+        XCTAssertGreaterThan(stats.hitRate, 0.5,
+                             "⭐ 同一条规则重复求值 ⇒ 命中率应 > 50%（实际 \(stats.hitRate)）")
+    }
+
+    /// ⭐ **缓存不改变行为**：命中缓存的 AST 与现算的**逐字相同**（§S-EVAL-11）
+    func testCachedASTMatchesFreshAST() throws {
+        let rules = ["class.book@tag.a@text", "class.booklist@tag.li@text", "$.data.bookList",
+                     "//div[@class='x']/p", "tag.h1@ownText", "##(\\d+)##$1##", "a@text"]
+        let cached = RuleParser(cache: RuleCache())
+        let fresh = RuleParser()
+        for r in rules {
+            let a = cached.parse(r, isJSON: false)
+            let b = fresh.parse(r, isJSON: false)
+            XCTAssertEqual(String(describing: a), String(describing: b),
+                           "⭐ 缓存不能改变 AST（规则 \(r)）")
+        }
+    }
+}

@@ -25,10 +25,15 @@ public struct RuleParser {
     /// - Parameters:
     ///   - raw: 规则原文
     ///   - isJSON: 响应体是不是 JSON（影响模式判定，§S-CLS-08）
+    /// ⭐ **缓存统计**（宿主 / 门禁用来确认「缓存真的在用」）
+    public var cacheStats: RuleCache.Stats { cache?.stats ?? .empty }
+
     public func parse(_ raw: String?, isJSON: Bool = false) -> RuleNode {
         // ⭐ **顶层入口走缓存**（§S-EVAL-11）
         guard let cache else { return parseInternal(raw, isJSON: isJSON) }
         let key = RuleCache.Key(rule: raw ?? "", isJSON: isJSON)
+        // ⭐ **先只查命中**（不创建闭包 ⇒ 命中路径零堆分配）
+        if let hit = cache.cached(for: key) { return hit }
         return cache.node(for: key) { [self] in parseInternal(raw, isJSON: isJSON) }
     }
 

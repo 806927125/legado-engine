@@ -46,6 +46,18 @@ public final class RuleCache: @unchecked Sendable {
     /// 取（或建）缓存项。
     ///
     /// - Parameter build: 未命中时的构造闭包（**只会被调用一次**）
+    /// ⭐ **只查命中**（**不创建闭包**）—— 命中路径零堆分配。
+    ///
+    /// ⚠️ 以前 `node(for:build:)` 的调用点**每次都创建逃逸闭包**（堆分配）
+    ///   ⇒ 缓存命中也要付一次闭包分配的钱 ⇒ 命中路径 35µs 里有相当一部分在这
+    public func cached(for key: Key) -> RuleNode? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let hit = storage[key] else { return nil }
+        _hits += 1
+        return hit
+    }
+
     public func node(for key: Key, build: () -> RuleNode) -> RuleNode {
         lock.lock()
         defer { lock.unlock() }
@@ -74,6 +86,8 @@ public final class RuleCache: @unchecked Sendable {
     }
 
     public struct Stats: Sendable, Equatable {
+        /// ⭐ 空统计（没有缓存时用）
+        public static let empty = Stats(hits: 0, misses: 0, count: 0)
         public let hits: Int
         public let misses: Int
         public let count: Int
