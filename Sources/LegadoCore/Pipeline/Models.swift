@@ -22,15 +22,18 @@ public struct Book: Sendable, Equatable {
     public var intro: String
     public var kind: String
     public var lastChapter: String
+    /// ⭐ **字数**（`rule*.wordCount`）—— 125 源里 **111 处**在用
+    public var wordCount: String
     /// 附加字段（给后续阶段用）
     public var raw: [String: String]
 
     public init(name: String = "", author: String = "", bookUrl: String = "",
                 coverUrl: String = "", intro: String = "", kind: String = "",
-                lastChapter: String = "", raw: [String: String] = [:]) {
+                lastChapter: String = "", wordCount: String = "",
+                raw: [String: String] = [:]) {
         self.name = name; self.author = author; self.bookUrl = bookUrl
         self.coverUrl = coverUrl; self.intro = intro; self.kind = kind
-        self.lastChapter = lastChapter; self.raw = raw
+        self.lastChapter = lastChapter; self.wordCount = wordCount; self.raw = raw
     }
 }
 
@@ -42,6 +45,8 @@ public struct BookInfo: Sendable, Equatable {
     public var kind: String
     public var coverUrl: String
     public var lastChapter: String
+    /// ⭐ **字数**（`ruleBookInfo.wordCount`）—— 44 个源在用
+    public var wordCount: String
     public var bookUrl: String
     /// 目录页 URL（**空** ⇒ 目录规则在详情页上跑）
     public var tocUrl: String
@@ -50,10 +55,12 @@ public struct BookInfo: Sendable, Equatable {
     public var raw: [String: String]
 
     public init(name: String = "", author: String = "", intro: String = "", kind: String = "",
-                coverUrl: String = "", lastChapter: String = "", bookUrl: String = "",
-                tocUrl: String = "", sourceName: String = "", raw: [String: String] = [:]) {
+                coverUrl: String = "", lastChapter: String = "", wordCount: String = "",
+                bookUrl: String = "", tocUrl: String = "", sourceName: String = "",
+                raw: [String: String] = [:]) {
         self.name = name; self.author = author; self.intro = intro; self.kind = kind
-        self.coverUrl = coverUrl; self.lastChapter = lastChapter; self.bookUrl = bookUrl
+        self.coverUrl = coverUrl; self.lastChapter = lastChapter
+        self.wordCount = wordCount; self.bookUrl = bookUrl
         self.tocUrl = tocUrl; self.sourceName = sourceName; self.raw = raw
     }
 }
@@ -65,11 +72,15 @@ public struct Chapter: Sendable, Equatable {
     public var url: String
     /// **是不是卷标题**（没有章节 URL ⇒ 是）
     public var isVolume: Bool
+    /// ⭐ **是不是付费章节**（`ruleToc.isVip`）—— 9 个源在用
+    public var isVip: Bool
     /// 目录里的序号
     public var index: Int
 
-    public init(name: String = "", url: String = "", isVolume: Bool = false, index: Int = 0) {
-        self.name = name; self.url = url; self.isVolume = isVolume; self.index = index
+    public init(name: String = "", url: String = "", isVolume: Bool = false,
+                isVip: Bool = false, index: Int = 0) {
+        self.name = name; self.url = url; self.isVolume = isVolume
+        self.isVip = isVip; self.index = index
     }
 }
 

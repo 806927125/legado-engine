@@ -161,6 +161,8 @@ public final class SourceEngine {
         info.kind = value(rules?.kind, in: nil, page: p)
         info.coverUrl = Self.absolute(value(rules?.coverUrl, in: nil, page: p), base: p.url)
         info.lastChapter = value(rules?.lastChapter, in: nil, page: p)
+        // ⭐ **字数**（44 个源在用）
+        info.wordCount = value(rules?.wordCount, in: nil, page: p)
         let toc = value(rules?.tocUrl, in: nil, page: p)
         // ⚠️ 该源没给 tocUrl ⇒ **目录规则在详情页上跑**（Legado 语义：空 = 用 bookUrl）
         info.tocUrl = toc.isEmpty ? "" : Self.absolute(toc, base: p.url)
@@ -219,10 +221,15 @@ public final class SourceEngine {
                     } else {
                         isVolume = chapterURL.isEmpty
                     }
+                    // ⭐ **付费章节标记**（`ruleToc.isVip` —— 9 个源在用）
+                    let isVipRule = rules.isVip ?? ""
+                    let isVip = isVipRule.isEmpty ? false
+                        : !value(isVipRule, in: node, page: p).isEmpty
                     out.append(Chapter(
                         name: name.isEmpty ? node.text : name,
                         url: chapterURL,
                         isVolume: isVolume,
+                        isVip: isVip,
                         index: out.count
                     ))
                 }
@@ -259,7 +266,8 @@ public final class SourceEngine {
             seen.insert(url)
             let p = try fetch(url)
             pages += 1
-            let piece = value(rules.content, in: nil, page: p)
+            // ⭐ 正文是**拼接**语义（命中多个 p ⇒ 全部正文都要）
+            let piece = valueAll(rules.content, page: p)
             if !piece.isEmpty { parts.append(piece) }
             // 下一段
             if let nextRule = rules.nextContentUrl, !nextRule.isEmpty {
@@ -367,7 +375,9 @@ public final class SourceEngine {
                 coverUrl: Self.absolute(value(rules.coverUrl, in: node, page: page), base: page.url),
                 intro: value(rules.intro, in: node, page: page),
                 kind: value(rules.kind, in: node, page: page),
-                lastChapter: value(rules.lastChapter, in: node, page: page)
+                lastChapter: value(rules.lastChapter, in: node, page: page),
+                // ⭐ **字数**（111 处站方在用）
+                wordCount: value(rules.wordCount, in: node, page: page)
             )
         }
     }
@@ -447,7 +457,52 @@ public final class SourceEngine {
         diagnostics.append(e.diagnostic)
         // ⭐ 把诊断**同时**送进宿主日志（宿主才能回放给用户看）
         logger?.log(Self.diagnosticLine(e.diagnostic))
+        // ⭐⭐ **字段出口：多个命中 ⇒ 取【第一个非空】**（Legado 语义）
+        //
+        // ⚠️ 以前用 `e.value.text` ⇒ 多个命中会被**拼起来**
+        //   （详情页有 2 个 `.w` ⇒ 字数变成 "12.3万字\n12.3万字" ⇒ 字段是脏的）
+        return Self.firstNonEmpty(e.value)
+    }
+
+    /// ⭐ **正文出口** —— 多个命中**全部拼接**（与字段出口相反）。
+    private func valueAll(_ rule: String?, page: Page) -> String {
+        guard let rule, !rule.isEmpty else { return "" }
+        let base: RuleBase = .page(page.text)
+        let ctx = EvalContext(base: base, baseUrl: page.url, raw: page.text,
+                              isJSON: page.isJSON, document: page.document)
+        let e = evaluator.evalOne(rule, base: base, ctx: ctx)
+        diagnostics.append(e.diagnostic)
+        logger?.log(Self.diagnosticLine(e.diagnostic))
         return e.value.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// ⭐⭐ **字段出口的值** —— 多个命中取**第一个非空**（Legado 语义）。
+    ///
+    /// ⚠️ 与**正文出口**不同：正文规则（`ruleContent.content`）命中多个时要**全部拼接**。
+    public static func firstNonEmpty(_ v: RuleValue) -> String {
+        switch v {
+        case .void:
+            return ""
+        case .string(let s):
+            return s.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .list(let items):
+            for it in items {
+                let t = it.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !t.isEmpty { return t }
+            }
+            return ""
+        case .json(let j):
+            if case .array(let arr) = j {
+                for it in arr {
+                    let t = it.scalarString.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !t.isEmpty { return t }
+                }
+                return ""
+            }
+            return j.scalarString.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .node(let n):
+            return n.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
     }
 
     /// ⭐ 出错时**先通知宿主**（toast / 弹窗），再把错误抛出去。
