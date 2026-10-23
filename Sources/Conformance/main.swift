@@ -39,6 +39,135 @@ if CommandLine.arguments.contains("--bench") {
     exit(0)
 }
 
+// ⭐ `--bench-e2e` 模式：**端到端**阶段计时（真书源 + 真页面快照）
+//
+// ⇒ 目的：找性能瓶颈在【哪一段】（DOM 解析 / 规则求值 / 编排）
+if CommandLine.arguments.contains("--bench-e2e") {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()   // Conformance
+        .deletingLastPathComponent()   // Sources
+        .deletingLastPathComponent()   // 根
+        .appendingPathComponent("conformance/fixtures/e2e")
+
+    final class FileTransport: HTTPTransport, @unchecked Sendable {
+        let dir: URL
+        let routes: [(String, String)]
+        var requested: [String] = []
+        init(dir: URL, routes: [(String, String)]) { self.dir = dir; self.routes = routes }
+        func send(_ request: HTTPRequest) throws -> HTTPResponse {
+            requested.append(request.url)
+            for (pat, file) in routes where request.url.contains(pat) {
+                let data = try Data(contentsOf: dir.appendingPathComponent(file))
+                return HTTPResponse(statusCode: 200, headers: [:], body: data, finalURL: request.url)
+            }
+            throw SourceError.requestFailed(request.url, "没有这个 fixture")
+        }
+    }
+
+    let sourceData = try Data(contentsOf: root.appendingPathComponent("source-52dzxy.json"))
+    let source = try JSONDecoder().decode(BookSource.self, from: sourceData)
+    let transport = FileTransport(dir: root, routes: [
+        ("/bkzs/all.html", "list.html"),
+        ("/articles/", "chapter.html"),
+        ("/202614/index.html", "detail.html"),
+    ])
+    let engine = SourceEngine(source: source, fetcher: PageFetcher(transport: transport))
+
+    // ① ⭐ **DOM 解析单独计时**（HTML 解析通常是大头）
+    let listHTML = try String(contentsOf: root.appendingPathComponent("list.html"), encoding: .utf8)
+    var t = Date()
+    for _ in 0..<20 {
+        _ = try SwiftSoupDocument(html: listHTML, baseURL: "https://x.example/")
+    }
+    let domTime = Date().timeIntervalSince(t) / 20
+    print(String(format: "① DOM 解析（list.html %d 字节）= %.3f ms/次", listHTML.utf8.count, domTime * 1000))
+
+    // ①' ⭐ **细分：SwiftSoup 解析 vs 我们的包装 vs DOM 查询**
+    do {
+        var t1 = Date()
+        for _ in 0..<20 { _ = try SwiftSoupDocument(html: listHTML, baseURL: "https://x.example/") }
+        let wrapped = Date().timeIntervalSince(t1) / 20
+        // ⭐ DOM 查询：一次「取全部 book 节点」的成本
+        let doc = try SwiftSoupDocument(html: listHTML, baseURL: "https://x.example/").document
+        t1 = Date()
+        for _ in 0..<20 { _ = doc.queryAll("div.book") }
+        let query = Date().timeIntervalSince(t1) / 20
+        print(String(format: "   我们的包装（SwiftSoupDocument）= %.3f ms", wrapped * 1000))
+        print(String(format: "   一次 queryAll 遍历 = %.3f ms", query * 1000))
+        // ⭐⭐ **一次「相对节点」的字段规则求值**（这才是 480 次的成本）
+        // ⭐ 用**这个源真实的选择器**来测
+        let nodes = doc.queryAll(".magazine-grid .magazine-item")
+        print("     ⇒ 列表节点 \(nodes.count) 个")
+        if let n0 = nodes.first { let n = DOMNodeRef(n0)
+            let ev = Evaluator()
+            let ctx = EvalContext(base: .element(n), baseUrl: "https://x.example/")
+            var t2 = Date()
+            for _ in 0..<50 { _ = ev.evalOne("a@text", base: .element(n), ctx: ctx) }
+            let oneText = Date().timeIntervalSince(t2) / 50
+            t2 = Date()
+            for _ in 0..<50 { _ = ev.evalOne("a@href", base: .element(n), ctx: ctx) }
+            let oneHref = Date().timeIntervalSince(t2) / 50
+            t2 = Date()
+            for _ in 0..<50 { _ = n.node.queryAll("a") }
+            let oneQuery = Date().timeIntervalSince(t2) / 50
+            print(String(format: "   一次相对求值 a@text = %.4f ms / a@href = %.4f ms / 只查 a = %.4f ms",
+                         oneText * 1000, oneHref * 1000, oneQuery * 1000))
+            print(String(format: "   ⇒ 60 本 × 2 字段 = %.1f ms（现状）；若共用选择器 ≈ %.1f ms",
+                         (oneText + oneHref) * 60 * 1000, (oneText + oneHref - oneQuery) * 60 * 1000))
+            // ⭐⭐ **逐段拆**：parse（缓存命中）/ classify / 链求值 / 取值
+            let ast = ev.parser.parse("a@text", isJSON: false)
+            var t3 = Date()
+            for _ in 0..<200 { _ = ev.parser.parse("a@text", isJSON: false) }
+            let parseCost = Date().timeIntervalSince(t3) / 200
+            t3 = Date()
+            for _ in 0..<200 { _ = RuleClassifier.classify("a@text", isJSON: false) }
+            let classifyCost = Date().timeIntervalSince(t3) / 200
+            t3 = Date()
+            for _ in 0..<200 { _ = ev.parser.parse("a@text", isJSON: false) }
+            let parseCost2 = Date().timeIntervalSince(t3) / 200
+            print(String(format: "   parse(缓存命中) = %.4f ms / classify = %.4f ms / 再 parse = %.4f ms",
+                         parseCost * 1000, classifyCost * 1000, parseCost2 * 1000))
+            // 链求值（不含取值）
+            if case .chain(let h, let hi, let steps) = ast {
+                t3 = Date()
+                for _ in 0..<200 { _ = LegadoSelector.resolve(root: n.node, head: h, headIndex: hi, steps: steps) }
+                let chainCost = Date().timeIntervalSince(t3) / 200
+                print(String(format: "   链求值 resolve = %.4f ms", chainCost * 1000))
+            } else {
+                print("   AST 不是 chain：\(ast)")
+            }
+        }
+    }
+
+    // ② 各阶段
+    func timed<T>(_ label: String, _ body: () throws -> T) throws -> T {
+        let t0 = Date()
+        let r = try body()
+        print(String(format: "  %@ = %.3f ms", label, Date().timeIntervalSince(t0) * 1000))
+        return r
+    }
+
+    let cats = try timed("categories（解析 exploreUrl）") { try engine.categories() }
+    let target = cats.first { $0.title.contains("百科知识") } ?? cats[0]
+    let books = try timed("explore（列表页：fetch+DOM+每本 8 个字段规则）") {
+        try engine.explore(target.url)
+    }
+    print("     ⇒ \(books.count) 本书")
+    let info = try timed("bookInfo（详情页）") { try engine.bookInfo(books[0]) }
+    let chapters = try timed("toc（目录页 + 每章 3 个规则）") { try engine.toc(info) }
+    print("     ⇒ \(chapters.count) 章")
+    let article = chapters.first { !$0.isVolume && !$0.url.isEmpty }!
+    try timed("content（正文页）") { try engine.content(article) }
+
+    // ③ ⭐ 规则求值次数（推算总开销）
+    print("     ⇒ 字段规则求值次数 ≈ \(books.count * 8) + \(chapters.count * 3)")
+
+    // ④ 再跑一遍（热缓存：AST 缓存命中）
+    print("--- 第二轮（AST 缓存已热）---")
+    _ = try timed("explore") { try engine.explore(target.url) }
+    exit(0)
+}
+
 // ⭐ `--audit <pack.json>` 模式：125 源规则覆盖体检（用真引擎逐条解析）
 if let idx = CommandLine.arguments.firstIndex(of: "--audit") {
     let pack = idx + 1 < CommandLine.arguments.count
