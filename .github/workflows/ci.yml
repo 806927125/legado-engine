@@ -73,3 +73,40 @@ jobs:
             jsc-build.log
             jsc-test.log
           if-no-files-found: ignore
+
+  ios:
+    name: iOS 编译检查（宿主层 UIKit/WebKit + 整个引擎在 iOS SDK 上）
+    # ⚠️⚠️ **这是接宿主 App 前的唯一硬缺口**
+    #   `LegadoHostApple` 里的 UIKit / WebKit 代码都在 `#if canImport(...)` 内
+    #   ⇒ **Linux 沙盒一个字节都不编译** ⇒ macOS job 也跳过（macOS 没有 UIKit）
+    #   ⇒ 只有这个 job 能真正验它们 ⭐
+    #
+    # ⭐ 顺带的好处：iOS 也有 JavaScriptCore ⇒ 这个 job 会把
+    #   **整个引擎（含 JSC 后端）在 iOS SDK 上编译一遍** ⇒ 比 macOS job 更接近真机
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 打印 Xcode / iOS SDK
+        run: |
+          xcodebuild -version
+          echo "SDK: $(xcrun --sdk iphonesimulator --show-sdk-path)"
+
+      # ⚠️ `| tee` 吞 exit code ⇒ 必须 `pipefail`（同 jsc job 的教训）
+      - name: 编译 iOS 目标（模拟器 · 不签名）
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -scheme LegadoHostApple \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee ios-build.log
+
+      - name: 归档 iOS 编译日志（排查用）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-log
+          path: ios-build.log
+          if-no-files-found: ignore
