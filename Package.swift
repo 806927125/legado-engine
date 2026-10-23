@@ -9,6 +9,12 @@ import PackageDescription
 /// - JS 运行时（JSC）属于**可选执行后端**，由 `JSExecutor` 协议隔离，不污染核心
 let package = Package(
     name: "LegadoCore",
+    // ⭐ 必须显式声明平台版本 —— SwiftPM 默认 macOS 10.13，
+    //   而 SwiftSoup 要求 macOS 12.0 ⇒ macOS 上会报
+    //   「the library 'LegadoCore' requires macos 10.13, but depends on
+    //    the product 'SwiftSoup' which requires macos 12.0」
+    // ⇒ **这不是 JSC 代码的问题，是平台声明缺失**（Linux 上不查这个 ⇒ 沙盒里看不出来）
+    platforms: [.macOS(.v12), .iOS(.v15)],
     products: [
         .library(name: "LegadoCore", targets: ["LegadoCore"]),
         .executable(name: "conformance", targets: ["Conformance"]),

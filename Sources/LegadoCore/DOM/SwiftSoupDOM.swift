@@ -38,6 +38,18 @@ public final class SwiftSoupNode: DOMNode {
         return v.isEmpty ? nil : v
     }
 
+    /// 全部属性（`result.book_id` 这类站方用法需要）
+    public var attributes: [String: String] {
+        var out: [String: String] = [:]
+        // ⚠️ SwiftSoup 的 `getAttributes()` 返回的是 `Attributes`（集合），**不是字典**
+        if let attrs = try? element.getAttributes() {
+            for a in attrs {
+                out[a.getKey()] = a.getValue()
+            }
+        }
+        return out
+    }
+
     public func queryAll(_ css: String) -> [DOMNode] {
         guard let els = try? element.select(css) else { return [] }
         return els.map { SwiftSoupNode($0) as DOMNode }

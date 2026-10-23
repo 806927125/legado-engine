@@ -93,7 +93,7 @@ public struct EvalContext: @unchecked Sendable {
     }
 }
 
-/// 宿主对象（`book` / `source` / `chapter`）—— 核心层不关心它们的实现，
+/// 宿主对象（`book` / `source` / `chapter` / `cookie` / `cache`）—— 核心层不关心它们的实现，
 /// 只要求：**必须是「包过 API 的对象」**，不是裸字典。
 ///
 /// 规格 §S-SCP-03 / §S-SCP-04。
@@ -101,15 +101,31 @@ public struct HostObject: Sendable {
     public let name: String
     /// 方法表：站方 JS 调 `book.getVariable('x')` ⇒ 落到这里
     public let methods: [String: HostMethod]
+    /// ⭐ **成员（属性）**：站方 JS 读 `book.name` / `source.bookSourceUrl` / `chapter.index`
+    /// ⇒ 站方真实用法里**属性比方法更常见**（大灰狼 9 个 book 成员里大半是属性）
+    public let properties: [String: JSONValue]
 
-    public init(name: String, methods: [String: HostMethod] = [:]) {
+    public init(name: String, methods: [String: HostMethod] = [:],
+                properties: [String: JSONValue] = [:]) {
         self.name = name
         self.methods = methods
+        self.properties = properties
     }
 
-    public func call(_ method: String, _ args: [String]) -> String? {
+    /// 调一个方法（参数/返回都用 JSON 形态）
+    public func call(_ method: String, _ args: [JSONValue]) -> JSONValue? {
         methods[method]?(args)
+    }
+
+    /// 读一个成员
+    public func property(_ name: String) -> JSONValue? {
+        properties[name]
     }
 }
 
-public typealias HostMethod = @Sendable ([String]) -> String?
+/// 宿主方法：参数与返回都用 JSON 形态。
+///
+/// ⚠️ 以前是 `[String] -> String?` ⇒ **只能传字符串、只能返回字符串**
+/// ⇒ `book.getVariable('x')` 这种还行，但 `java.ajax(url, {…})`（第二个参数是对象）
+///    和「返回数组/对象」就都表达不了 ⇒ **JSC 侧必须换掉这个签名**。
+public typealias HostMethod = @Sendable ([JSONValue]) -> JSONValue?

@@ -41,3 +41,35 @@ jobs:
           name: conformance-report
           path: conformance/out/
           if-no-files-found: ignore
+
+  jsc:
+    name: JSC 后端（macOS · 只有这里能验 JavaScriptCore）
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ⚠️⚠️ **不要用 swift-actions 装 Swift**！
+      #   macOS runner 的 Xcode 26.6 自带 **SDK 是 Swift 6.3.2 编的**，
+      #   而 swift-actions 装的 6.1.2 编译器**认不了这个 SDK** ⇒
+      #   「this SDK is not supported by the compiler」⇒ 编 Foundation/Combine 直接炸。
+      # ⇒ 改用 **runner 自带的 swift**（跟 SDK 同版本）✅
+      - name: 打印工具链版本（确认与 SDK 同版本）
+        run: swift --version
+
+      # ⚠️ `swift build 2>&1 | tee` 会**吞掉 exit code**（tee 返回 0）
+      #    ⇒ 编译失败也会被标成 success ⇒ 白等一轮 ⇒ 必须 `pipefail`
+      - name: 编译语义内核
+        run: set -o pipefail; swift build 2>&1 | tee jsc-build.log
+
+      - name: JSC 门禁（Linux 上这些用例会被跳过 ⇒ 只能在这里跑）
+        run: set -o pipefail; swift test --filter JSCExecutorTests 2>&1 | tee jsc-test.log
+
+      - name: 归档 JSC 编译日志（排查用）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jsc-build-log
+          path: |
+            jsc-build.log
+            jsc-test.log
+          if-no-files-found: ignore

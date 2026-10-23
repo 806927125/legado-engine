@@ -1161,6 +1161,35 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 **依据**：🟢 轻阅的教训：诊断只在 NSLog 里 ⇒ **用户完全看不到**。
 **现状**：✅（`SourceEngine.diagnosticLine(_:)` 给单行文本形式）。
 
+### S-JS-11 ⭐ 宿主 API **契约清单**（实证来的，不是拍脑袋列的）
+**规范**：`java.*` / `source.*` / `book.*` / `chapter.*` / `cookie.*` / `cache.*`
+的**方法与属性**要有明确清单（`Sources/LegadoCore/JS/JSHostAPI.swift`）。
+**依据**：🟢 扫 **🍅大灰狼聚合 vip完全版**（jsLib 31,961B + loginUrl 61,678B + 9 处规则级 JS）
+＋ **125 源包** 全部 JS 片段 ⇒ 实测：**方法 55 个 / 属性 22 个**（另有 4 个 `java.lang/util/net/io`
+是 Java 包访问，JS 里不存在 ⇒ 不算 API）。
+**现状**：✅（清单 81 条；门禁 `JSHostAPITests` 断言**契约 ⊇ 真实用量** ⇒ 站方加了新 API 会红）
+
+⚠️ **契约与实现分离**：清单只说「有哪些 API」，**实现由宿主给**（`JSHostAPIProvider`）
+⇒ 宿主少实现一个 ⇒ 诊断里明说「宿主缺 xxx」，而不是让站方 JS 报 `undefined is not a function`。
+
+### S-JS-12 ⭐ 求值形态 = **Script 的完成值**（**不要包成函数体**）
+**规范**：`eval("1 + 2")` ⇒ 完成值 = **3**；`(function(){ 1 + 2 })()` ⇒ **undefined**（函数体要显式 return）。
+**依据**：🟡 Legado/Rhino 也是 `eval` ⇒ 两端一致。
+**现状**：✅。
+
+⇒ 站方自己给 `result` 赋值的情况**天然正确**：`result = String(...)` 作为末行 ⇒ 赋值表达式的值 = 赋的值。
+⚠️ **代价**：顶层 `return` 是**语法错**（Script 不允许）⇒ 与 Legado/Rhino 一致 ⇒ 站方规范本来也要求「末行表达式」。
+
+### S-JS-13 ⭐ 宿主对象 = **方法 + 属性**
+**规范**：`book.getVariable('x')` 是方法；`book.name` / `source.bookSourceUrl` 是**属性**（不带括号）。
+**依据**：🟢 真书源里**属性比方法更常见**。
+**现状**：✅（`HostObject` 改 JSON 形态：`[JSONValue] -> JSONValue?` ＋ `properties`）
+
+### S-RES-8 ⭐ 条目级 `result` = 那个对象的 **JSON 视图**
+**规范**：条目级基准 ⇒ `result` 是 `{全部属性 + "_text": 文本}` ⇒ 站方能读 `result.book_id`。
+**依据**：🟡 §S-RES-01（基准决定 result）+ 真书源（`let book_id = result.book_id;`）。
+**现状**：✅（`DOMNode` 加 `attributes`（**协议扩展给默认实现** ⇒ 替身不用改））
+
 ## 18. 尚未覆盖 / 已知缺口
 
 | # | 缺口 | 状态 | 备注 |
@@ -1190,6 +1219,7 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 
 | 日期 | 变更 |
 |---|---|
+| 2026-10-23 | **JS 宿主 API 契约 + JSC 执行器**（Phase 3.8）：扫 **🍅大灰狼聚合 vip完全版**（jsLib 31,961B + loginUrl 61,678B + 9 处规则级 JS）+ 125 源包 ⇒ 实测**方法 55 / 属性 22** ⇒ 落成 `JSHostAPI` 契约清单（81 条）+ `JSHostAPIProvider`（实现由宿主给）；写 **JSC 执行器**（`#if canImport(JavaScriptCore)`）；⭐ 求值形态定为 **Script 的完成值**（**不包函数体** ⇒ 与 Legado/Rhino 一致）；`HostObject` 改 JSON 形态（方法+属性）；门禁：契约 ⊇ 真实用量（读 `js-api-usage.json`）＋ scope 构造 ＋ **用 Node 真跑**验完成值；⭐ **CI 加 macos job** ⇒ JSC 专属用例（Linux 上跳过）终于有地方跑；规格 138→**142 条** · XCTest 68→**74 项** |
 | 2026-10-23 | **⑤宿主服务契约**（Phase 3.7）：新增 `Host/HostServices.swift` —— 存储/文件/浏览器/提示/日志**五个协议** + 内存实现；编排层接线：诊断**同时**进宿主日志（§S-HOST-06）、出错**先通知宿主再抛**（§S-HOST-05）；门禁 4 项；⚠️ 顺带修掉自己写的**又一处平凡通过**（`XCTAssertTrue(a.isEmpty || !a.isEmpty)` 恒真）⇒ 改成断言通知条数与内容；规格 134→**139 条** · XCTest 64→**68 项** |
 | 2026-10-23 | **搜索端到端**（Phase 3.6）：真书源「神魔」(<https://book.eayue.com>) + 真搜索页快照 ⇒ 新增端到端门禁 6 项；⭐ 门禁抓出**一个真 bug**：尾部正则的**替换串**里 `$1`/`$2` **没展开**（`replaceCharacters(in:with:)` 不展开）⇒ URL 里留着字面量 `$1` ⇒ 站方 20+ 处这种写法全废；规格 **134 条** · fixture **127 条** · XCTest **64 项** |
 | 2026-10-23 | **125 源规则覆盖体检**（Phase 3.5）：新增 `swift run conformance --audit <pack.json>`（**用真引擎**逐条解析 125 源 / **2755 条规则**）⇒ **79/125 源全部规则都能被引擎读懂**，38 个只差 JS 后端，**真语义缺口只剩 6 条**；据此**修掉 2 个真缺口**：① **JSONPath `.[…]`**（`$.[*]` / `$.[-1].title`，125 源 **16 处**）② **纯副作用规则**（`@put:` 整条 ⇒ 诊断不再说谎）；并给「路径 + 尾部 `<js>` 块」复合形态**单独分类**（4 处）⇒ 规格 129→**131 条**、fixture 125→**126 条**、XCTest 49→**51 项** |

@@ -63,7 +63,7 @@ final class EndToEndSourceTests: XCTestCase {
     }
 
     /// 跑一遍「发现 → 详情 → 目录」，返回链上的产物（多条断言共用）
-    private func runChain(_ engine: SourceEngine) throws -> (cats: [Category], books: [Book],
+    private func runChain(_ engine: SourceEngine) throws -> (cats: [SourceCategory], books: [Book],
                                                             info: BookInfo, chapters: [Chapter]) {
         let cats = try engine.categories()
         // ⚠️ **不许强解包** —— 崩了不产汇总行，看不出是哪条断言挂的

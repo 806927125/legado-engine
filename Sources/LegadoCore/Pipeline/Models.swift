@@ -1,7 +1,7 @@
 import Foundation
 
 /// **分类** —— 发现页的一个入口。
-public struct Category: Sendable, Equatable {
+public struct SourceCategory: Sendable, Equatable {
     public var title: String
     public var url: String
     /// Legado 的 `style`（网格/列表），本引擎暂不使用

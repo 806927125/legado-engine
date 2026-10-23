@@ -62,7 +62,7 @@ public final class SourceEngine {
     /// 两种形态都支持：
     /// - 老式：每行 `标题::URL`（**URL 可相对**，相对书源首页）
     /// - 新式：JSON 数组 `[{"title":…,"url":…,"style":…}]`
-    public func categories() throws -> [Category] {
+    public func categories() throws -> [SourceCategory] {
         guard let exploreUrl = source.exploreUrl,
               !exploreUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw SourceError.ruleMissing("exploreUrl")
@@ -73,7 +73,7 @@ public final class SourceEngine {
     }
 
     /// 解析 `exploreUrl`（纯函数，便于单测）
-    public static func parseExploreUrl(_ raw: String, base: String) -> [Category] {
+    public static func parseExploreUrl(_ raw: String, base: String) -> [SourceCategory] {
         let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // 新式：JSON 数组
@@ -85,13 +85,13 @@ public final class SourceEngine {
             return arr.compactMap { item in
                 guard let url = (item["url"] as? String), !url.isEmpty else { return nil }
                 let title = (item["title"] as? String) ?? url
-                return Category(title: title, url: absolute(url, base: base),
+                return SourceCategory(title: title, url: absolute(url, base: base),
                                 style: item["style"] as? String)
             }
         }
 
         // 老式：`标题::URL` 每行一条
-        var out: [Category] = []
+        var out: [SourceCategory] = []
         for line in text.components(separatedBy: .newlines) {
             let l = line.trimmingCharacters(in: .whitespaces)
             guard !l.isEmpty, !l.hasPrefix("//") else { continue }
@@ -100,7 +100,7 @@ public final class SourceEngine {
             let title = parts[0].trimmingCharacters(in: .whitespaces)
             let url = parts[1].trimmingCharacters(in: .whitespaces)
             guard !url.isEmpty else { continue }
-            out.append(Category(title: title.isEmpty ? url : title,
+            out.append(SourceCategory(title: title.isEmpty ? url : title,
                                 url: absolute(url, base: base), style: nil))
         }
         return out

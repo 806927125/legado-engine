@@ -6,11 +6,11 @@ import Foundation
 /// 这样门禁主体仍能在沙盒跑（jsdom），只有极小一块需要真机验。
 public protocol JSExecutor {
     /// 执行站方 JS，返回值（转换后的 JSON 形态）
-    func run(_ code: String, context: JSContext) throws -> JSONValue
+    func run(_ code: String, context: JSRunContext) throws -> JSONValue
 }
 
 /// JS 执行的上下文（**同步**）
-public struct JSContext {
+public struct JSRunContext {
     /// 当前基准（决定 `result` 的语义，§S-RES）
     public var base: RuleBase
     public var baseUrl: String
@@ -645,7 +645,7 @@ public struct Evaluator {
             diag.branch = "JS"
             return .void
         }
-        let jctx = JSContext(base: base, baseUrl: ctx.baseUrl, raw: ctx.raw,
+        let jctx = JSRunContext(base: base, baseUrl: ctx.baseUrl, raw: ctx.raw,
                              book: ctx.book, source: ctx.source, chapter: ctx.chapter,
                              vars: ctx.vars, key: ctx.key, page: ctx.page, document: ctx.document)
         do {

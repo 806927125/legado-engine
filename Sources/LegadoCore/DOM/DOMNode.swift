@@ -22,6 +22,10 @@ public protocol DOMNode: AnyObject {
     var tagName: String { get }
     /// 属性值（未解实体）
     func attribute(_ name: String) -> String?
+    /// ⭐ **全部属性** —— 站方 JS 读 `result.book_id` 时要用（条目级基准 ⇒ result 是那个对象）
+    ///
+    /// ⚠️ **给默认实现**（协议扩展）⇒ 文本节点 / 测试替身不用改也能编过。
+    var attributes: [String: String] { get }
     /// 在本节点内按 CSS 选（**含自身**）
     func queryAll(_ css: String) -> [DOMNode]
     /// 本节点是否匹配 CSS
@@ -32,6 +36,11 @@ public protocol DOMNode: AnyObject {
     func children() -> [DOMNode]
     /// **直接子文本节点** —— XPath 的 `text()` 取的是这个，**不是**完整文本
     func directText() -> String
+}
+
+public extension DOMNode {
+    /// 默认：**没有属性**（只有真实元素实现才覆盖它）
+    var attributes: [String: String] { [:] }
 }
 
 /// 节点引用 —— 可跨线程传递的薄包装。
