@@ -352,7 +352,8 @@ public final class SourceEngine {
     /// | `java.base64Decode` / `base64Encode` / `hexDecodeToString` | 7/5/3 | ✅ 纯计算 |
     /// | `java.randomUUID` | 2 | ✅ |
     /// | `java.toNumChapter` | 1 | ✅ |
-    /// | `java.getString` / `get` / `put` / `timeFormat` | 63/34/23/16 | ⬜ 下一批 |
+    /// | `java.getString` / `get` / `put` | 63/34/23 | ✅ 本轮 |
+    /// | `java.timeFormat` / `timeFormatUTC` | 16/2 | ✅ 本轮 |
     /// | `java.toast` / `log` / `getCookie` / `startBrowser` … | — | **宿主** |
     public func engineJava(_ method: String, _ args: [JSONValue], _ base: RuleBase = .page("")) -> JSONValue? {
         let first = args.first?.scalarString ?? ""
@@ -377,6 +378,17 @@ public final class SourceEngine {
         // ⭐⭐ `java.getString('$.x')` ⇒ **对当前基准做 JSONPath**（125 源里 63 处）
         //   ⚠️ 不是「读文件」—— 站方的实际约定是「取 result 里的字段」
         //   ⇒ 实参以 `$` 开头 ⇒ JSONPath；否则 ⇒ 读源级变量
+        // ⭐⭐ `java.timeFormat(t)` ⇒ **epoch 毫秒 → "yyyy-MM-dd HH:mm:ss"**（本地时区）
+        //   `java.timeFormatUTC(t, pattern, tz)` ⇒ UTC + **时区偏移小时**（如 8 = UTC+8）
+        //   依据：轻阅参考实现（reference/js/java-api.js）+ 125 源真实用法
+        case "timeFormat", "timeFormatUTC":
+            guard let ms = TimeFormat.millis(from: first) else { return .string("") }
+            let pattern = args.count > 1 ? args[1].scalarString : nil
+            // ⚠️ 只有 UTC 版才带时区参数（站方：`timeFormatUTC(ms,'yyyy-MM-dd',8)`）
+            let tz = (method == "timeFormatUTC" && args.count > 2)
+                ? Int(args[2].scalarString) : nil
+            return .string(TimeFormat.format(millis: ms, pattern: pattern,
+                                             utcOffsetHours: tz))
         case "getString":
             if first.hasPrefix("$") || first.hasPrefix("result") {
                 let ctx = EvalContext(base: base, varBox: varBox)

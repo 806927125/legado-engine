@@ -1467,3 +1467,22 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 
 ⚠️ `java.get(key)` 没有默认值 ⇒ 空串；`java.get(key, default)` ⇒ 默认值。
 ⚠️ `java.put` / `java.get` **读写的也是源级变量**（不是文件、不是配置）。
+
+### S-JS-22 ⭐ `java.timeFormat` / `java.timeFormatUTC` 的语义
+**规范**：
+- `java.timeFormat(t)` ⇒ **epoch 毫秒** → 默认 `"yyyy-MM-dd HH:mm:ss"`（**本地时区**）
+- `java.timeFormat(t, pattern)` ⇒ 按 pattern
+- `java.timeFormatUTC(t, pattern, tz)` ⇒ UTC 基础 + **时区偏移小时**（如 8 = UTC+8）
+**依据**：🟢 轻阅参考实现（`reference/js/java-api.js` 的注释）+ 125 源真实用法
+（`java.timeFormatUTC(java.getString('$.updated')*1000,'yyyy-MM-dd',8)`）。
+**现状**：✅（2026-10-23 补）。
+
+⚠️⚠️ **Java pattern 大小写敏感**：`MM` = **月**、`mm` = **分** ⇒ 混了差 100 倍 ⭐
+⚠️ 时区用 `TimeZone(secondsFromGMT:)` ⇒ **固定偏移**（不管 DST）⇒ 与 Java 的 `GMT+8` 一致。
+⚠️ 入参是**毫秒**（站方那边是秒 ⇒ 自己 `*1000`）。
+⚠️ 解析不了 ⇒ **空串**（不是 nil —— nil = 不接管）。
+
+### S-JS-23 ⭐ 宿主 API 能力清单**自动生成**
+**规范**：`docs/HOST-API-GUIDE.md` 由 `tools/gen_host_api_guide.py` 从
+**契约 + 引擎实现 + 真实用量**扫出来 ⇒ 改代码后重跑即同步 ⇒ **不会过期**。
+**现状**：✅。
