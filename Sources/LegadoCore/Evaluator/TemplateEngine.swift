@@ -55,6 +55,14 @@ public enum TemplateEngine {
         if expr.hasPrefix("$") {
             return jsonPathValue(expr, ctx: ctx)
         }
+        // ⭐⭐ **算术表达式**：`{{page-1}}` / `{{page+1}}` / `{{(page-1)*30}}`
+        //   （125 源里 **12 个**用 `{{page-1}}`、**1 个**用 `{{page+1}}`）
+        //
+        // ⚠️⚠️ **以前这些求值失败 ⇒ 返回空串** ⇒ 站方 URL 拼成 `…page=`
+        // ⇒ **发现页翻页挂掉**（13 个源受影响）
+        if let v = Arithmetic.evaluate(expr, vars: ["page": Double(ctx.page)]) {
+            return v
+        }
         // 其余：求值失败 ⇒ 空串（轻阅口径）
         return ""
     }
@@ -185,5 +193,106 @@ public enum VarStore {
         }
         out += (s as NSString).substring(from: last)
         return out
+    }
+}
+
+/// ⭐⭐ **模板里的算术求值** —— 支持 `+ - * /`、括号、数字、`page` 这类变量。
+///
+/// ⚠️⚠️ **以前 `{{page-1}}` 求值失败 ⇒ 返回空串**
+/// ⇒ 站方 URL 拼成 `…page=` ⇒ **发现页翻页挂掉**（13 个源受影响）
+///
+/// 语法（够用就好，不做通用表达式）：
+/// ```
+/// expr   := term (('+' | '-') term)*
+/// term   := factor (('*' | '/') factor)*
+/// factor := 数字 | 变量 | '(' expr ')' | '-' factor
+/// ```
+public enum Arithmetic {
+    /// 求值 ⇒ 字符串；**失败返回 nil**（调用方决定兜底）
+    public static func evaluate(_ expr: String, vars: [String: Double]) -> String? {
+        var p = Parser(chars: Array(expr), vars: vars)
+        guard let v = p.parseExpr(), p.atEnd else { return nil }
+        return format(v)
+    }
+
+    /// 整数不带小数点（`3` 而不是 `3.0`）
+    public static func format(_ d: Double) -> String {
+        if d == d.rounded(), abs(d) < 1e15 { return String(Int(d)) }
+        return String(d)
+    }
+
+    private struct Parser {
+        let chars: [Character]
+        let vars: [String: Double]
+        var i = 0
+
+        init(chars: [Character], vars: [String: Double]) { self.chars = chars; self.vars = vars }
+
+        var atEnd: Bool { i >= chars.count }
+
+        mutating func skipSpaces() {
+            while i < chars.count, chars[i] == " " || chars[i] == "\t" { i += 1 }
+        }
+
+        mutating func parseExpr() -> Double? {
+            guard var left = parseTerm() else { return nil }
+            while true {
+                skipSpaces()
+                guard i < chars.count, chars[i] == "+" || chars[i] == "-" else { return left }
+                let op = chars[i]; i += 1
+                guard let right = parseTerm() else { return nil }
+                left = (op == "+") ? (left + right) : (left - right)
+            }
+        }
+
+        mutating func parseTerm() -> Double? {
+            guard var left = parseFactor() else { return nil }
+            while true {
+                skipSpaces()
+                guard i < chars.count, chars[i] == "*" || chars[i] == "/" else { return left }
+                let op = chars[i]; i += 1
+                guard let right = parseFactor() else { return nil }
+                if op == "*" {
+                    left *= right
+                } else {
+                    guard right != 0 else { return nil }   // 除零 ⇒ 失败
+                    left /= right
+                }
+            }
+        }
+
+        mutating func parseFactor() -> Double? {
+            skipSpaces()
+            guard i < chars.count else { return nil }
+            let c = chars[i]
+            if c == "-" {
+                i += 1
+                guard let v = parseFactor() else { return nil }
+                return -v
+            }
+            if c == "(" {
+                i += 1
+                guard let v = parseExpr() else { return nil }
+                skipSpaces()
+                guard i < chars.count, chars[i] == ")" else { return nil }
+                i += 1
+                return v
+            }
+            if c.isNumber || c == "." {
+                var s = ""
+                while i < chars.count, chars[i].isNumber || chars[i] == "." {
+                    s.append(chars[i]); i += 1
+                }
+                return Double(s)
+            }
+            if c.isLetter || c == "_" {
+                var s = ""
+                while i < chars.count, chars[i].isLetter || chars[i].isNumber || chars[i] == "_" {
+                    s.append(chars[i]); i += 1
+                }
+                return vars[s]
+            }
+            return nil
+        }
     }
 }
