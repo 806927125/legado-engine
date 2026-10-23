@@ -100,7 +100,9 @@ public enum VarStore {
                 k = String(t[t.startIndex..<i]).trimmingCharacters(in: .whitespaces)
                 v = String(t[t.index(after: i)...]).trimmingCharacters(in: .whitespaces)
             }
-            ctx.vars[k] = v.isEmpty ? currentResultText(ctx) : evalVarExpr(v, ctx: ctx)
+            let value = v.isEmpty ? currentResultText(ctx) : evalVarExpr(v, ctx: ctx)
+            // ⭐⭐ 有 varBox ⇒ 写**共享存储**（后续规则 / 站方 JS 读得到）
+            if let box = ctx.varBox { box.set(k, value) } else { ctx.vars[k] = value }
             return ""
         }
 
@@ -108,7 +110,9 @@ public enum VarStore {
         s = replace2(s, pattern: #"@(get|getString|getInt):\{([^}]*)\}"#) { op0, key0 in
             let op = op0.lowercased()
             let key = key0.trimmingCharacters(in: .whitespaces)
-            guard let v = ctx.vars[key] else { return "" }
+            // ⭐⭐ 优先读共享存储（varBox）⇒ 与站方 `java.put` 写的是同一份
+            let v = ctx.varBox?.get(key) ?? ctx.vars[key]
+            guard let v else { return "" }
             if op == "getint" { return String(Int(v) ?? 0) }
             return v
         }

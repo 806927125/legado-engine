@@ -43,7 +43,7 @@ final class JSCAjaxTests: XCTestCase {
     private func makeExec(_ transport: MemTransport) -> (JSCExecutor, NoAjaxAPI) {
         let api = NoAjaxAPI()
         let exec = JSCExecutor(api: api)
-        exec.setEngineAPI { method, args in
+        exec.setEngineAPI { method, args, _ in
             guard method == "ajax" else { return nil }
             var req = HTTPRequest(url: args.first?.scalarString ?? "", method: "GET")
             if let o = args.count > 1 ? args[1] : nil, case .object(let oo) = o {
@@ -93,7 +93,7 @@ final class JSCAjaxTests: XCTestCase {
     func testMD5EncodeInJSC() throws {
         let api = NoAjaxAPI()
         let exec = JSCExecutor(api: api)
-        exec.setEngineAPI { method, args in
+        exec.setEngineAPI { method, args, _ in
             guard method == "md5Encode" else { return nil }
             return .string(Crypto.md5Hex(args.first?.scalarString ?? ""))
         }
@@ -113,7 +113,7 @@ final class JSCAjaxTests: XCTestCase {
         let exec = JSCExecutor(api: api)
         // ⭐ **返回 `.null` = 「我接管了，但这次失败」**
         // ⚠️ **返回 nil = 「我不接管」⇒ 落回宿主**（那是另一条语义，§S-JS-19）
-        exec.setEngineAPI { _, _ in .null }   // 已接管但失败
+        exec.setEngineAPI { _, _, _ in .null }   // 已接管但失败
         let ctx = JSRunContext(base: .page(""), baseUrl: "https://x.example/")
         let out = try exec.run("java.ajax('https://x.example/a')", context: ctx)
         XCTAssertTrue(out.isNull || out.scalarString.isEmpty,

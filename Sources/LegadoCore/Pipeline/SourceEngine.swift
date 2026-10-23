@@ -27,6 +27,8 @@ public final class SourceEngine {
     public let source: BookSource
     /// 抓页面的入口
     public let fetcher: PageFetcher
+    /// ⭐⭐ **源级变量的共享存储**（站方 `java.put` / `java.get` 读写的就是它）
+    public let varBox: VarBox
     /// ⭐⭐ **源级请求头**（`BookSource.header`）—— 125 源里 **54 个**在用
     ///
     /// ⚠️ 以前编排层**一次都没用** ⇒ 这 54 个源的请求全缺 UA / Referer / Cookie
@@ -59,6 +61,8 @@ public final class SourceEngine {
         self.fetcher = fetcher
         // ⭐⭐ **源级请求头**（54 个源在用 ⇒ 缺了就 403 / 空页）
         self.sourceHeaders = Self.parseSourceHeader(source.header)
+        // ⭐⭐ 源级变量的**共享**存储（跨规则 / 跨 JS 调用可写）
+        self.varBox = VarBox()
         self.evaluator = Evaluator(js: js)
         self.storage = storage
         self.files = files
@@ -69,9 +73,9 @@ public final class SourceEngine {
         //
         // ⭐ 引擎**全同步** ⇒ 这里可以**同步发请求**并直接返回正文
         // ⇒ **不需要「两遍跑」机制**（那是 WKWebView 异步桥的补丁）⭐
-        js?.setEngineAPI { [weak self] method, args in
+        js?.setEngineAPI { [weak self] method, args, base in
             guard let self else { return nil }
-            return self.engineJava(method, args)
+            return self.engineJava(method, args, base)
         }
     }
 
@@ -350,7 +354,7 @@ public final class SourceEngine {
     /// | `java.toNumChapter` | 1 | ✅ |
     /// | `java.getString` / `get` / `put` / `timeFormat` | 63/34/23/16 | ⬜ 下一批 |
     /// | `java.toast` / `log` / `getCookie` / `startBrowser` … | — | **宿主** |
-    public func engineJava(_ method: String, _ args: [JSONValue]) -> JSONValue? {
+    public func engineJava(_ method: String, _ args: [JSONValue], _ base: RuleBase = .page("")) -> JSONValue? {
         let first = args.first?.scalarString ?? ""
         switch method {
         case "ajax":
@@ -370,6 +374,24 @@ public final class SourceEngine {
             return .string(Crypto.randomUUID())
         case "toNumChapter":
             return .string(Crypto.convertChineseNumerals(in: first))
+        // ⭐⭐ `java.getString('$.x')` ⇒ **对当前基准做 JSONPath**（125 源里 63 处）
+        //   ⚠️ 不是「读文件」—— 站方的实际约定是「取 result 里的字段」
+        //   ⇒ 实参以 `$` 开头 ⇒ JSONPath；否则 ⇒ 读源级变量
+        case "getString":
+            if first.hasPrefix("$") || first.hasPrefix("result") {
+                let ctx = EvalContext(base: base, varBox: varBox)
+                return .string(VarStore.evalVarExpr(first, ctx: ctx))
+            }
+            return .string(varBox.get(first) ?? "")
+        // ⭐ `java.get(key)` / `java.get(key, default)` ⇒ **读源级变量**
+        case "get":
+            let def = args.count > 1 ? args[1].scalarString : ""
+            return .string(varBox.get(first) ?? def)
+        // ⭐ `java.put(key, value)` ⇒ **写源级变量**（共享存储 ⇒ 后续规则读得到）
+        case "put":
+            let value = args.count > 1 ? args[1].scalarString : ""
+            varBox.set(first, value)
+            return .string("")
         default:
             // ⭐ **不接管** ⇒ 落回宿主实现
             return nil
@@ -481,7 +503,7 @@ public final class SourceEngine {
                        key: String = "") throws -> Page {
         let baseURL = base ?? source.bookSourceUrl
         // 模板插值（`{{page}}` / `{{key}}` / `{{baseUrl}}`）
-        var ctx = EvalContext(base: .page(""), baseUrl: baseURL)
+        var ctx = EvalContext(base: .page(""), baseUrl: baseURL, varBox: varBox)
         ctx.page = page
         ctx.key = key
         let rule = TemplateEngine.render(urlRule, ctx: ctx)
@@ -532,7 +554,7 @@ public final class SourceEngine {
     private func listNodes(_ rule: String, page: Page, field: String,
                             strict: Bool = true) throws -> [DOMNodeRef] {
         let ctx = EvalContext(base: .page(page.text), baseUrl: page.url, raw: page.text,
-                              isJSON: page.isJSON, document: page.document)
+                              varBox: varBox, isJSON: page.isJSON, document: page.document)
         let nodes = evaluator.evalNodes(rule, base: ctx.base, ctx: ctx)
         // ⚠️ 翻页时 `strict = false` —— 后面某页没命中是常态，**不许炸掉整个目录**
         if nodes.isEmpty, strict { throw SourceError.emptyResult(field) }
@@ -553,7 +575,7 @@ public final class SourceEngine {
         guard let rule, !rule.isEmpty else { return [] }
         let base: RuleBase = .page(page.text)
         let ctx = EvalContext(base: base, baseUrl: page.url, raw: page.text,
-                              isJSON: page.isJSON, document: page.document)
+                              varBox: varBox, isJSON: page.isJSON, document: page.document)
         let e = evaluator.evalOne(rule, base: base, ctx: ctx)
         diagnostics.append(e.diagnostic)
         logger?.log(Self.diagnosticLine(e.diagnostic))
@@ -598,7 +620,7 @@ public final class SourceEngine {
         guard let rule, !rule.isEmpty else { return "" }
         let base: RuleBase = scope.map { RuleBase.element($0) } ?? .page(page.text)
         let ctx = EvalContext(base: base, baseUrl: page.url, raw: page.text,
-                              isJSON: page.isJSON, document: page.document)
+                              varBox: varBox, isJSON: page.isJSON, document: page.document)
         let e = evaluator.evalOne(rule, base: base, ctx: ctx)
         diagnostics.append(e.diagnostic)
         // ⭐ 把诊断**同时**送进宿主日志（宿主才能回放给用户看）
@@ -615,7 +637,7 @@ public final class SourceEngine {
         guard let rule, !rule.isEmpty else { return "" }
         let base: RuleBase = .page(page.text)
         let ctx = EvalContext(base: base, baseUrl: page.url, raw: page.text,
-                              isJSON: page.isJSON, document: page.document)
+                              varBox: varBox, isJSON: page.isJSON, document: page.document)
         let e = evaluator.evalOne(rule, base: base, ctx: ctx)
         diagnostics.append(e.diagnostic)
         logger?.log(Self.diagnosticLine(e.diagnostic))

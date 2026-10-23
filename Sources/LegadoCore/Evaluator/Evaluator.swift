@@ -23,13 +23,17 @@ public protocol JSExecutor {
     /// ⭐⭐ **因为引擎内部全同步** ⇒ `java.ajax` 可以**同步发请求**并直接返回正文
     /// ⇒ **不需要「两遍跑」机制**（那是 WKWebView 异步桥的补丁）⭐
     ///
+    /// - Parameters:
+    ///   - method: API 名（如 `ajax` / `md5Encode` / `getString`）
+    ///   - args: 参数
+    ///   - base: **当前基准**（`java.getString('$.x')` 要对基准做 JSONPath ⇒ 需要它）
     /// - Returns: **返回 nil = 「我不接管」** ⇒ 执行器落回宿主实现
     ///   （⇒ 引擎只抢它真正实现的那几个，其余仍归宿主）
     func setEngineAPI(_ handler: JSEngineAPIHandler?)
 }
 
 /// ⭐ **引擎侧 `java.*` 的实现签名**
-public typealias JSEngineAPIHandler = (String, [JSONValue]) -> JSONValue?
+public typealias JSEngineAPIHandler = (String, [JSONValue], RuleBase) -> JSONValue?
 
 extension JSExecutor {
     /// 默认实现 = **不接管**（宿主自己实现全部 `java.*`）
@@ -51,6 +55,8 @@ public struct JSRunContext {
     public var chapter: HostObject?
     /// 源级变量
     public var vars: [String: String]
+    /// ⭐⭐ **源级变量的共享存储**（站方 `java.put` 要能写回引擎）
+    public var varBox: VarBox?
     /// 搜索词
     public var key: String
     /// 页码
@@ -60,10 +66,12 @@ public struct JSRunContext {
 
     public init(base: RuleBase, baseUrl: String = "", raw: String = "",
                 book: HostObject? = nil, source: HostObject? = nil, chapter: HostObject? = nil,
-                vars: [String: String] = [:], key: String = "", page: Int = 1, document: DOMNode? = nil) {
+                vars: [String: String] = [:], varBox: VarBox? = nil,
+                key: String = "", page: Int = 1, document: DOMNode? = nil) {
         self.base = base; self.baseUrl = baseUrl; self.raw = raw
         self.book = book; self.source = source; self.chapter = chapter
-        self.vars = vars; self.key = key; self.page = page; self.document = document
+        self.vars = vars; self.varBox = varBox
+        self.key = key; self.page = page; self.document = document
     }
 }
 
@@ -115,6 +123,24 @@ public struct Evaluator {
         return Evaluation(value: .void, diagnostic: lastDiag)
     }
 
+    /// ⭐ **整条规则是不是一个 `@get:{k}`** ⇒ 是则返回变量名。
+    ///
+    /// 形式：`@get:{k}` / `@getString:{k}` / `@getInt:{k}`（**整条**规则）
+    private static func pureVarKey(_ rule: String) -> String? {
+        let t = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let m = t.range(of: #"^@(get|getString|getInt):\{([^}]*)\}$"#, options: .regularExpression)
+        else { return nil }
+        let body = String(t[m])
+        guard let colon = body.firstIndex(of: ":") else { return nil }
+        let op = String(body[body.startIndex..<colon])
+        let key = String(body[body.index(after: colon)...])
+            .trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: "{", with: "")
+            .replacingOccurrences(of: "}", with: "")
+        guard !key.isEmpty else { return nil }
+        return key
+    }
+
     /// **单条规则**求值（不按行拆）
     private func evalSingle(_ rule: String, base: RuleBase, ctx ctxIn: EvalContext) -> Evaluation {
         var ctx = ctxIn
@@ -136,6 +162,23 @@ public struct Evaluator {
            !rule.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             diag.branch = "副作用规则（不产出值）"
             return Evaluation(value: .void, diagnostic: diag)
+        }
+
+        // ①'' ⭐⭐ **整条规则 = `@get:{k}` ⇒ 结果就是那个值**（§S-EVAL-13）
+        //
+        // ⚠️⚠️ 以前 `VarStore.apply` 把它替换成变量值后 ⇒ 继续当【选择器】查
+        //   ⇒ 规则形如 `@get:{xid}` ⇒ 查 "X-9" ⇒ 命中不了 ⇒ **空**
+        // ⇒ 「整条规则 = 取值模式」这条语义（§S-VAL-01：`text` / `href` 同款）
+        //   **也要覆盖 `@get:`** ⭐
+        // ⚠️ 判**原规则**（跟 §S-TPL-02 一样）⇒ apply 之前就能判定。
+        if let key = Self.pureVarKey(rule) {
+            let raw = ctx.varBox?.get(key) ?? ctx.vars[key] ?? ""
+            let v = raw
+            diag.branch = "变量取值模式 @get:{\(key)}"
+            if v.isEmpty {
+                diag.failure = .noMatch(reason: "变量为空：\(key)")
+            }
+            return Evaluation(value: .string(v), diagnostic: diag)
         }
 
         // ② 插值 —— ⚠️ JS 模式**不插值**（build202 定的）
@@ -709,7 +752,7 @@ public struct Evaluator {
         }
         let jctx = JSRunContext(base: base, baseUrl: ctx.baseUrl, raw: ctx.raw,
                              book: ctx.book, source: ctx.source, chapter: ctx.chapter,
-                             vars: ctx.vars, key: ctx.key, page: ctx.page, document: ctx.document)
+                             vars: ctx.vars, varBox: ctx.varBox, key: ctx.key, page: ctx.page, document: ctx.document)
         do {
             let out = try js.run(code, context: jctx)
             diag.branch = "JS"

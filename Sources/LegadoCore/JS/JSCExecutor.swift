@@ -169,7 +169,7 @@ public final class JSCExecutor: JSExecutor {
             //
             // ⭐ **返回 nil = 「我不接管」** ⇒ 落回宿主实现
             //   （⇒ 引擎只抢它真做的那几个，其余仍归宿主）
-            if object == "java", let engineAPI, let r = engineAPI(method, args) {
+            if object == "java", let engineAPI, let r = engineAPI(method, args, context.base) {
                 // ⚠️ 顶层标量不能 JSON 序列化 ⇒ 统一包一层数组（JS 侧取 `[0]`）
                 let any = Self.toFoundation(r)
                 guard let data = try? JSONSerialization.data(withJSONObject: [any]),

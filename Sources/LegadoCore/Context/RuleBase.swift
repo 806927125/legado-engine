@@ -55,6 +55,8 @@ public struct EvalContext: @unchecked Sendable {
     public var chapter: HostObject?
     /// 源级变量（`@put` / `@get` 存的东西）
     public var vars: [String: String]
+    /// ⭐⭐ **源级变量的共享存储**（引用语义 ⇒ 站方 `java.put` 写的变量后续规则能读到）
+    public var varBox: VarBox?
     /// 页码
     public var page: Int
     /// 搜索词
@@ -74,7 +76,7 @@ public struct EvalContext: @unchecked Sendable {
                 book: HostObject? = nil,
                 source: HostObject? = nil,
                 chapter: HostObject? = nil,
-                vars: [String: String] = [:],
+                vars: [String: String] = [:], varBox: VarBox? = nil,
                 page: Int = 1,
                 key: String = "",
                 isJSON: Bool = false,
@@ -86,6 +88,7 @@ public struct EvalContext: @unchecked Sendable {
         self.source = source
         self.chapter = chapter
         self.vars = vars
+        self.varBox = varBox
         self.page = page
         self.key = key
         self.isJSON = isJSON
