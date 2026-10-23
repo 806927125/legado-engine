@@ -28,10 +28,31 @@ public final class SourceEngine {
     /// ⭐ **诊断流水** —— 每次求值都记一条，UI 可以整段回放
     public private(set) var diagnostics: [EngineDiagnostic] = []
 
-    public init(source: BookSource, fetcher: PageFetcher, js: JSExecutor? = nil) {
+    // MARK: - 宿主服务（都是**可选**的 ⇒ 核心层不依赖任何具体实现）
+
+    /// 键值存储（书源变量 / 登录态 / 用户选择）
+    public let storage: KeyValueStorage?
+    /// 文件存储（缓存 / 离线正文）
+    public let files: FileStorage?
+    /// 浏览器（登录交接）
+    public let browser: BrowserProvider?
+    /// 用户提示（toast）
+    public let notifier: Notifier?
+    /// 引擎日志
+    public let logger: EngineLogger?
+
+    public init(source: BookSource, fetcher: PageFetcher, js: JSExecutor? = nil,
+                storage: KeyValueStorage? = nil, files: FileStorage? = nil,
+                browser: BrowserProvider? = nil, notifier: Notifier? = nil,
+                logger: EngineLogger? = nil) {
         self.source = source
         self.fetcher = fetcher
         self.evaluator = Evaluator(js: js)
+        self.storage = storage
+        self.files = files
+        self.browser = browser
+        self.notifier = notifier
+        self.logger = logger
     }
 
     // MARK: - ① 分类
@@ -89,8 +110,10 @@ public final class SourceEngine {
 
     /// **发现** —— 抓分类页，列出书。
     public func explore(_ url: String, page: Int = 1) throws -> [Book] {
-        let p = try fetch(url, page: page)
-        return try books(from: p, rules: source.ruleExplore, field: "bookList")
+        try notifying {
+            let p = try fetch(url, page: page)
+            return try books(from: p, rules: source.ruleExplore, field: "bookList")
+        }
     }
 
     // MARK: - ③ 搜索
@@ -100,11 +123,13 @@ public final class SourceEngine {
         guard let searchUrl = source.searchUrl, !searchUrl.isEmpty else {
             throw SourceError.ruleMissing("searchUrl")
         }
-        let rule = searchUrl
-            .replacingOccurrences(of: "{{key}}", with: keyword)
-            .replacingOccurrences(of: "{{page}}", with: String(page))
-        let p = try fetch(rule, base: source.bookSourceUrl, page: page, key: keyword)
-        return try books(from: p, rules: source.ruleSearch, field: "bookList")
+        return try notifying {
+            let rule = searchUrl
+                .replacingOccurrences(of: "{{key}}", with: keyword)
+                .replacingOccurrences(of: "{{page}}", with: String(page))
+            let p = try fetch(rule, base: source.bookSourceUrl, page: page, key: keyword)
+            return try books(from: p, rules: source.ruleSearch, field: "bookList")
+        }
     }
 
     // MARK: - ④ 详情
@@ -113,6 +138,7 @@ public final class SourceEngine {
     public func bookInfo(_ book: Book) throws -> BookInfo {
         guard !book.bookUrl.isEmpty else { throw SourceError.invalidSource("bookUrl 为空") }
         let rules = source.ruleBookInfo
+        return try notifying {
         let p = try fetch(book.bookUrl)
         var info = BookInfo()
         info.bookUrl = book.bookUrl
@@ -128,6 +154,7 @@ public final class SourceEngine {
         info.tocUrl = toc.isEmpty ? "" : Self.absolute(toc, base: p.url)
         info.raw["bookUrl"] = book.bookUrl
         return info
+        }
     }
 
     // MARK: - ⑤ 目录
@@ -140,6 +167,7 @@ public final class SourceEngine {
         // ⚠️ tocUrl 为空 ⇒ 用 bookUrl（目录规则跑在详情页上）
         let url = info.tocUrl.isEmpty ? info.bookUrl : info.tocUrl
         guard !url.isEmpty else { throw SourceError.invalidSource("目录 URL 为空") }
+        return try notifying {
         let p = try fetch(url)
 
         let nodes = try listNodes(listRule, page: p, field: "chapterList")
@@ -166,6 +194,7 @@ public final class SourceEngine {
             ))
         }
         return out
+        }
     }
 
     // MARK: - ⑥ 正文
@@ -174,12 +203,14 @@ public final class SourceEngine {
     public func content(_ chapter: Chapter) throws -> String {
         guard let rules = source.ruleContent else { throw SourceError.ruleMissing("ruleContent") }
         guard !chapter.url.isEmpty else { throw SourceError.invalidSource("章节 URL 为空") }
+        return try notifying {
         let p = try fetch(chapter.url)
         let contentRule = rules.content ?? ""
         guard !contentRule.isEmpty else { throw SourceError.ruleMissing("content") }
         var text = value(rules.content, in: nil, page: p)
         text = Self.clean(text, using: rules.replaceRegex)
         return text
+        }
     }
 
     // MARK: - 内部
@@ -256,7 +287,29 @@ public final class SourceEngine {
                               isJSON: page.isJSON, document: page.document)
         let e = evaluator.evalOne(rule, base: base, ctx: ctx)
         diagnostics.append(e.diagnostic)
+        // ⭐ 把诊断**同时**送进宿主日志（宿主才能回放给用户看）
+        logger?.log(Self.diagnosticLine(e.diagnostic))
         return e.value.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// ⭐ 出错时**先通知宿主**（toast / 弹窗），再把错误抛出去。
+    ///
+    /// ⇒ 宿主既能弹提示（用户看得见），又能拿到错误对象（自己做重试/兜底）——**两条路都要有**。
+    private func notifying<T>(_ body: () throws -> T) throws -> T {
+        do { return try body() }
+        catch let e as SourceError {
+            notifier?.notifyError(e.errorDescription ?? String(describing: e))
+            throw e
+        }
+    }
+
+    /// 诊断的**单行文本形式**（给宿主日志 / 「测书源」报告）
+    public static func diagnosticLine(_ d: EngineDiagnostic) -> String {
+        var parts: [String] = []
+        if let b = d.branch, !b.isEmpty { parts.append("分支=\(b)") }
+        if let f = d.failure { parts.append("失败=\(f)") }
+        if parts.isEmpty { parts.append("ok") }
+        return "规则[\(d.rule)] " + parts.joined(separator: " ")
     }
 
     // MARK: - 工具
