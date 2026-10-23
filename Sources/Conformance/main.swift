@@ -196,6 +196,55 @@ if CommandLine.arguments.contains("--bench-e2e") {
     exit(0)
 }
 
+// ⭐ `--live <pack.json> [N]` 模式：**真实站点活体验证**（真网络 + 真引擎）
+//
+// ⇒ 验的是「真书源 + 真实站方页面」能不能跑通「发现 → 详情 → 目录 → 正文」
+// ⇒ ⚠️ 站方可能限流/改版 ⇒ 逐个源独立跑、逐阶段记录（不因一个源失败而中断）
+if let li = CommandLine.arguments.firstIndex(of: "--live") {
+    let packPath = CommandLine.arguments.count > li + 1 ? CommandLine.arguments[li + 1] : ""
+    let limit = CommandLine.arguments.count > li + 2 ? (Int(CommandLine.arguments[li + 2]) ?? 5) : 5
+    let packData = try Data(contentsOf: URL(fileURLWithPath: packPath))
+    let pack = try JSONDecoder().decode([BookSource].self, from: packData)
+    let transport = URLSessionTransport()
+    var ok = 0, fail = 0
+    var tried = 0
+    for src in pack {
+        guard tried < limit else { break }
+        // 只挑「有 exploreUrl 且看起来还活着」的源
+        guard let eu = src.exploreUrl, !eu.isEmpty else { continue }
+        tried += 1
+        let engine = SourceEngine(source: src, fetcher: PageFetcher(transport: transport))
+        var line = "【\(src.bookSourceName)】"
+        do {
+            let cats = try engine.categories()
+            guard let cat = cats.first(where: { $0.url.contains("{{page}}") }) ?? cats.first else {
+                line += " 分类空"; print(line); fail += 1; continue
+            }
+            let books = try engine.explore(cat.url)
+            line += " 分类\(cats.count)"
+            guard let b = books.first else { line += " 书0"; print(line); fail += 1; continue }
+            line += " 书\(books.count)"
+            let info = try engine.bookInfo(b)
+            line += " 详情(\(info.name.prefix(10)))"
+            let chapters = try engine.toc(info)
+            line += " 章\(chapters.count)"
+            if let ch = chapters.first(where: { !$0.isVolume && !$0.url.isEmpty }) {
+                let text = try engine.content(ch)
+                line += " 正文\(text.count)字"
+            }
+            line += " ✅"
+            ok += 1
+        } catch {
+            line += " ❌ \(error)"
+            fail += 1
+        }
+        print(line)
+        fflush(stdout)
+    }
+    print("── 活体：成功 \(ok) / 失败 \(fail) / 共试 \(tried)")
+    exit(0)
+}
+
 // ⭐ `--audit <pack.json>` 模式：125 源规则覆盖体检（用真引擎逐条解析）
 if let idx = CommandLine.arguments.firstIndex(of: "--audit") {
     let pack = idx + 1 < CommandLine.arguments.count
