@@ -9,7 +9,7 @@
 >
 > **证据来源**（按可信度排序）：
 > - 🟢 源码事实（`QiReaderLite/Resources/engine/*.js`）——实现即证据
-> - 🟢 栖阅《引擎反推》材料（符号表 + 字面量 + 随包 JS 兼容层）——见 `栖阅-轻阅-引擎对账.md`
+> - 🟢 栖阅《引擎反推》材料（符号表 + 字面量 + 随包 JS 兼容层）——见 `qiyue-qingyue-engine-audit.md`
 > - 🟡 Legado 安卓端行为（`com.gy.reader` 的 `AnalyzeUrl` / `AnalyzeRule` / `SourceRule`）
 > - 🟡 站方书源实测（125 源包活体体检、`sources/`）
 > - 🔴 推断（**不许当规范用**，只能当假设）
@@ -34,7 +34,7 @@
 **门禁**：`test/xxx.test.js` 里的用例名，或 `semantics-cases.json` 的 case id。
 ```
 
-⚠️ **「现状」和「规范」不一致的地方，就是债。** 报告见 `docs/现状符合度报告.md`。
+⚠️ **「现状」和「规范」不一致的地方，就是债。** 报告见 `docs/conformance-status.md`。
 
 ---
 
@@ -350,7 +350,7 @@ if (v.text !== undefined || v.title !== undefined) {
 ### S-CMP-05 `@js:` 规则取 `result` 变量
 **规范**：`@js:` 形态的规则只认 `result` 变量。
 **依据**：🟢 栖阅 cstring（`Function(__script + "\n;return (typeof result !== 'undefined') ? result : undefined;")`）。
-**现状**：⚠️ 轻阅取**完成值**（更宽松）。**故意保留宽松**（`栖阅-轻阅-引擎对账.md` §1 判定）。
+**现状**：⚠️ 轻阅取**完成值**（更宽松）。**故意保留宽松**（`qiyue-qingyue-engine-audit.md` §1 判定）。
 ⇒ 这是一条**已知差异**，不是 bug。新引擎应实现成「先取 `result`，取不到再取完成值」。
 
 ---
@@ -854,7 +854,7 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 
 ## 17. S-FLT 过滤表达式（Sextant）
 
-> 完整语法见 `栖阅-轻阅-引擎对账.md` §3.5（从 Sextant 源码读出来的，源码级事实）。
+> 完整语法见 `qiyue-qingyue-engine-audit.md` §3.5（从 Sextant 源码读出来的，源码级事实）。
 
 ### S-FLT-01 运算符全集
 **规范**：支持 `== != === !== < <= > >= =~ IN NIN SUBSETOF ANYOF NONEOF CONTAINS ALL EXISTS TYPE SIZE EMPTY`。

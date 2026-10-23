@@ -74,7 +74,7 @@ legado-engine/
 │   └── out/report.md                # 对拍报告（自动生成）
 ├── docs/
 │   ├── legado-semantics.md          # ⭐ 语义规格（21 域 129 条）
-│   ├── 现状符合度报告.md              # 轻阅现状 vs 规格
+│   ├── conformance-status.md              # 轻阅现状 vs 规格
 │   └── architecture.md               # 目标架构
 ├── tools/
 │   ├── conformance-diff.sh          #   一键对拍
@@ -211,7 +211,7 @@ JSON 对象被 flatten 吃掉标题、裸标签名链断、`||` 兜底链不跳�
 ## 文档
 
 - [`docs/legado-semantics.md`](docs/legado-semantics.md) —— 语义规格（**先看这个**）
-- [`docs/现状符合度报告.md`](docs/现状符合度报告.md) —— 轻阅现状 vs 规格
+- [`docs/conformance-status.md`](docs/conformance-status.md) —— 轻阅现状 vs 规格
 - [`docs/architecture.md`](docs/architecture.md) —— 目标架构
 - [`conformance/out/report.md`](conformance/out/report.md) —— 双实现对拍报告（自动生成）
 

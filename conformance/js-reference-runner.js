@@ -8,7 +8,7 @@
  * 这不是「门禁」，是**符合度体检**：
  *   读 test/fixtures/semantics-cases.json（每条用例引用 docs/legado-semantics.md 里的语义 id）
  *   → 用**当前引擎**跑一遍
- *   → 产出 docs/现状符合度报告.md
+ *   → 产出 docs/conformance-status.md
  *
  * 不符合 = **债**（不是回归）。所以默认 exit 0；
  * 债还清之后加 --gate 就能当门禁用（任一不符即红）。

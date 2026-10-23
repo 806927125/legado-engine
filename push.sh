@@ -7,7 +7,7 @@
 # 用法（iSH）：
 #   cd ~ && curl -sL -o legado-engine.zip '<OSS 直链>'
 #   cd ~ && rm -rf legado-engine && mkdir -p legado-engine && cd legado-engine
-#   unzip -qo "$HOME/legado-engine.zip" && sh 推.sh
+#   unzip -qo "$HOME/legado-engine.zip" && sh push.sh
 #
 set -e
 cd "$(dirname "$0")"
