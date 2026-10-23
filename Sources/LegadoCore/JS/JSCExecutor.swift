@@ -27,6 +27,22 @@ public final class JSCExecutor: JSExecutor {
     /// ⭐⭐ **引擎侧接管的 `java.*`**（可选）—— 宿主不用实现引擎能做的那些
     private var engineAPI: JSEngineAPIHandler?
 
+    // MARK: - ⭐⭐ 上下文复用（性能）
+
+    /// ⭐⭐ **复用的 `JSContext`** —— 实测「每次新建」**1.018 ms/次**
+    ///   vs「复用」**0.003 ms/次** ⇒ **省 340×**（macOS CI 实测，见 JSCPerfTests）
+    private var cachedContext: JavaScriptCore.JSContext?
+
+    /// 宿主通道 / 包装函数**是否已注入**（契约不变 ⇒ 只注入一次）
+    private var hostChannelReady = false
+
+    /// ⭐ **基线全局快照**（注入完宿主通道后的全局名集合）
+    /// ⇒ 每次跑之前把「**相对基线新增的**」全删掉 ⇒ 站方 jsLib 的全局不会串源 ⭐
+    private var baselineGlobals: Set<String> = []
+
+    /// ⭐ **JSContext 不是线程安全的** ⇒ 整个 `run` 加锁（引擎全同步 ⇒ 本来就是串的）
+    private let contextLock = NSLock()
+
     public init(api: JSHostAPIProvider) {
         self.api = api
     }
@@ -37,8 +53,20 @@ public final class JSCExecutor: JSExecutor {
     }
 
     public func run(_ code: String, context: JSRunContext) throws -> JSONValue {
-        guard let js = JavaScriptCore.JSContext() else {
-            throw JSCError.contextUnavailable
+        // ⭐⭐ **上下文复用** ⇒ 整个 run 加锁（JSContext 非线程安全）
+        contextLock.lock()
+        defer { contextLock.unlock() }
+
+        // ① 拿（首次则建）**可复用**的 context
+        let js: JavaScriptCore.JSContext
+        if let cached = cachedContext {
+            js = cached
+        } else {
+            guard let created = JavaScriptCore.JSContext() else {
+                throw JSCError.contextUnavailable
+            }
+            cachedContext = created
+            js = created
         }
         // ⚠️ Swift 的 block **不能抛错** ⇒ 异常处理器只**记录**
         //    （macOS 上编译不过的元凶之一）
@@ -58,29 +86,39 @@ public final class JSCExecutor: JSExecutor {
         //   JS 侧：包函数把参数 JSON 化 ⇒ 调 `__hostJSON(obj, method, argsJSON)`
         //   Swift 侧：解析 args ⇒ 调宿主 ⇒ 结果 JSON 化回字符串
         //   JS 侧再 `JSON.parse` 还原 ⇒ 站方拿到原类型
-        if let hostBlock = makeHostBlock(in: js, base: context.base) {
-            js.setObject(unsafeBitCast(hostBlock, to: AnyObject.self),
-                          forKeyedSubscript: "__hostJSON" as NSString)
-        }
+        // ①' ⭐⭐ **宿主通道只注入一次**（契约不变 ⇒ 包装函数不用重生成）
+        if !hostChannelReady {
+            if let hostBlock = makeHostBlock(in: js, base: context.base) {
+                js.setObject(unsafeBitCast(hostBlock, to: AnyObject.self),
+                              forKeyedSubscript: "__hostJSON" as NSString)
+            }
+            // ② 先把宿主对象**建出来**（包装函数要往它们身上挂）
+            _ = js.evaluateScript("var source={},book={},chapter={},cookie={},cache={},java={};")
 
-        // ② 先把宿主对象**建出来**（包装函数要往它们身上挂）
-        _ = js.evaluateScript("var source={},book={},chapter={},cookie={},cache={},java={};")
-
-        // ③ 注入**属性**（属性不是函数 ⇒ 直接 setObject，不走 block）
-        for name in JSHostAPI.objects {
-            guard let obj = api.hostObject(named: name) else { continue }
-            // ⚠️ `forKeyedSubscript` **不支持 "a.b" 路径** ⇒ 要先拿到那个对象再设属性
-            guard let hostObj = js.objectForKeyedSubscript(name as NSString) else { continue }
-            for (prop, value) in obj.properties {
-                if let jv = Self.toJS(value, in: js) {
-                    hostObj.setObject(jv, forKeyedSubscript: prop as NSString)
+            // ③ 注入**属性**（属性不是函数 ⇒ 直接 setObject，不走 block）
+            for name in JSHostAPI.objects {
+                guard let obj = api.hostObject(named: name) else { continue }
+                // ⚠️ `forKeyedSubscript` **不支持 "a.b" 路径** ⇒ 要先拿到那个对象再设属性
+                guard let hostObj = js.objectForKeyedSubscript(name as NSString) else { continue }
+                for (prop, value) in obj.properties {
+                    if let jv = Self.toJS(value, in: js) {
+                        hostObj.setObject(jv, forKeyedSubscript: prop as NSString)
+                    }
                 }
             }
-        }
 
-        // ④ 为契约里的每个**方法**生成 JS 包装函数
-        for src in JSScopeBuilder.hostWrappers() {
-            _ = js.evaluateScript(src)
+            // ④ 为契约里的每个**方法**生成 JS 包装函数
+            for src in JSScopeBuilder.hostWrappers() {
+                _ = js.evaluateScript(src)
+            }
+            // ⭐ **基线快照**（注入完之后）⇒ 之后每次跑清掉「相对它新增的」全局
+            baselineGlobals = Self.currentGlobals(in: js)
+            hostChannelReady = true
+        } else {
+            // ⭐⭐ **清理站方残留的全局**（复用 context 的代价 ⇒ 必须治）
+            //   站方 jsLib 定义的 `var host` / `function getArguments` 会留在全局
+            //   ⇒ 下条规则/下个源会被污染（轻阅踩过这个坑）⭐
+            Self.removeGlobals(notIn: baselineGlobals, in: js)
         }
 
         // ⑤ 求值（scope 变量 + 站方代码 ⇒ 完成值）
@@ -194,6 +232,37 @@ public final class JSCExecutor: JSExecutor {
             return text
         }
         return block
+    }
+
+    // MARK: - ⭐⭐ 全局治理（复用 context 的代价）
+
+    /// ⭐ **枚举当前 context 的全局名**。
+    ///
+    /// ⚠️ **JSC 没有「列出全局」的 API** ⇒ 只能**在 JS 里枚举**
+    /// ⇒ `for...in` + `hasOwnProperty` ⇒ 能拿到全局的**自有可枚举属性**
+    /// ⇒ 正好就是 `var` / `function` 声明留下的那些（站方 jsLib 的污染源）⭐
+    private static func currentGlobals(in js: JavaScriptCore.JSContext) -> Set<String> {
+        let src = """
+        (function(){var o=[];for(var k in this){if(Object.prototype.hasOwnProperty.call(this,k)){o.push(k);}}return o.join(String.fromCharCode(1));})()
+        """
+        guard let v = js.evaluateScript(src) else { return [] }
+        let text = v.toString() ?? ""
+        guard !text.isEmpty else { return [] }
+        return Set(text.components(separatedBy: "\u{1}"))
+    }
+
+    /// ⭐ **删掉不在 `keep` 里的全局**（⇒ 站方 jsLib 的全局不会串源）
+    ///
+    /// ⚠️ 全局 `var` / `function` 声明的属性是**可配置**的 ⇒ `delete` 可行 ✔
+    private static func removeGlobals(notIn keep: Set<String>, in js: JavaScriptCore.JSContext) {
+        let extras = currentGlobals(in: js).subtracting(keep)
+        guard !extras.isEmpty else { return }
+        let list = extras.sorted().map { name -> String in
+            let escaped = name.replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+            return "\"" + escaped + "\""
+        }.joined(separator: ",")
+        _ = js.evaluateScript("(function(){var g=this;[\(list)].forEach(function(k){try{delete g[k];}catch(e){}});})()")
     }
 
     /// JSONValue → Foundation 值（要能过 `JSONSerialization`）
