@@ -111,7 +111,9 @@ final class JSCAjaxTests: XCTestCase {
     func testJavaAjaxFailureYieldsUndefined() throws {
         let api = NoAjaxAPI()
         let exec = JSCExecutor(api: api)
-        exec.setEngineAPI { _, _ in nil }   // 失败
+        // ⭐ **返回 `.null` = 「我接管了，但这次失败」**
+        // ⚠️ **返回 nil = 「我不接管」⇒ 落回宿主**（那是另一条语义，§S-JS-19）
+        exec.setEngineAPI { _, _ in .null }   // 已接管但失败
         let ctx = JSRunContext(base: .page(""), baseUrl: "https://x.example/")
         let out = try exec.run("java.ajax('https://x.example/a')", context: ctx)
         XCTAssertTrue(out.isNull || out.scalarString.isEmpty,
