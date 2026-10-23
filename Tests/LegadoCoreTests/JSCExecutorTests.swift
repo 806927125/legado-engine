@@ -131,9 +131,9 @@ func testCompositePathWithJSBlockKeepsArrayType() throws {
             "list": .array([.object(["n": .string("a")]), .object(["n": .string("b")])]),
         ]),
     ])
-    let ctx = EvalContext(base: .json(json), isJSON: true)
+    let ctx = EvalContext(base: RuleBase.json(json), isJSON: true)
     let e = ev.evalOne("$.data.list<js>result.map(function(x){return x.n}).join(',')</js>",
-                      base: .json(json), ctx: ctx)
+                      base: RuleBase.json(json), ctx: ctx)
     XCTAssertNil(e.diagnostic.failure, "诊断不该有失败：\(String(describing: e.diagnostic.failure))")
     XCTAssertEqual(e.value.text, "a,b", "⭐ JS 里的 result 必须是数组 ⇒ .map 才能跑")
 }
@@ -146,8 +146,8 @@ func testCompositePathWithJSBlockKeepsObjectType() throws {
     let json: JSONValue = .object([
         "book": .object(["book_id": .string("MTgzNTEy"), "tab": .string("小说")]),
     ])
-    let ctx = EvalContext(base: .json(json), isJSON: true)
-    let e = ev.evalOne("$.book<js>result.book_id</js>", base: .json(json), ctx: ctx)
+    let ctx = EvalContext(base: RuleBase.json(json), isJSON: true)
+    let e = ev.evalOne("$.book<js>result.book_id</js>", base: RuleBase.json(json), ctx: ctx)
     XCTAssertNil(e.diagnostic.failure, "诊断不该有失败：\(String(describing: e.diagnostic.failure))")
     XCTAssertEqual(e.value.text, "MTgzNTEy")
 }
@@ -158,8 +158,8 @@ func testCompositePathWithJSBlockKeepsStringType() throws {
     let exec = JSCExecutor(api: api)
     let ev = Evaluator(js: exec)
     let json: JSONValue = .object(["uptime": .string("2024-01-01")])
-    let ctx = EvalContext(base: .json(json), isJSON: true)
-    let e = ev.evalOne("$.uptime<js>result + '!'</js>", base: .json(json), ctx: ctx)
+    let ctx = EvalContext(base: RuleBase.json(json), isJSON: true)
+    let e = ev.evalOne("$.uptime<js>result + '!'</js>", base: RuleBase.json(json), ctx: ctx)
     XCTAssertNil(e.diagnostic.failure, "诊断不该有失败：\(String(describing: e.diagnostic.failure))")
     XCTAssertEqual(e.value.text, "2024-01-01!")
 }

@@ -47,7 +47,7 @@ final class CompositeJSBackendTests: XCTestCase {
             ]),
         ])
         let got = try capture("$.data.list<js>result.map(function(x){return x.n}).join(',')</js>",
-                             base: .json(json))
+                             base: RuleBase.json(json))
         guard case .json(let j) = got else {
             return XCTFail("⭐ 数组主体被压成了非 JSON 基准：\(got) ⇒ JS 里 result 是字符串 ⇒ result.map 炸")
         }
@@ -69,7 +69,7 @@ final class CompositeJSBackendTests: XCTestCase {
         let json: JSONValue = .object([
             "book": .object(["book_id": .string("MTgzNTEy"), "tab": .string("小说")]),
         ])
-        let got = try capture("$.book<js>result.book_id</js>", base: .json(json))
+        let got = try capture("$.book<js>result.book_id</js>", base: RuleBase.json(json))
         guard case .json(let j) = got else {
             return XCTFail("⭐ 对象主体被压成了非 JSON 基准：\(got) ⇒ JS 里 result 是字符串 ⇒ result.book_id 得 undefined")
         }
@@ -84,7 +84,7 @@ final class CompositeJSBackendTests: XCTestCase {
     /// 字符串主体 ⇒ `result` 是字符串（**别把字符串也变成 JSON 串**）
     func testStringSubjectStaysString() throws {
         let json: JSONValue = .object(["uptime": .string("2024-01-01")])
-        let got = try capture("$.uptime<js>result + '!'</js>", base: .json(json))
+        let got = try capture("$.uptime<js>result + '!'</js>", base: RuleBase.json(json))
         // ⭐ 断言的是「**JS 看到的 result**」（`RuleBase.resultValue`）⇒ 与基准用哪个 case 无关
         let seen = got.resultValue
         XCTAssertEqual(seen.jsonValue.scalarString, "2024-01-01",
