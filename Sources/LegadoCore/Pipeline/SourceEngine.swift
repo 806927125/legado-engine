@@ -55,6 +55,19 @@ public final class SourceEngine {
     /// 引擎日志
     public let logger: EngineLogger?
 
+    // MARK: - ⭐⭐ 站方 JS 的宿主对象（book / source / chapter）
+
+    /// ⭐⭐ **当前书籍对象**（站方 JS 里的 `book`）
+    ///
+    /// ⚠️ **必须真的传进去**（轻阅 build161 的教训）：
+    ///   站方 `ruleToc.chapterList` 第一句就 `book.getVariable('custom')`
+    ///   ⇒ 不给 book 就抛 `Cannot read properties of undefined` ⇒ **整条规则静默失效** ⭐
+    public var bookObject: HostObject?
+    /// ⭐⭐ **当前章节对象**（站方 JS 里的 `chapter`）
+    public var chapterObject: HostObject?
+    /// ⭐⭐ **书源对象**（站方 JS 里的 `source`）
+    public var sourceObject: HostObject?
+
     public init(source: BookSource, fetcher: PageFetcher, js: JSExecutor? = nil,
                 storage: KeyValueStorage? = nil, files: FileStorage? = nil,
                 browser: BrowserProvider? = nil, notifier: Notifier? = nil,
@@ -376,7 +389,11 @@ public final class SourceEngine {
     // MARK: - ④ 详情
 
     /// **详情** —— 抓详情页取字段。
-    public func bookInfo(_ book: Book) throws -> BookInfo {
+    ///
+    /// - Parameters:
+    ///   - book: 书籍（列表项）
+    ///   - variables: **书籍变量**（站方 `book.getVariable('custom')` 要读它）
+    public func bookInfo(_ book: Book, variables: [String: String] = [:]) throws -> BookInfo {
         guard !book.bookUrl.isEmpty else { throw SourceError.invalidSource("bookUrl 为空") }
         let rules = source.ruleBookInfo
         return try notifying {
@@ -384,15 +401,46 @@ public final class SourceEngine {
         var info = BookInfo()
         info.bookUrl = book.bookUrl
         info.sourceName = source.bookSourceName
-        info.name = value(rules?.name, in: nil, page: p)
-        info.author = value(rules?.author, in: nil, page: p)
-        info.intro = value(rules?.intro, in: nil, page: p)
-        info.kind = value(rules?.kind, in: nil, page: p)
-        info.coverUrl = Self.absolute(value(rules?.coverUrl, in: nil, page: p), base: p.url)
-        info.lastChapter = value(rules?.lastChapter, in: nil, page: p)
+
+        // ⭐⭐⭐ **`ruleBookInfo.init`** —— 在详情页结果上跑一次，
+        //   **输出当后面所有字段规则的基准**（JSON 接口源几乎全靠它：
+        //   `init: "$.data"` 把 `{code,msg,data:{…}}` 缩成 `{…}`）⭐
+        let base: RuleBase
+        if let initRule = rules?.initRule, !initRule.isEmpty {
+            let initCtx = EvalContext(base: .page(p.text), baseUrl: p.url, raw: p.text,
+                                     varBox: varBox, isJSON: p.isJSON, document: p.document)
+            let e = evaluator.evalOne(initRule, base: initCtx.base, ctx: initCtx)
+            diagnostics.append(e.diagnostic)
+            logger?.log(Self.diagnosticLine(e.diagnostic))
+            switch e.value {
+            case .json(let j): base = .json(j)
+            case .string(let s): base = .page(s)
+            case .list(let items):
+                // ⚠️ init 命中多个 ⇒ 取**第一个**（当基准用）
+                if let first = items.first {
+                    if case .json(let j) = first { base = .json(j) } else { base = .page(first.text) }
+                } else { base = .page(p.text) }
+            case .node(let n): base = .element(n)
+            case .void: base = .page(p.text)
+            }
+        } else {
+            base = .page(p.text)
+        }
+
+        // ⭐ 站方 JS 里的 `book` 对象（`book.getVariable('custom')`）
+        bookObject = Self.makeBookObject(book, variables: variables)
+        sourceObject = Self.makeSourceObject(source, varBox: varBox,
+                                              loginInfo: loadLoginInfo())
+
+        info.name = value(rules?.name, in: nil, page: p, base: base)
+        info.author = value(rules?.author, in: nil, page: p, base: base)
+        info.intro = value(rules?.intro, in: nil, page: p, base: base)
+        info.kind = value(rules?.kind, in: nil, page: p, base: base)
+        info.coverUrl = Self.absolute(value(rules?.coverUrl, in: nil, page: p, base: base), base: p.url)
+        info.lastChapter = value(rules?.lastChapter, in: nil, page: p, base: base)
         // ⭐ **字数**（44 个源在用）
-        info.wordCount = value(rules?.wordCount, in: nil, page: p)
-        let toc = value(rules?.tocUrl, in: nil, page: p)
+        info.wordCount = value(rules?.wordCount, in: nil, page: p, base: base)
+        let toc = value(rules?.tocUrl, in: nil, page: p, base: base)
         // ⚠️ 该源没给 tocUrl ⇒ **目录规则在详情页上跑**（Legado 语义：空 = 用 bookUrl）
         info.tocUrl = toc.isEmpty ? "" : Self.absolute(toc, base: p.url)
         info.raw["bookUrl"] = book.bookUrl
@@ -403,7 +451,12 @@ public final class SourceEngine {
     // MARK: - ⑤ 目录
 
     /// **目录** —— 抓目录页（或详情页）列章节。
-    public func toc(_ info: BookInfo) throws -> [Chapter] {
+    ///
+    /// - Parameters:
+    ///   - info: 详情结果（`tocUrl` 空 ⇒ 目录规则跑在详情页上）
+    ///   - book: **书籍对象**（站方 JS 里的 `book`；不给 ⇒ 站方 `book.getVariable(...)` 会炸）⭐
+    ///   - variables: 书籍变量
+    public func toc(_ info: BookInfo, book: Book? = nil, variables: [String: String] = [:]) throws -> [Chapter] {
         guard let rules = source.ruleToc else { throw SourceError.ruleMissing("ruleToc") }
         let listRule = rules.chapterList ?? ""
         guard !listRule.isEmpty else { throw SourceError.ruleMissing("chapterList") }
@@ -411,6 +464,11 @@ public final class SourceEngine {
         let url = info.tocUrl.isEmpty ? info.bookUrl : info.tocUrl
         guard !url.isEmpty else { throw SourceError.invalidSource("目录 URL 为空") }
         return try notifying {
+        // ⭐⭐ **站方 JS 的 `book` 对象**（站方目录 JS 第一句常是 `book.getVariable('custom')`）
+        if let book {
+            bookObject = Self.makeBookObject(book, variables: variables)
+        }
+        sourceObject = Self.makeSourceObject(source, varBox: varBox, loginInfo: loadLoginInfo())
         // ⭐⭐⭐ **目录翻页**（`ruleToc.nextTocUrl`）—— 125 源里 **24 个**在用
         //
         // 以前只抓**第一页** ⇒ 这 24 个源的目录是**残缺的**（红薯小说：50 章 / 实际 274 章）
@@ -441,19 +499,20 @@ public final class SourceEngine {
                 //   没给 ⇒ 退到「没有章节 URL 就是卷标题」
                 let isVolumeRule = rules.isVolume ?? ""
                 for node in nodes {
-                    let name = value(rules.chapterName, in: node, page: p)
-                    let rawURL = value(rules.chapterUrl, in: node, page: p)
+                    let item = ListItem.node(node)
+                    let name = value(rules.chapterName, in: item, page: p)
+                    let rawURL = value(rules.chapterUrl, in: item, page: p)
                     let chapterURL = rawURL.isEmpty ? "" : Self.absolute(rawURL, base: p.url)
                     let isVolume: Bool
                     if !isVolumeRule.isEmpty {
-                        isVolume = !value(isVolumeRule, in: node, page: p).isEmpty
+                        isVolume = !value(isVolumeRule, in: item, page: p).isEmpty
                     } else {
                         isVolume = chapterURL.isEmpty
                     }
                     // ⭐ **付费章节标记**（`ruleToc.isVip` —— 9 个源在用）
                     let isVipRule = rules.isVip ?? ""
                     let isVip = isVipRule.isEmpty ? false
-                        : !value(isVipRule, in: node, page: p).isEmpty
+                        : !value(isVipRule, in: item, page: p).isEmpty
                     out.append(Chapter(
                         name: name.isEmpty ? node.text : name,
                         url: chapterURL,
@@ -476,7 +535,12 @@ public final class SourceEngine {
     // MARK: - ⑥ 正文
 
     /// **正文** —— 抓章节页取内容。
-    public func content(_ chapter: Chapter) throws -> String {
+    ///
+    /// - Parameters:
+    ///   - chapter: 章节
+    ///   - book: **书籍对象**（站方正文 JS 常调 `book.getVariable('custom')` ⇒ 不给就整条规则失效）⭐
+    ///   - variables: 书籍变量
+    public func content(_ chapter: Chapter, book: Book? = nil, variables: [String: String] = [:]) throws -> String {
         guard let rules = source.ruleContent else { throw SourceError.ruleMissing("ruleContent") }
         guard !chapter.url.isEmpty else { throw SourceError.invalidSource("章节 URL 为空") }
         return try notifying {
@@ -490,6 +554,12 @@ public final class SourceEngine {
         var seen: Set<String> = []
         var parts: [String] = []
         var pages = 0
+        // ⭐⭐ **站方 JS 的 `book` / `chapter` 对象**
+        if let book {
+            bookObject = Self.makeBookObject(book, variables: variables)
+        }
+        chapterObject = Self.makeChapterObject(chapter)
+        sourceObject = Self.makeSourceObject(source, varBox: varBox, loginInfo: loadLoginInfo())
         while !url.isEmpty, pages < Self.maxContentPages {
             guard !seen.contains(url) else { break }   // ⭐ 防死循环
             seen.insert(url)
@@ -621,6 +691,23 @@ public final class SourceEngine {
             let value = args.count > 1 ? args[1].scalarString : ""
             varBox.set(first, value)
             return .string("")
+        // ⭐⭐ **宿主侧的出口**（站方 JS 的提示 / 日志 / cookie）
+        //
+        // ⚠️⚠️ **宿主没给 notifier / logger ⇒ 一律不接管**（返回 nil ⇒ 落回宿主）
+        //   —— 「toast 归宿主」是引擎的既定契约（门禁 `testUnimplementedMethodsAreNotIntercepted` 钉死）
+        //   ⇒ 只有「宿主明确给了出口」时引擎才代劳（否则站方 toast 会静默丢）⭐
+        case "toast":
+            guard let notifier else { return nil }
+            notifier.notify(first)
+            return .string("")
+        case "log":
+            guard let logger else { return nil }
+            logger.log(first)
+            return .string("")
+        case "getCookie":
+            // ⚠️ 站方语义 = 「取某个 URL 的 cookie 串」⇒ 引擎有 CookieJar 就能答
+            if let jar = fetcher.cookieJar { return .string(jar.cookieHeader(for: first) ?? "") }
+            return nil
         default:
             // ⭐ **不接管** ⇒ 落回宿主实现
             return nil
@@ -847,6 +934,72 @@ public final class SourceEngine {
         return obj
     }
 
+    // MARK: - ⭐⭐ 宿主对象工厂（站方 JS 里的 book / source / chapter）
+
+    /// ⭐⭐ **书籍对象**（站方 JS 里的 `book`）
+    ///
+    /// ⚠️ **必须真的传进去**（轻阅 build161 的教训）：
+    ///   站方 `ruleToc.chapterList` 第一句就 `book.getVariable('custom')`
+    ///   ⇒ 不给 book 就抛 `Cannot read properties of undefined` ⇒ **整条规则静默失效** ⭐
+    public static func makeBookObject(_ book: Book, variables: [String: String]) -> HostObject {
+        var methods: [String: HostMethod] = [:]
+        methods["getVariable"] = { args in
+            let key = args.first?.scalarString ?? ""
+            guard !key.isEmpty else { return .string("") }
+            return .string(variables[key] ?? "")
+        }
+        var properties: [String: JSONValue] = [:]
+        properties["name"] = .string(book.name)
+        properties["author"] = .string(book.author)
+        properties["bookUrl"] = .string(book.bookUrl)
+        properties["coverUrl"] = .string(book.coverUrl)
+        properties["intro"] = .string(book.intro)
+        properties["kind"] = .string(book.kind)
+        properties["lastChapter"] = .string(book.lastChapter)
+        properties["wordCount"] = .string(book.wordCount)
+        // ⭐ **原始字段也挂上去**（站方 `book.book_id` 之类）
+        for (k, v) in book.raw { properties[k] = .string(v) }
+        return HostObject(name: "book", methods: methods, properties: properties)
+    }
+
+    /// ⭐⭐ **书源对象**（站方 JS 里的 `source`）
+    public static func makeSourceObject(_ source: BookSource, varBox: VarBox,
+                                        loginInfo: [String: String] = [:]) -> HostObject {
+        var methods: [String: HostMethod] = [:]
+        methods["getVariable"] = { args in
+            let key = args.first?.scalarString ?? ""
+            guard !key.isEmpty else { return .string("") }
+            return .string(varBox.get(key) ?? "")
+        }
+        methods["setVariable"] = { args in
+            let key = args.first?.scalarString ?? ""
+            let value = args.count > 1 ? args[1].scalarString : ""
+            if !key.isEmpty { varBox.set(key, value) }
+            return .string("")
+        }
+        methods["getLoginInfoMap"] = { _ in
+            var out: [String: JSONValue] = [:]
+            for (k, v) in loginInfo { out[k] = .string(v) }
+            return .object(out)
+        }
+        var properties: [String: JSONValue] = [:]
+        properties["bookSourceUrl"] = .string(source.bookSourceUrl)
+        properties["bookSourceName"] = .string(source.bookSourceName)
+        properties["bookSourceGroup"] = .string(source.bookSourceGroup ?? "")
+        return HostObject(name: "source", methods: methods, properties: properties)
+    }
+
+    /// ⭐⭐ **章节对象**（站方 JS 里的 `chapter`）
+    public static func makeChapterObject(_ chapter: Chapter) -> HostObject {
+        var properties: [String: JSONValue] = [:]
+        properties["title"] = .string(chapter.name)
+        properties["url"] = .string(chapter.url)
+        properties["index"] = .int(chapter.index)
+        properties["isVolume"] = .bool(chapter.isVolume)
+        properties["isVip"] = .bool(chapter.isVip)
+        return HostObject(name: "chapter", methods: [:], properties: properties)
+    }
+
     // MARK: - 内部
 
     /// 抓一页
@@ -890,27 +1043,76 @@ public final class SourceEngine {
         guard let rules else { throw SourceError.ruleMissing(field) }
         let listRule = rules.bookList ?? ""
         guard !listRule.isEmpty else { throw SourceError.ruleMissing(field) }
-        let nodes = try listNodes(listRule, page: page, field: field)
-        return nodes.map { node in
+        // ⭐⭐⭐ **JSON 页面 ⇒ 列表项是 JSON 对象**（以前只认 DOM 节点 ⇒ JSON 源 0 本）⭐
+        let items = try listItems(listRule, page: page, field: field)
+        return items.map { item in
             Book(
-                name: value(rules.name, in: node, page: page),
-                author: value(rules.author, in: node, page: page),
+                name: value(rules.name, in: item, page: page),
+                author: value(rules.author, in: item, page: page),
                 // ⚠️ 相对地址相对**列表页 URL** 绝对化
-                bookUrl: Self.absolute(value(rules.bookUrl, in: node, page: page), base: page.url),
-                coverUrl: Self.absolute(value(rules.coverUrl, in: node, page: page), base: page.url),
-                intro: value(rules.intro, in: node, page: page),
-                kind: value(rules.kind, in: node, page: page),
-                lastChapter: value(rules.lastChapter, in: node, page: page),
+                bookUrl: Self.absolute(value(rules.bookUrl, in: item, page: page), base: page.url),
+                coverUrl: Self.absolute(value(rules.coverUrl, in: item, page: page), base: page.url),
+                intro: value(rules.intro, in: item, page: page),
+                kind: value(rules.kind, in: item, page: page),
+                lastChapter: value(rules.lastChapter, in: item, page: page),
                 // ⭐ **字数**（111 处站方在用）
-                wordCount: value(rules.wordCount, in: node, page: page)
+                wordCount: value(rules.wordCount, in: item, page: page),
+                // ⭐⭐⭐ **原始字段**（站方聚合源要 book_id 之类 ⇒ 少了整本书崩）
+                raw: item.rawFields
             )
         }
+    }
+
+    /// ⭐⭐⭐ **列表规则 → 列表项**（HTML ⇒ DOM 节点；**JSON ⇒ JSON 对象**）
+    ///
+    /// ⚠️ **为什么必须分两路**（2026-10-23 换引擎时暴露的缺口）：
+    ///   以前编排层的列表项**只有 DOM 节点** ⇒ JSONPath 命中的是 JSON 值不是节点
+    ///   ⇒ `evalNodes` 返回空 ⇒ **JSON 接口源一个都出不来**（列表 0 本）⭐
+    private func listItems(_ rule: String, page: Page, field: String,
+                           strict: Bool = true) throws -> [ListItem] {
+        let ctx = EvalContext(base: .page(page.text), baseUrl: page.url, raw: page.text,
+                              varBox: varBox, isJSON: page.isJSON, document: page.document)
+        if page.isJSON {
+            let e = evaluator.evalOne(rule, base: .page(page.text), ctx: ctx)
+            diagnostics.append(e.diagnostic)
+            logger?.log(Self.diagnosticLine(e.diagnostic))
+            var raw: [JSONValue] = []
+            switch e.value {
+            case .json(let j):
+                raw = [j]
+            case .list(let items):
+                raw = items.map { item in
+                    if case .json(let j) = item { return j }
+                    // ⚠️ 站方 `@js:` 的 bookList 常返回**字符串数组**
+                    //   （每项一行 ⇒ 子规则用 `##正则##` 抠字段）⇒ 当成「文本项」
+                    return .string(item.text)
+                }
+            case .string(let s):
+                if !s.isEmpty { raw = [.string(s)] }
+            case .node(let n):
+                return [.node(n)]
+            case .void:
+                break
+            }
+            // ⭐⭐⭐ **摊平一层**（命中的是**数组** ⇒ 元素才是列表项）
+            //   （老引擎 `jsonListOf` 同口径：数组 ⇒ 元素；对象 ⇒ 自身当一项）
+            var flat: [JSONValue] = []
+            for v in raw {
+                if case .array(let arr) = v { flat.append(contentsOf: arr) } else { flat.append(v) }
+            }
+            let out = flat.map { ListItem.json($0) }
+            if out.isEmpty, strict { throw SourceError.emptyResult(field) }
+            return out
+        }
+        let nodes = try listNodes(rule, page: page, field: field, strict: strict)
+        return nodes.map { ListItem.node($0) }
     }
 
     /// 列表规则 → 节点
     private func listNodes(_ rule: String, page: Page, field: String,
                             strict: Bool = true) throws -> [DOMNodeRef] {
         let ctx = EvalContext(base: .page(page.text), baseUrl: page.url, raw: page.text,
+                              book: bookObject, source: sourceObject, chapter: chapterObject,
                               varBox: varBox, isJSON: page.isJSON, document: page.document)
         let nodes = evaluator.evalNodes(rule, base: ctx.base, ctx: ctx)
         // ⚠️ 翻页时 `strict = false` —— 后面某页没命中是常态，**不许炸掉整个目录**
@@ -973,10 +1175,12 @@ public final class SourceEngine {
     /// ⇒ `chapterName: "a@text"` 作用在 `a` 节点上能命中自己 ✔
     /// ⇒ `name: "a@text"` 作用在 `div` 节点上能命中后代 `a` ✔
     /// 一条规则同时覆盖「相对子元素」和「取自身」两种站方写法。
-    private func value(_ rule: String?, in scope: DOMNodeRef?, page: Page) -> String {
+    private func value(_ rule: String?, in item: ListItem?, page: Page,
+                       base overrideBase: RuleBase? = nil) -> String {
         guard let rule, !rule.isEmpty else { return "" }
-        let base: RuleBase = scope.map { RuleBase.element($0) } ?? .page(page.text)
+        let base: RuleBase = overrideBase ?? item.map { $0.base } ?? .page(page.text)
         let ctx = EvalContext(base: base, baseUrl: page.url, raw: page.text,
+                              book: bookObject, source: sourceObject, chapter: chapterObject,
                               varBox: varBox, isJSON: page.isJSON, document: page.document)
         let e = evaluator.evalOne(rule, base: base, ctx: ctx)
         diagnostics.append(e.diagnostic)
@@ -994,6 +1198,7 @@ public final class SourceEngine {
         guard let rule, !rule.isEmpty else { return "" }
         let base: RuleBase = .page(page.text)
         let ctx = EvalContext(base: base, baseUrl: page.url, raw: page.text,
+                              book: bookObject, source: sourceObject, chapter: chapterObject,
                               varBox: varBox, isJSON: page.isJSON, document: page.document)
         let e = evaluator.evalOne(rule, base: base, ctx: ctx)
         diagnostics.append(e.diagnostic)

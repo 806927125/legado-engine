@@ -112,37 +112,64 @@ public struct RuleFields: Codable, Sendable {
     public var replaceRegex: String?
     public var sourceRegex: String?
 
+    /// ⭐⭐⭐ **`ruleBookInfo.init`** —— 在**详情页结果**上跑一次，
+    /// **把输出当成后面所有字段规则的基准**。
+    ///
+    /// ⚠️ **JSON 接口源几乎全靠它**（`init: "$.data"` 把 `{code,msg,data:{…}}` 缩成 `{…}`）。
+    ///
+    /// ⚠️ **属性不能叫 `init`**（Swift 保留字）⇒ 属性叫 `initRule`，对外 JSON 键仍是 `init`。
+    public var initRule: String?
+
     private enum CodingKeys: String, CodingKey {
         case name, author, kind, intro, coverUrl, lastChapter, bookUrl, wordCount
         case searchUrl, bookList, tocUrl
         case chapterList, chapterName, chapterUrl, isVolume, isVip, nextTocUrl, nextUrl
         case content, nextContentUrl, replaceRegex, sourceRegex
+        case initRule = "init"
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        name = try? c.decode(String.self, forKey: .name)
-        author = try? c.decode(String.self, forKey: .author)
-        kind = try? c.decode(String.self, forKey: .kind)
-        intro = try? c.decode(String.self, forKey: .intro)
-        coverUrl = try? c.decode(String.self, forKey: .coverUrl)
-        lastChapter = try? c.decode(String.self, forKey: .lastChapter)
-        bookUrl = try? c.decode(String.self, forKey: .bookUrl)
-        wordCount = try? c.decode(String.self, forKey: .wordCount)
-        searchUrl = try? c.decode(String.self, forKey: .searchUrl)
-        bookList = try? c.decode(String.self, forKey: .bookList)
-        tocUrl = try? c.decode(String.self, forKey: .tocUrl)
-        chapterList = try? c.decode(String.self, forKey: .chapterList)
-        chapterName = try? c.decode(String.self, forKey: .chapterName)
-        chapterUrl = try? c.decode(String.self, forKey: .chapterUrl)
-        isVolume = try? c.decode(String.self, forKey: .isVolume)
-        isVip = try? c.decode(String.self, forKey: .isVip)
-        nextTocUrl = try? c.decode(String.self, forKey: .nextTocUrl)
-        nextUrl = try? c.decode(String.self, forKey: .nextUrl)
-        content = try? c.decode(String.self, forKey: .content)
-        nextContentUrl = try? c.decode(String.self, forKey: .nextContentUrl)
-        replaceRegex = try? c.decode(String.self, forKey: .replaceRegex)
-        sourceRegex = try? c.decode(String.self, forKey: .sourceRegex)
+        // ⭐⭐ **规则字段的容错解码** —— 站方一个字段可能是：
+        //   ① 字符串（最常见）② **字符串数组**（多条候选规则）③ null
+        //   ⇒ 数组要**合并成换行分隔**（站方的多规则写法是换行 ⇒ 列表出口合并 / 字段出口取第一个非空）
+        //   ⇒ 以前只解 String ⇒ 数组形式**整条规则丢失**（静默）⭐
+        func r(_ k: CodingKeys) -> String? {
+            if let s = try? c.decode(String.self, forKey: k) {
+                let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                return t.isEmpty ? nil : t
+            }
+            if let a = try? c.decode([String].self, forKey: k) {
+                let lines = a
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                return lines.isEmpty ? nil : lines.joined(separator: "\n")
+            }
+            return nil
+        }
+        name = r(.name)
+        author = r(.author)
+        kind = r(.kind)
+        intro = r(.intro)
+        coverUrl = r(.coverUrl)
+        lastChapter = r(.lastChapter)
+        bookUrl = r(.bookUrl)
+        wordCount = r(.wordCount)
+        searchUrl = r(.searchUrl)
+        bookList = r(.bookList)
+        tocUrl = r(.tocUrl)
+        chapterList = r(.chapterList)
+        chapterName = r(.chapterName)
+        chapterUrl = r(.chapterUrl)
+        isVolume = r(.isVolume)
+        isVip = r(.isVip)
+        nextTocUrl = r(.nextTocUrl)
+        nextUrl = r(.nextUrl)
+        content = r(.content)
+        nextContentUrl = r(.nextContentUrl)
+        replaceRegex = r(.replaceRegex)
+        sourceRegex = r(.sourceRegex)
+        initRule = r(.initRule)
     }
 
     public init() {}

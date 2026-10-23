@@ -407,6 +407,21 @@ public struct Evaluator {
                 return .void
             }
             if hits.isEmpty {
+                // ⭐⭐⭐ **`result.` 前缀的两种语义都试**（规格 §32）
+                //
+                //   ① `result.X` 改写成 `$.X`（**根别名**）—— 站方多数写法
+                //   ② 命中不了 ⇒ 再按「**顶层 `result` 字段下的 X**」试（`$.result.X`）
+                //      （纵横中文的真实接口就是这种：
+                //        `{"code":0,"result":{"resultList":[…]}}` + 规则 `result.resultList`）
+                //
+                // ⚠️ **不能一刀切成一种**（125 源里两种都真实存在）
+                // ⚠️ **也不能改写规则本身**（会破坏 132 条对拍）⇒ 只在**求值时**兜底
+                if let alt = Self.resultKeyFallback(path),
+                   let altHits = JSONPath.select(j, alt), !altHits.isEmpty {
+                    diag.branch = "JSONPath（result. 兜底）"
+                    if altHits.count == 1 { return .json(altHits[0]) }
+                    return .list(altHits.map { RuleValue.json($0) })
+                }
                 diag.failure = .noMatch(reason: "JSONPath 未命中：\(path)")
                 diag.branch = "JSONPath"
                 return .void
@@ -496,6 +511,24 @@ public struct Evaluator {
                                 base: RuleBase, ctx: EvalContext,
                                 diag: inout EngineDiagnostic, rawNodes: Bool = false) -> RuleValue {
         guard let node = baseNode(base, ctx: ctx) else {
+            // ⭐⭐⭐ **JSON 基准 + 裸路径** ⇒ 当成「相对 JSON 路径」取（Legado 语义）
+            //
+            // ⚠️ **为什么必须补这条**（换引擎时暴露的缺口）：
+            //   站方 JSON 源的字段规则是**裸字段名**（`name: "bookName"` / `author: "authorName"`）
+            //   ⇒ 老引擎（轻阅）在 JSON 基准上 `baseToNode` 返回 null ⇒ **直接返回空**
+            //   ⇒ **JSON 接口源一个都出不来**（列表 0 本 / 字段全空）⭐
+            //   ⇒ Legado 的语义是「**相对当前 JSON 对象**取字段」⇒ 这里补齐
+            //
+            // ⚠️ 判据要严：**只认裸路径**（不含 CSS 标记）⇒ 别把 `.content@p@text` 当 JSON 路径
+            if steps.isEmpty, headIndex == nil, Self.looksLikeJSONPath(head),
+               let j = Self.jsonBaseValue(base, ctx: ctx),
+               let hits = JSONPath.select(j, head), !hits.isEmpty {
+                diag.branch = "JSON 相对路径"
+                if rawNodes { return .list([]) }   // ⭐ JSON 项没有 DOM 节点
+                // ⭐ 与 JSONPath 分支同口径：**单个命中 ⇒ 单值**（空字符串也算空 ⇒ 兜底链能继续往下走）
+                if hits.count == 1 { return .json(hits[0]) }
+                return .list(hits.map { RuleValue.json($0) })
+            }
             diag.failure = .baseTypeMismatch(expected: "DOM", actual: baseTypeName(base))
             diag.branch = "默认规则链"
             return .void
@@ -804,6 +837,48 @@ public struct Evaluator {
         }
     }
 
+    /// ⭐⭐⭐ **JSON 基准的值**（`.json` 基准 / JSON 页面的 `.page` 基准）
+    ///
+    /// ⚠️ **JSON 页面的基准是 `.page(原文)`** ⇒ 要现解析成 JSON 才能当 JSON 用
+    static func jsonBaseValue(_ base: RuleBase, ctx: EvalContext) -> JSONValue? {
+        switch base {
+        case .json(let j): return j
+        case .page(let raw):
+            // ⚠️ 只有响应**确实是 JSON**（ctx.isJSON）时才当 JSON 基准
+            guard ctx.isJSON else { return nil }
+            // ⭐⭐⭐ **必须真的解析**（`JSONValue.from(String)` 只会得到一个字符串！）
+            return JSONValue(json: raw)
+        case .element, .node: return nil
+        }
+    }
+
+    /// ⭐⭐⭐ **`$.X` ⇒ `$.result.X`**（`result.` 前缀的**第二种解释**）
+    ///
+    /// ⚠️ 已经是 `$.result.` 开头的**不再兜底**（否则会套娃）
+    static func resultKeyFallback(_ path: String) -> String? {
+        guard path.hasPrefix("$.") else { return nil }
+        let rest = String(path.dropFirst(2))
+        guard !rest.hasPrefix("result.") else { return nil }
+        return "$.result." + rest
+    }
+
+    /// ⭐⭐⭐ **这条规则是不是「裸 JSON 路径」**（`bookName` / `a.b` / `a[0]` / `a.b[1].c`）
+    ///
+    /// ⚠️ **必须排除 CSS 标记** ⇒ 否则 `.content@p@text` 这种会被当 JSON 路径
+    ///   （`JSONPath.parse(".content")` 会解析成 `.child("content")` ⇒ 误命中）
+    static func looksLikeJSONPath(_ s: String) -> Bool {
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return false }
+        // ⭐ 开头不能是 CSS 标记
+        if let c = t.first, ".*#@>:, [".contains(c) { return false }
+        // ⭐ 中间不能有 CSS 标记（`@text` / `>` / `:` / `#` / 空格 / 逗号）
+        for c in t {
+            if "@>#, \t".contains(c) { return false }
+            if c == ":" { return false }
+        }
+        return true
+    }
+
     private func baseNode(_ base: RuleBase, ctx: EvalContext) -> DOMNode? {
         switch base {
         case .page:               return ctx.document
@@ -820,7 +895,12 @@ public struct Evaluator {
             //    否则 ⇒ 返回 nil ⇒ 触发「基准类型不符」的真错误诊断
             //    （以前这里直接 JSONValue.from(HTML) ⇒ 静默「没命中」⭐）
             guard ctx.isJSON else { return nil }
-            return JSONValue.from(raw)
+            // ⭐⭐⭐ **必须真的解析成 JSON**！
+            //   `JSONValue.from(raw)` 对 String 走的是「当普通字符串」分支
+            //   ⇒ 基准变成 `.string(整页JSON)` ⇒ JSONPath 在字符串上查 ⇒ **永远 0 命中**
+            //   ⇒ 症状：「所有 JSON 接口源都出不来 / 字段全空」⭐
+            //   （`JSONValue(json:)` 才是「从 JSON 文本构造」）
+            return JSONValue(json: raw)
         case .element, .node:     return nil
         }
     }

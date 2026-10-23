@@ -1639,11 +1639,62 @@ body: cateFineId=0&cateType=0&pageNum=1&pageSize=20&period=0&rankNo=&rankType=3
 ⇒ ⇒ 那种基准下 `result.` = **根别名**（`$.`）是对的
 
 ### ⇒⇒ **两种语义都真实存在**（取决于响应 JSON 顶层有没有 `result` 字段）
-⇒⇒ **待修方案（未实施）**：JSONPath 求值时 ⇒
+⇒⇒ **✅ 已实施（2026-10-23）**：JSONPath 求值时 ⇒
 ① 先按「根别名」改写（`$.`）试
-② 命中不了 ⇒ **再按「顶层字段名」试**（不吞 `result` 这一段）⇒ 命中就用
+② 命中不了 ⇒ **再按「顶层字段名」试**（`$.result.X`）⇒ 命中就用
 ⇒⇒ 两种站方形态都覆盖 ⇒ **不破坏已有 132 条对拍**
+⇒ 实施位置：`Evaluator.resultKeyFallback(_:)`
 
-⚠️ **改动前必须**：① 量化影响面（125 源里 `result.` 的 130 处分布）
-② 补 fixture 用例（两种基准各一条）③ 变异验证
-⚠️⚠️ **⚠️ 现有 fixture `json-06` 是【按错误理解写的】** ⇒ 实施时要一并修正
+⚠️⚠️ **实施时发现的一个更大的坑（比 `result.` 本身严重得多）**：
+**`.page` 基准在 JSON 响应下压根没被解析成 JSON** ⇒
+`baseJSON(.page(raw))` 用的是 `JSONValue.from(raw)` ⇒ 对 String 走「当普通字符串」分支
+⇒ 基准变成 `.string(整页JSON)` ⇒ **JSONPath 在字符串上查 ⇒ 永远 0 命中**
+⇒ ⇒ **所有 JSON 接口源的 JSONPath 规则全废**（列表 0 本 / 字段全空）⭐
+⇒ ⇒ **上一轮的探针之所以判错**：它用的是 `base: .json(JSONValue.from(j))`（**显式解析**）
+⇒ ⇒ **绕过了真实链路** ⇒ 结论跑偏 ⇒ 教训：**探针必须走生产路径**
+
+⇒ 修法：`JSONValue(json: raw)`（真的解析）⇒ 门禁 `JsonSourceSupportTests` 覆盖
+
+## 33. S-SWITCH 换引擎补齐的四个缺口（2026-10-23）
+
+> 背景：轻阅要把老 JS 引擎**完全换掉**成自研引擎 ⇒ 活体验证暴露了四个缺口 ⇒ 一次补齐。
+
+### S-SWITCH-01 ⭐⭐⭐ **JSON 列表源**（列表项可以是 JSON 对象，不只是 DOM 节点）
+**规范**：列表规则在 **JSON 响应**上求值 ⇒ 命中的是 JSON 值 ⇒ **列表项 = JSON 对象**。
+**现状**：✅（`ListItem` / `SourceEngine.listItems`）。
+**依据**：站方 JSON 源：`bookList: "$.data.books"` + 字段规则 `name: "bookName"`（**裸字段名**）。
+
+### S-SWITCH-02 ⭐⭐⭐ **裸字段名相对当前 JSON 对象取值**
+**规范**：JSON 基准上，**裸路径**（`bookName` / `a.b`）⇒ 相对当前对象取值。
+**现状**：✅（`Evaluator.looksLikeJSONPath` + JSON 相对路径分支）。
+**依据**：125 源里 JSON 源的字段规则大量是裸字段名 ⇒ 老引擎在 JSON 基准上返回空。
+
+### S-SWITCH-03 ⭐⭐ **`ruleBookInfo.init`**（详情页结果上跑一次，输出当后面字段规则的基准）
+**规范**：`init` 的输出（JSON 对象）⇒ 后面所有 `ruleBookInfo` 字段规则的基准。
+**现状**：✅（`RuleFields.initRule` / `SourceEngine.bookInfo`）。
+**依据**：JSON 接口源几乎全靠它（`init: "$.data"` 把包装层剥掉）。
+
+### S-SWITCH-04 ⭐⭐⭐ **列表项的原始字段（raw）必须保留**
+**规范**：JSON 列表项 ⇒ `Book.raw` = 该对象的**所有键**。
+**现状**：✅（`ListItem.rawFields` / `JSONValue.stringMap`）。
+**依据**：站方聚合源要 `book_id` / `bid` 之类 ⇒ 少了 ⇒ 载荷缺字段 ⇒ 服务器报 base64 错 ⇒ 整本书崩。
+
+### S-SWITCH-05 ⭐⭐ **规则字段的数组形式**（`["规则A","规则B"]`）
+**规范**：规则字段写成数组 ⇒ **合并成换行分隔**（列表出口合并 / 字段出口取第一个非空）。
+**现状**：✅（`RuleFields.init(from:)` 的 `r(_:)` 容错解码）。
+**依据**：以前只解 String ⇒ 数组形式**整条规则静默丢失**。
+
+### S-SWITCH-06 ⭐⭐ **站方 JS 的宿主对象**（`book` / `source` / `chapter`）
+**规范**：编排层必须把 `book` / `source` / `chapter` 注入求值上下文。
+**现状**：✅（`SourceEngine.makeBookObject` / `makeSourceObject` / `makeChapterObject`）。
+**依据**：站方 `ruleToc.chapterList` 第一句就 `book.getVariable('custom')`
+⇒ 不给 book 就抛 `Cannot read properties of undefined` ⇒ **整条规则静默失效**。
+
+### ⭐ 活体效果（`swift run conformance --live`，同 14 个源）
+| | 成功 | 失败 |
+|---|---|---|
+| 补齐前 | 3 | 11 |
+| **补齐后** | **6** | 8 |
+
+⇒ 新通的两个是 **疯读小说 / 悦读小说**（JSON 源，从「列表 0 本」变成能出书）
+⇒ **纵横中文**也从「列表 0 本」变成「分类 122 / 书 20」⭐
