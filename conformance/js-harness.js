@@ -3,7 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const ENGINE_DIR = path.join(__dirname, '..', 'QiReaderLite', 'Resources', 'engine');
+// ⭐ **可覆盖**：默认指轻阅仓库；沙盒里没有轻阅仓库时用 `reference/js`（轻阅引擎的只读快照）
+//    ⇒ 用途：拿同一批真实规则，**两边的解析器各跑一遍** ⇒ 对比谁读得懂更多 ⭐
+const ENGINE_DIR = process.env.LEGADO_ENGINE_DIR
+  || path.join(__dirname, '..', 'QiReaderLite', 'Resources', 'engine');
 // 顺序必须与 QiReaderLite/Core/RuleSandbox.swift 的 ResourceLocator.scripts 完全一致 ——
 // 不一致会让"沙盒能跑、真机不跑"或者反过来。
 const FILES = [

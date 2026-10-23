@@ -1519,3 +1519,24 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 **规范**：引擎只负责「对给定页面跑 JS + 交出结果字符串」。
 **依据**：站方写法各异（有的返回 true、有的返回页面 HTML、有的用 Rhino 专属 API）。
 **现状**：✅。
+
+## 29. S-DIFF 双实现对拍的用法
+
+### S-DIFF-01 ⭐ 对拍可以指向**任意引擎目录**
+**规范**：`LEGADO_ENGINE_DIR` 环境变量 ⇒ 覆盖 harness 加载的引擎目录。
+**现状**：✅（2026-10-23 加）。
+
+```bash
+# 默认：轻阅仓库的引擎（QiReaderLite/Resources/engine）
+bash tools/conformance-diff.sh
+
+# 指向「轻阅引擎的只读快照」（沙盒里没有轻阅仓库时）
+LEGADO_ENGINE_DIR=$PWD/reference/js bash tools/conformance-diff.sh
+
+# 指向**真机 IPA 里的引擎**（最权威）
+LEGADO_ENGINE_DIR=/tmp/qy215/ipa/Payload/QingYue.app bash tools/conformance-diff.sh
+```
+
+⭐ **用途**：验证「快照 == 真包」⇒ 确认对拍基线没过时。
+⇒ 2026-10-23 实测：build215 真包与快照的 132 条结果**完全一致**（112/132）
+⇒ ⇒ 轻阅那 20 条债**一条没修**（全在 `rule-analyzer.js`/`jsoup-compat.js` ⇒ 这两个文件逐字节没变）⭐
