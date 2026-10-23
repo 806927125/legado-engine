@@ -148,12 +148,58 @@ public final class JSCExecutor: JSExecutor {
         }
 
         // ⑤ 求值（scope 变量 + 站方代码 ⇒ 完成值）
-        let source = JSScopeBuilder.build(context) + "\n" + JSScopeBuilder.program(code)
+        //
+        // ⭐⭐⭐ **必须包一层函数 + eval**（2026-10-23 真机栽的：🍅大灰狼聚合）
+        //
+        // ⚠️ **症状**：`SyntaxError: Can't create duplicate variable: 'device_type'`
+        //   ⇒ 大灰狼的 `exploreUrl` 里有 `let device_type = '安卓';`
+        //   ⇒ 以前是**直接拼接后在全局执行** ⇒ `let` 进了 **JSContext 全局**
+        //   ⇒ 同一段代码再跑一次（jsLib 加载 + 规则求值 / 翻页重跑）⇒ **重复声明** ⇒ 炸 ⭐
+        //
+        // ⚠️ **老引擎为什么没事**：它的站方代码跑在**函数作用域**里 ⇒ `let` 是局部的 ⇒ 跑几次都不冲突
+        //
+        // ⭐ **改成 eval 之后**：
+        //   ① `let` / `const` / `var` / `function` 声明 ⇒ **eval 自己的作用域** ⇒ 不污染全局
+        //      （顺带解决了「站方 JS 污染全局 ⇒ 多书源串台」的老坑 ⭐）
+        //   ② **完成值仍然拿得到**（`eval("1+2")` = 3 ⇒ eval 的完成值就是末行表达式的值）⭐
+        //      ⇒ 不能直接写 `(function(){ 1 + 2 })()`（那样返回 undefined）
+        //   ③ scope 变量（result / baseUrl / source / book）**照样可见**（eval 在闭包里）⭐
+        let scope = JSScopeBuilder.build(context)
+        let codeLiteral = JSScopeBuilder.jsonLiteral(.string(code))
+        let source = scope + "\n" + "(function(){ return eval(" + codeLiteral + "); })()"
         let value = js.evaluateScript(source)
         // ⭐ 站方 JS 抛异常 ⇒ 必须**报出来**（不能静默空）
         if let msg = caught.value {
             throw JSCError.scriptException(msg)
         }
+        guard let value else { return .null }
+        return Self.toJSON(value)
+    }
+
+    /// ⭐⭐⭐ **全局求值**（**间接 eval**）—— **站方 jsLib 专用**
+    ///
+    /// ⚠️ jsLib 的 `var` / `function` **必须留在全局作用域** ⇒ 站方规则才调得到
+    ///   （老引擎就是间接 eval 加载 jsLib 的 ⇒ 它的全局污染是既定行为）⭐
+    /// ⇒ `(0, eval)(code)` ⇒ 间接 eval ⇒ **全局作用域** ✔
+    public func runGlobal(_ code: String, context: JSRunContext) throws -> JSONValue {
+        contextLock.lock()
+        defer { contextLock.unlock() }
+        let js: JavaScriptCore.JSContext
+        if let cached = cachedContext {
+            js = cached
+        } else {
+            guard let created = JavaScriptCore.JSContext() else { throw JSCError.contextUnavailable }
+            cachedContext = created
+            js = created
+        }
+        final class Box: @unchecked Sendable { var value: String? }
+        let caught = Box()
+        js.exceptionHandler = { (ctx: JavaScriptCore.JSContext?, exception: JSValue?) in
+            if let exception { caught.value = String(describing: exception) }
+        }
+        let codeLiteral = JSScopeBuilder.jsonLiteral(.string(code))
+        let value = js.evaluateScript("(0, eval)(" + codeLiteral + ")")
+        if let msg = caught.value { throw JSCError.scriptException(msg) }
         guard let value else { return .null }
         return Self.toJSON(value)
     }

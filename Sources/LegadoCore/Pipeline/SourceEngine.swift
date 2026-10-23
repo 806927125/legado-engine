@@ -863,6 +863,19 @@ public final class SourceEngine {
         return text
     }
 
+    /// ⭐⭐⭐ **加载站方 jsLib**（**全局作用域** ⇒ 站方规则调得到）
+    ///
+    /// ⚠️ **必须用 `runGlobal`**（间接 eval）⇒ jsLib 的 `var` / `function` 留在全局
+    /// ⇒ 而**普通规则求值用 eval 局部作用域**（否则 `let device_type` 撞全局 ⇒ 炸）⭐
+    public func loadJsLib(_ code: String) throws {
+        guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
+        let ctx = JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl, varBox: varBox)
+        _ = try js.runGlobal(code, context: ctx)
+        // ⭐⭐ **必须重设基线** ⇒ 站方 jsLib 定义的全局要长期保留
+        //   （否则「每次求值前清全局」会把它们删掉 ⇒ 站方规则一调就炸）⭐
+        js.markGlobalsAsBaseline()
+    }
+
     // MARK: - ⑥ 登录链路
 
     /// ⭐⭐⭐ **加载站方的登录脚本**（`loginUrl`）⇒ 加载到 **JS 全局**。

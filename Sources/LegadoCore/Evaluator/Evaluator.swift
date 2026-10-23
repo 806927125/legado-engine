@@ -39,6 +39,18 @@ public protocol JSExecutor {
     /// ⇒ ⇒ 加载完站方脚本 ⇒ 调一次本方法 ⇒ 新基线 ⇒ 之后照常清理 ⭐
     func markGlobalsAsBaseline()
 
+    /// ⭐⭐⭐ **全局求值**（**间接 eval**）—— 只给「站方 jsLib」用
+    ///
+    /// ⚠️⚠️ **jsLib 的 `var` / `function` 必须留在全局** ⇒ 站方规则才调得到
+    ///   （老引擎就是**间接 eval** 加载 jsLib 的 ⇒ 它的全局污染是既定行为）⭐
+    /// ⚠️ **而普通的规则求值不能这样** ⇒ 站方代码里的 `let device_type` 会进全局
+    ///   ⇒ 同一段代码跑第二次 ⇒ `Can't create duplicate variable` ⇒ **炸** ⭐
+    ///   （真机实证：🍅大灰狼聚合的 `exploreUrl`）
+    /// ⇒ **两个入口，两个语义**：jsLib 走全局，规则走 eval 局部
+    ///
+    /// - Note: 默认实现**不保证全局**（只有生产实现该覆盖）⇒ 测试替身够用。
+    func runGlobal(_ code: String, context: JSRunContext) throws -> JSONValue
+
     /// ⭐⭐⭐ **作废 JS 上下文**（下次求值重建一个干净的）
     ///
     /// ⚠️ **站方书源 jsLib 跑完必须调**（它定义的全局 `var host` / `function getArguments`
@@ -53,6 +65,10 @@ public typealias JSEngineAPIHandler = (String, [JSONValue], RuleBase) -> JSONVal
 extension JSExecutor {
     /// 默认实现 = **不接管**（宿主自己实现全部 `java.*`）
     public func setEngineAPI(_ handler: JSEngineAPIHandler?) {}
+    /// ⚠️ 默认实现**不保证全局**（只有生产实现该覆盖 ⇒ 测试替身够用）
+    public func runGlobal(_ code: String, context: JSRunContext) throws -> JSONValue {
+        try run(code, context: context)
+    }
     /// 默认实现 = **无可作废的上下文**（无状态执行器）
     public func invalidate() {}
     /// 默认实现 = **无可保留的全局**（无状态执行器）
