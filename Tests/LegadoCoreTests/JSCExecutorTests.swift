@@ -114,53 +114,53 @@ final class JSCExecutorTests: XCTestCase {
         let ctx = JSRunContext(base: .page(""), baseUrl: "https://x.example/", raw: "", key: "", page: 1)
         XCTAssertThrowsError(try exec.run("throw new Error('站方炸了');", context: ctx))
     }
-}
 
-// MARK: - ⑫ 复合形态「路径 + `<js>` 块」端到端（§S-CMP-07）
+    // MARK: - ⑫ 复合形态「路径 + `<js>` 块」端到端（§S-CMP-07）
 
 /// ⭐⭐⭐ **这条才是「真跑」的门禁** —— 前面沙盒那份只断言「引擎传了什么基准」，
 /// 这条在 **macOS CI** 上用**真 JavaScriptCore** 跑 ⇒ 站方 JS 真的能 `result.map(...)`。
 ///
 /// ⚠️ 变异测试已验：把 `splitPostProcess` 退回旧逻辑 ⇒ 数组/对象/字符串三条**全红**。
-func testCompositePathWithJSBlockKeepsArrayType() throws {
-    let api = FakeAPI()
-    let exec = JSCExecutor(api: api)
-    let ev = Evaluator(js: exec)
-    let json: JSONValue = .object([
+    func testCompositePathWithJSBlockKeepsArrayType() throws {
+        let api = FakeAPI()
+        let exec = JSCExecutor(api: api)
+        let ev = Evaluator(js: exec)
+        let json: JSONValue = .object([
         "data": .object([
             "list": .array([.object(["n": .string("a")]), .object(["n": .string("b")])]),
         ]),
     ])
-    let ctx = EvalContext(base: RuleBase.json(json), isJSON: true)
-    let e = ev.evalOne("$.data.list<js>result.map(function(x){return x.n}).join(',')</js>",
+        let ctx = EvalContext(base: RuleBase.json(json), isJSON: true)
+        let e = ev.evalOne("$.data.list<js>result.map(function(x){return x.n}).join(',')</js>",
                       base: RuleBase.json(json), ctx: ctx)
-    XCTAssertNil(e.diagnostic.failure, "诊断不该有失败：\(String(describing: e.diagnostic.failure))")
-    XCTAssertEqual(e.value.text, "a,b", "⭐ JS 里的 result 必须是数组 ⇒ .map 才能跑")
+        XCTAssertNil(e.diagnostic.failure, "诊断不该有失败：\(String(describing: e.diagnostic.failure))")
+        XCTAssertEqual(e.value.text, "a,b", "⭐ JS 里的 result 必须是数组 ⇒ .map 才能跑")
 }
 
 /// 对象主体 ⇒ `result.book_id` 取得到（站方大灰狼就靠这个）
-func testCompositePathWithJSBlockKeepsObjectType() throws {
-    let api = FakeAPI()
-    let exec = JSCExecutor(api: api)
-    let ev = Evaluator(js: exec)
-    let json: JSONValue = .object([
+    func testCompositePathWithJSBlockKeepsObjectType() throws {
+        let api = FakeAPI()
+        let exec = JSCExecutor(api: api)
+        let ev = Evaluator(js: exec)
+        let json: JSONValue = .object([
         "book": .object(["book_id": .string("MTgzNTEy"), "tab": .string("小说")]),
     ])
-    let ctx = EvalContext(base: RuleBase.json(json), isJSON: true)
-    let e = ev.evalOne("$.book<js>result.book_id</js>", base: RuleBase.json(json), ctx: ctx)
-    XCTAssertNil(e.diagnostic.failure, "诊断不该有失败：\(String(describing: e.diagnostic.failure))")
-    XCTAssertEqual(e.value.text, "MTgzNTEy")
+        let ctx = EvalContext(base: RuleBase.json(json), isJSON: true)
+        let e = ev.evalOne("$.book<js>result.book_id</js>", base: RuleBase.json(json), ctx: ctx)
+        XCTAssertNil(e.diagnostic.failure, "诊断不该有失败：\(String(describing: e.diagnostic.failure))")
+        XCTAssertEqual(e.value.text, "MTgzNTEy")
 }
 
 /// 字符串主体 ⇒ `result` 是字符串（别被包成 JSON 串）
-func testCompositePathWithJSBlockKeepsStringType() throws {
-    let api = FakeAPI()
-    let exec = JSCExecutor(api: api)
-    let ev = Evaluator(js: exec)
-    let json: JSONValue = .object(["uptime": .string("2024-01-01")])
-    let ctx = EvalContext(base: RuleBase.json(json), isJSON: true)
-    let e = ev.evalOne("$.uptime<js>result + '!'</js>", base: RuleBase.json(json), ctx: ctx)
-    XCTAssertNil(e.diagnostic.failure, "诊断不该有失败：\(String(describing: e.diagnostic.failure))")
-    XCTAssertEqual(e.value.text, "2024-01-01!")
+    func testCompositePathWithJSBlockKeepsStringType() throws {
+        let api = FakeAPI()
+        let exec = JSCExecutor(api: api)
+        let ev = Evaluator(js: exec)
+        let json: JSONValue = .object(["uptime": .string("2024-01-01")])
+        let ctx = EvalContext(base: RuleBase.json(json), isJSON: true)
+        let e = ev.evalOne("$.uptime<js>result + '!'</js>", base: RuleBase.json(json), ctx: ctx)
+        XCTAssertNil(e.diagnostic.failure, "诊断不该有失败：\(String(describing: e.diagnostic.failure))")
+        XCTAssertEqual(e.value.text, "2024-01-01!")
+}
 }
 #endif
