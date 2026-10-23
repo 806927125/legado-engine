@@ -210,6 +210,7 @@ FileHandle.standardError.write("Swift 侧：通过 \(pass) / 不符合 \(fail)\n
 func describe(_ n: RuleNode) -> String {
     switch n {
     case .empty: return "empty"
+    case .value(let mode): return "value(\(mode))"
     case .literal(let s): return "literal(\(s))"
     case .css(let s): return "css(\(s))"
     case .xpath(let s): return "xpath(\(s))"
@@ -395,6 +396,7 @@ func quoted(_ s: String) -> String {
 func describeValue2(_ n: RuleNode) -> String {
     switch n {
     case .empty: return "e"
+    case .value(let mode): return "v(\(mode))"
     case .literal(let s): return "l\(s)"
     case .css(let s): return "c\(s)"
     case .xpath(let s): return "x\(s)"

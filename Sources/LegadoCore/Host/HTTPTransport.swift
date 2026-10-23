@@ -43,9 +43,14 @@ public struct HTTPResponse: Sendable, Equatable {
     public var statusCode: Int
     public var headers: [String: String]
     public var body: Data
+    /// **最终 URL**（重定向后）—— 相对地址绝对化必须用它，
+    /// 否则「详情页里的相对章节链接」会相对到错误的地址。
+    public var finalURL: String?
 
-    public init(statusCode: Int, headers: [String: String] = [:], body: Data = Data()) {
+    public init(statusCode: Int, headers: [String: String] = [:], body: Data = Data(),
+                finalURL: String? = nil) {
         self.statusCode = statusCode; self.headers = headers; self.body = body
+        self.finalURL = finalURL
     }
 
     /// 正文（UTF-8）
@@ -93,6 +98,9 @@ public struct PageFetcher: Sendable {
         if let jar = cookieJar {
             jar.store(headers: resp.headers, for: built.url)
         }
-        return resp
+        // ⭐ 把**最终 URL**带回去 —— 相对地址绝对化要靠它
+        var out = resp
+        if out.finalURL == nil { out.finalURL = built.url }
+        return out
     }
 }

@@ -52,6 +52,19 @@ public indirect enum RuleNode: Sendable, Equatable {
     case chain(head: String, headIndex: Int?, steps: [ChainStep])
     /// 尾部后处理（`##正则##` 或 `@js:` 后缀）作用在主体上
     case post(RuleNode, PostProcess)
+    /// ⭐ **整条规则就是一个取值模式** ⇒ 「取**当前节点**的这个值」
+    ///
+    /// 站方真实写法（真书源「过期杂志」逐字）：
+    /// - `"chapterName": "text"` ⇒ 取章节节点的文本
+    /// - `"chapterUrl": "href"`   ⇒ 取章节节点的 href
+    ///
+    /// ⚠️ **与 `text.x` 不是一回事**：
+    /// - `text.x` ⇒ 筛选（找文本**完全等于** x 的元素）
+    /// - `text`   ⇒ 取值（取当前节点的文本）
+    ///
+    /// ⚠️ 以前这类规则被当成 CSS 标签名去查（`select("text")`）⇒ **永远查不到**
+    /// ⇒ 表现为「目录有章节、但章名和章地址全是空」。
+    case value(mode: String)
 
     /// 尾部后处理
     public enum PostProcess: Sendable, Equatable {

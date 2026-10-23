@@ -6,9 +6,9 @@
 
 | 指标 | 值 |
 |---|---|
-| 用例总数 | 122 |
-| 两边一致 | **87** |
-| 存在差异 | **35** |
+| 用例总数 | 125 |
+| 两边一致 | **88** |
+| 存在差异 | **37** |
 
 ## 差异明细
 
@@ -31,6 +31,7 @@
 | `dom-01` | `{"count":2,"texts":["第一章 风起","第二章 云涌"]}` | `{"count":2,"texts":["第一章 风起","第二章 云涌"]}` | `{"count":1,"texts":["第一章 风起第二章 云涌"]}` | **轻阅的 bug**（自研已按规格修对） |
 | `dom-05` | `{"count":1,"texts":["第二章 云涌"]}` | `{"count":1,"texts":["第二章 云涌"]}` | `{"count":1,"texts":["第一章 风起第二章 云涌"]}` | **轻阅的 bug**（自研已按规格修对） |
 | `dom-06` | `{"count":0,"texts":[]}` | `{"count":0,"texts":[]}` | `{"count":1,"texts":["第一章 风起第二章 云涌"]}` | **轻阅的 bug**（自研已按规格修对） |
+| `fbk-04` | `{"count":2}` | `{"count":2}` | `{"count":1}` | **轻阅的 bug**（自研已按规格修对） |
 | `json-03` | `{"values":["{\"title\":\"章节名\",\"url\":\"u1\"}"]}` | `{"values":["{\"title\":\"章节名\",\"url\":\"u1\"}"]}` | `{"values":["\tu1"]}` | **轻阅的 bug**（自研已按规格修对） |
 | `json-04` | `{"value":"{\"title\":\"章节名\",\"url\":\"u1\"}"}` | `{"value":"{\"title\":\"章节名\",\"url\":\"u1\"}"}` | `{"value":"\tu1"}` | **轻阅的 bug**（自研已按规格修对） |
 | `put-01` | `{"value":"https://x.example/read/XID-001/1.html"}` | `{"value":"https://x.example/read/XID-001/1.html"}` | `{"value":"https://x.example/read//1.html"}` | **轻阅的 bug**（自研已按规格修对） |
@@ -49,9 +50,10 @@
 | `url-10` | `method="GET",body="",url="https://x.com/api"` | `method="GET",body="",url="https://x.com/api"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
 | `url-11` | `method="GET",body="",url="https://x.com/d?book_id=x&source=%E7%95%AA%E8%8C%84&variable=%7B%22custom%22%3A%22%22%7D"` | `method="GET",body="",url="https://x.com/d?book_id=x&source=%E7%95%AA%E8%8C%84&variable=%7B%22custom%22%3A%22%22%7D"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
 | `url-12` | `method="GET",body="",url="https://x.com/a,b"` | `method="GET",body="",url="https://x.com/a,b"` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
+| `val-01` | `{"value":"主标题"}` | `{"value":"主标题"}` | `SKIPPED` | **轻阅的 bug**（自研已按规格修对） |
 
 ## 说明
 
 - **Swift 侧不符**（0 条）⇒ 自研实现还没写完 / 写错了。
-- **JS 侧不符**（18 条）⇒ 轻阅现有实现与规格不一致（多数是**已知债**）。
+- **JS 侧不符**（19 条）⇒ 轻阅现有实现与规格不一致（多数是**已知债**）。
 - 两边都跑不了的用例（`SKIPPED`）⇒ 属于后续切片（需要 DOM / JS 后端）。

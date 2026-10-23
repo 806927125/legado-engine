@@ -1833,6 +1833,58 @@
         "body": "",
         "url": "https://x.com/a,b"
       }
+    },
+    {
+      "id": "fbk-04",
+      "semantic": "S-FBK-04",
+      "title": "换行多规则 ⇒ 结果合并（轻阅只返回第一行 ⇒ 债）",
+      "kind": "getElements",
+      "rule": "tag.h1@text\ntag.h2@text",
+      "base": {
+        "type": "html",
+        "value": "<html><body><h1>主标题</h1><h2>副标题</h2></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 2
+      }
+    },
+    {
+      "id": "comma-01",
+      "semantic": "S-FBK-05",
+      "title": "头段逗号 = CSS 并集（不是兜底链）",
+      "kind": "getElements",
+      "rule": "tag.h1, tag.h2",
+      "base": {
+        "type": "html",
+        "value": "<html><body><h1>主标题</h1><h2>副标题</h2></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "count": 2
+      }
+    },
+    {
+      "id": "val-01",
+      "semantic": "S-VAL-01",
+      "title": "整条规则 = 取值模式（轻阅当 CSS 标签查 ⇒ 债）",
+      "kind": "evalOne",
+      "rule": "text",
+      "base": {
+        "type": "html",
+        "value": "<html><body><h1>主标题</h1></body></html>"
+      },
+      "ctx": {
+        "baseUrl": "https://x.example/"
+      },
+      "expect": {
+        "value": "主标题"
+      },
+      "requires": "swift-only"
     }
   ]
 }

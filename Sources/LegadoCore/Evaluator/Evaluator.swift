@@ -72,6 +72,24 @@ public struct Evaluator {
     /// ③ 解析成 AST
     /// ④ 按 AST 求值
     public func evalOne(_ rule: String, base: RuleBase, ctx ctxIn: EvalContext) -> Evaluation {
+        // ⭐ **换行分隔的多条规则** —— 站方的多规则写法是**换行**。
+        //   字符串出口取**第一个非空**（Legado 语义）；列表出口见 `getElements`。
+        let lines = Self.splitRuleLines(rule)
+        guard lines.count > 1 else {
+            return evalSingle(rule, base: base, ctx: ctxIn)
+        }
+        var lastDiag = EngineDiagnostic(rule: rule)
+        for line in lines {
+            let e = evalSingle(line, base: base, ctx: ctxIn)
+            if !e.value.isEmpty { return e }
+            lastDiag = e.diagnostic
+        }
+        lastDiag.failure = .noMatch(reason: "多行规则全部未命中")
+        return Evaluation(value: .void, diagnostic: lastDiag)
+    }
+
+    /// **单条规则**求值（不按行拆）
+    private func evalSingle(_ rule: String, base: RuleBase, ctx ctxIn: EvalContext) -> Evaluation {
         var ctx = ctxIn
         var r = rule
         var diag = EngineDiagnostic(rule: rule)
@@ -121,19 +139,78 @@ public struct Evaluator {
         return Evaluation(value: value, diagnostic: diag)
     }
 
-    /// **列表求值**（含 `||` / `&&` / `,` 兜底链）
+    /// **列表求值**（含 `||` / `&&` 兜底链 + **换行多规则合并**）
+    ///
+    /// ⭐ **换行多规则 ⇒ 结果合并**（不是第一个非空）——
+    /// 站方的多规则写法是换行，列表出口要把**每一行**的结果都收进来。
+    /// ⚠️ 轻阅只返回**第一行**（实测：`getElements("a@text\nb@text")` ⇒ 只有第一行）
+    /// ⇒ 这是**轻阅的债**，对拍会把它标成差异。
     public func getElements(_ rule: String, base: RuleBase, ctx: EvalContext) -> Evaluation {
-        let e = evalOne(rule, base: base, ctx: ctx)
-        if e.value.isEmpty {
-            return Evaluation(value: .void, diagnostic: e.diagnostic)
+        let lines = Self.splitRuleLines(rule)
+        var merged: [RuleValue] = []
+        var lastDiag = EngineDiagnostic(rule: rule)
+        for line in lines {
+            let e = evalSingle(line, base: base, ctx: ctx)
+            if e.value.isEmpty { continue }
+            merged.append(contentsOf: e.value.items)
+            lastDiag = e.diagnostic
         }
-        return Evaluation(value: .list(e.value.items), diagnostic: e.diagnostic)
+        if merged.isEmpty {
+            lastDiag.failure = .noMatch(reason: "规则求值为空")
+            return Evaluation(value: .void, diagnostic: lastDiag)
+        }
+        return Evaluation(value: .list(merged), diagnostic: lastDiag)
+    }
+
+    /// ⭐ **按换行拆多条规则** —— 整块语法（`{{…}}` / `<js>…</js>` / `@js:`）**不拆**。
+    ///
+    /// ⚠️ 轻阅的口径叫 `isBlockRule`：整条含块语法就当一整块。
+    public static func splitRuleLines(_ rule: String) -> [String] {
+        if rule.contains("{{") || rule.contains("<js>") || rule.contains("<JS>")
+            || rule.contains("@js:") || rule.contains("@get:") || rule.contains("@put:") {
+            return [rule]
+        }
+        let lines = rule.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        return lines.isEmpty ? [rule] : lines
+    }
+
+    /// **节点求值** —— 编排层要「一组节点」（列表项 / 章节项），字段层要「一个字符串」。
+    ///
+    /// ⭐ 走的是**同一条求值路径**（`evaluate(..., rawNodes: true)`）
+    /// ⇒ `||` / `&&` / 逗号 / `@@` 等**组合节点天然全支持**。
+    ///
+    /// ⚠️ 以前编排层另开了一条只认 `.chain` / `.css` 的路径
+    /// ⇒ 碰到 `||`（AST = `.fallback`）直接掉进 default ⇒ **整条兜底链返回空**
+    /// ⇒ 表现为「分类出得来、目录 0 章」这种「像站方坏了」的故障。
+    public func evalNodes(_ rule: String, base: RuleBase, ctx: EvalContext) -> [DOMNodeRef] {
+        var out: [DOMNodeRef] = []
+        for line in Self.splitRuleLines(rule) {
+            let ast = parser.parse(line, isJSON: ctx.isJSON)
+            var diag = EngineDiagnostic(rule: line)
+            let value = evaluate(ast, base: base, ctx: ctx, diag: &diag, rawNodes: true)
+            out.append(contentsOf: value.items.compactMap { item -> DOMNodeRef? in
+                if case .node(let n) = item { return n }
+                return nil
+            })
+        }
+        return out
     }
 
     // MARK: - AST 求值
 
+    /// - Parameter rawNodes: `true` ⇒ 链求值**不套取值模式**，返回**节点**（编排层要它）
+    ///                       `false` ⇒ 返回已取值的字符串（字段规则用）
+    ///
+    /// ⭐ **为什么要这个开关**（Phase 3 的教训）：
+    /// 编排层要的是「一组节点」（列表项 / 章节项），字段层要的是「一个字符串」。
+    /// 以前编排层另开了一条求值路径（`evalNodes`），结果**只认 `.chain` / `.css`**
+    /// ⇒ 碰到 `||` 组合节点（`.fallback`）直接掉进 default ⇒ **整条兜底链返回空**
+    /// ⇒ 表现为「分类有、目录 0 章」这种「看起来像站方坏了」的故障。
+    /// ⇒ 现在**只有一条求值路径**，靠开关区分出口 ⇒ 组合节点天然全支持。
     public func evaluate(_ node: RuleNode, base: RuleBase, ctx: EvalContext,
-                          diag: inout EngineDiagnostic) -> RuleValue {
+                          diag: inout EngineDiagnostic, rawNodes: Bool = false) -> RuleValue {
         switch node {
         case .empty:
             diag.failure = .noMatch(reason: "空规则")
@@ -149,7 +226,7 @@ public struct Evaluator {
         case .fallback(let xs):
             for x in xs {
                 var sub = diag
-                let v = evaluate(x, base: base, ctx: ctx, diag: &sub)
+                let v = evaluate(x, base: base, ctx: ctx, diag: &sub, rawNodes: rawNodes)
                 if !v.isEmpty { diag = sub; return v }
             }
             diag.failure = .noMatch(reason: "|| 兜底链全部未命中")
@@ -158,7 +235,7 @@ public struct Evaluator {
 
         // ② `&&` 串接 —— 依次求值并拼接（§S-FBK-02）
         case .concat(let xs):
-            let parts = xs.map { evaluate($0, base: base, ctx: ctx, diag: &diag).text }
+            let parts = xs.map { evaluate($0, base: base, ctx: ctx, diag: &diag, rawNodes: rawNodes).text }
             let joined = parts.joined()
             if joined.isEmpty {
                 diag.failure = .noMatch(reason: "&& 串接结果为空")
@@ -172,7 +249,7 @@ public struct Evaluator {
         case .alternatives(let xs):
             for x in xs {
                 var sub = diag
-                let v = evaluate(x, base: base, ctx: ctx, diag: &sub)
+                let v = evaluate(x, base: base, ctx: ctx, diag: &sub, rawNodes: rawNodes)
                 if !v.isEmpty { diag = sub; return v }
             }
             diag.failure = .noMatch(reason: "逗号多规则全部未命中")
@@ -181,11 +258,18 @@ public struct Evaluator {
 
         // ④ `@@` 二次解析
         case .reparse(let inner):
-            return evaluate(inner, base: base, ctx: ctx, diag: &diag)
+            return evaluate(inner, base: base, ctx: ctx, diag: &diag, rawNodes: rawNodes)
 
         // ⑤ 尾部后处理
         case .post(let inner, let post):
-            let v = evaluate(inner, base: base, ctx: ctx, diag: &diag)
+            // ⚠️ rawNodes 模式下**不套后处理** —— 正则/JS 作用于「文本」，
+            //    而节点集没有「文本」可替换 ⇒ 强行套会毁掉节点。
+            //    ⇒ 透传内层节点，并把这件事记进诊断（不许静默）。
+            if rawNodes {
+                diag.branch = "尾部后处理（节点模式跳过）"
+                return evaluate(inner, base: base, ctx: ctx, diag: &diag, rawNodes: rawNodes)
+            }
+            let v = evaluate(inner, base: base, ctx: ctx, diag: &diag, rawNodes: rawNodes)
             return applyPost(v, post, base: base, ctx: ctx, diag: &diag)
 
         // ⑥ 正则（对基准的文本）
@@ -243,7 +327,7 @@ public struct Evaluator {
 
         case .chain(let head, let headIndex, let steps):
             return selectDOMChain(head: head, headIndex: headIndex, steps: steps,
-                                  base: base, ctx: ctx, diag: &diag)
+                                  base: base, ctx: ctx, diag: &diag, rawNodes: rawNodes)
 
         // ⑩ JS
         case .js(let code):
@@ -253,6 +337,23 @@ public struct Evaluator {
             let v = runJS(code, base: base, ctx: ctx, diag: &diag)
             guard let tail, !tail.isEmpty else { return v }
             return applyTail(v, tail, base: base, ctx: ctx, diag: &diag)
+
+        // ⑪ ⭐ **整条规则 = 取值模式** ⇒ 取当前节点的这个值
+        //     （站方写法：`"chapterName": "text"` / `"chapterUrl": "href"`）
+        case .value(let mode):
+            guard let node = baseNode(base, ctx: ctx) else {
+                diag.failure = .baseTypeMismatch(expected: "DOM", actual: baseTypeName(base))
+                diag.branch = "取值模式"
+                return .void
+            }
+            guard let vm = ValueMode.fromAttributeName(mode) else {
+                diag.failure = .unsupportedSyntax("未知取值模式：\(mode)")
+                diag.branch = "取值模式"
+                return .void
+            }
+            diag.branch = "取值模式 \(mode)"
+            if rawNodes { return .list([RuleValue.node(DOMNodeRef(node))]) }
+            return .string(ValueExtractor.value(node, mode: vm, baseURL: ctx.baseUrl))
         }
     }
 
@@ -279,7 +380,7 @@ public struct Evaluator {
     /// 默认规则语法链
     private func selectDOMChain(head: String, headIndex: Int?, steps: [ChainStep],
                                 base: RuleBase, ctx: EvalContext,
-                                diag: inout EngineDiagnostic) -> RuleValue {
+                                diag: inout EngineDiagnostic, rawNodes: Bool = false) -> RuleValue {
         guard let node = baseNode(base, ctx: ctx) else {
             diag.failure = .baseTypeMismatch(expected: "DOM", actual: baseTypeName(base))
             diag.branch = "默认规则链"
@@ -292,6 +393,10 @@ public struct Evaluator {
             return .void
         }
         diag.branch = "默认规则链"
+        // ⭐ rawNodes ⇒ 返回**节点**（编排层要在条目内再跑字段规则）
+        if rawNodes {
+            return .list(resolved.nodes.map { RuleValue.node(DOMNodeRef($0)) })
+        }
         // 取值模式：属性后缀 ⇒ 取值；没有 ⇒ 完整文本
         let values = resolved.nodes.map { n -> RuleValue in
             if let mode = resolved.mode {
@@ -308,15 +413,59 @@ public struct Evaluator {
                            ctx: EvalContext, diag: inout EngineDiagnostic) -> RuleValue {
         switch post {
         case .regex(let spec):
-            let (pattern, replacements) = parseRegexSpec(spec)
-            return applyRegex(value.text, pattern: pattern, replacements: replacements,
-                              baseURL: ctx.baseUrl, diag: &diag)
+            // ⚠️⭐ **尾部正则的语义 = 替换/删除**，不是「纯提取」
+            //   `##正则`      ⇒ **删除**匹配部分（站方净化广告的常见写法）
+            //   `##正则##替换` ⇒ 替换
+            //   （「纯提取」是**整条规则**为 `##正则##` 时的语义，两处别混）
+            // ⚠️ 以前这里把 spec 当成「pattern##reps」去拆 ⇒ 「无替换」时 pattern 变空
+            //   ⇒ 整条规则返回空 ⇒ 站方 `content = "tag.p@html##我爱读者校园网"` 直接踩中 ⭐
+            let (pattern, replacements) = RuleParser.parseRegexRule(spec)
+            return applyRegexReplace(value.text, pattern: pattern, replacements: replacements,
+                                     baseURL: ctx.baseUrl, diag: &diag)
         case .js(let code):
             // 尾部 `@js:`：以主体结果为 `result`
             var sub = ctx
             sub.base = .page(value.text)
             return runJS(code, base: .page(value.text), ctx: sub, diag: &diag)
         }
+    }
+
+    /// **替换 / 删除**（尾部正则语义）—— 与 `applyRegex` 的「纯提取」是两回事。
+    ///
+    /// - `replacements` 为空 ⇒ 删除匹配部分
+    /// - 有多段 ⇒ 第 N 个匹配用第 N 个替换串（用完沿用最后一个）
+    private func applyRegexReplace(_ text: String, pattern: String, replacements: [String],
+                                   baseURL: String, diag: inout EngineDiagnostic) -> RuleValue {
+        guard !pattern.isEmpty else {
+            diag.failure = .unsupportedSyntax("尾部正则为空")
+            diag.branch = "尾部正则"
+            return .void
+        }
+        guard let re = try? NSRegularExpression(pattern: pattern) else {
+            diag.failure = .unsupportedSyntax("正则语法错误：\(pattern)")
+            diag.branch = "尾部正则"
+            return .void
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        var matches: [NSTextCheckingResult] = []
+        re.enumerateMatches(in: text, options: [], range: range) { m, _, _ in
+            if let m { matches.append(m) }
+        }
+        // ⭐ **倒序替换** —— 正序会把后面的匹配位置推偏
+        let ns = NSMutableString(string: text)
+        for (i, m) in matches.enumerated().reversed() {
+            let rep: String
+            if replacements.isEmpty {
+                rep = ""
+            } else if i < replacements.count {
+                rep = replacements[i]
+            } else {
+                rep = replacements[replacements.count - 1]
+            }
+            ns.replaceCharacters(in: m.range, with: rep)
+        }
+        diag.branch = "尾部正则"
+        return .string(ns as String)
     }
 
     /// `##pattern##rep1##rep2##` 的拆分（复用 RuleParser 的口径）

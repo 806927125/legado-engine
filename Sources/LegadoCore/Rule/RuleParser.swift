@@ -61,11 +61,16 @@ public struct RuleParser {
             return .concat(andParts.map { parseInternal($0, isJSON: isJSON) })
         }
 
-        // ⑤ 逗号分隔多规则回退（§S-FBK-03）
-        let commaParts = Self.splitTopLevel(s, separators: [","])
-        if commaParts.count > 1 {
-            return .alternatives(commaParts.map { parseInternal($0, isJSON: isJSON) })
-        }
+        // ⑤ ⛔ **不再按逗号拆分**
+        //
+        // ⚠️⚠️ **逗号是 CSS 选择器并集，不是兜底链** —— 这是 Phase 3 用真书源踩出来的：
+        //   `ruleToc.chapterList = ".catalog-section-title,.article-title a||…"`
+        //   逗号拆分 ⇒ 第一段（10 个卷标题）命中就停 ⇒ **16 个章节全丢**
+        //   ⇒ 现象是「目录只有卷标题、没有章节」。
+        // ⇒ 逗号原样交给 CSS 引擎（`select("a,b")` 天然是并集）。
+        // ⇒ 真正的兜底链只有 `||`（择一）和 `&&`（串接）。
+        //
+        // 📌 规格 §S-FBK-03 已据此改写（原写法「逗号多规则回退」是**错的**）。
 
         return parseSingle(s, isJSON: isJSON)
     }
@@ -117,6 +122,20 @@ public struct RuleParser {
         }
     }
 
+    /// ⭐ **取值模式**（`text` / `href` / `html` / …）—— 整条规则就是它时，
+    /// 语义是「取**当前节点**的这个值」。
+    ///
+    /// ⚠️ 与 `text.x`（文本**完全相等**的筛选）**不是一回事**：
+    /// - `text.x` ⇒ 筛选：找文本等于 x 的元素
+    /// - `text`   ⇒ 取值：取当前节点的文本
+    public static func valueMode(of raw: String) -> String? {
+        let s = raw.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !s.isEmpty else { return nil }
+        // `all` 是「取全部属性」，不是单值模式 ⇒ 不算
+        if s == "all" { return nil }
+        return ChainSegmentClassifier.attributeNames.contains(s) ? s : nil
+    }
+
     /// `<js>…</js>` 整块（可能带尾部选择器：`<js>…</js>$.data`）
     private func parseBlock(_ s: String) -> RuleNode {
         let body = stripBlockWrapper(s)
@@ -147,6 +166,33 @@ public struct RuleParser {
         }
 
         let segs = r.components(separatedBy: "@")
+
+        // ⭐⭐ **逗号把规则切成多条完整规则**（每段都带 `@`）⇒ 择一。
+        //
+        // ⚠️ **两种逗号语义要分清**：
+        // - `"tag.h1, tag.h2"`      ⇒ **头段逗号** ⇒ CSS 选择器**并集**（真书源用法）
+        // - `"tag.h1@text, tag.h2@text"` ⇒ 逗号把**完整规则**切开 ⇒ **择一**（第一个非空胜出）
+        //
+        // 判据 = **切开后每段是否都带 `@`**（带 ⇒ 每段是独立完整规则；不带 ⇒ 是 CSS 并集）。
+        let commaParts = r.components(separatedBy: ",").map {
+            $0.trimmingCharacters(in: .whitespaces)
+        }
+        if commaParts.count > 1, commaParts.allSatisfy({ $0.contains("@") }) {
+            return .fallback(commaParts.map { parseSelectorChain($0) })
+        }
+
+        // ⭐⭐ **整条规则就是一个取值模式** ⇒ 「取当前节点的这个值」
+        //
+        // 站方真实写法（真书源「过期杂志」逐字）：
+        //   "chapterName": "text"   ⇒ 取章节节点的文本
+        //   "chapterUrl":  "href"   ⇒ 取章节节点的 href
+        // ⚠️ 以前这里当成 CSS 标签名去查（`select("text")`）⇒ **永远查不到**。
+        //
+        // 判定：整条规则**精确等于**一个取值模式名（且没有 `@` 分段）。
+        if segs.count == 1, let mode = Self.valueMode(of: segs[0]) {
+            return .value(mode: mode)
+        }
+
         // ⭐ 头段也可能带索引（`tag.li.0` 整条就是头段）⇒ 拆出来
         let (head, headIndex) = ChainSegmentClassifier.splitIndex(segs.first ?? "")
         var steps: [ChainStep] = []
@@ -259,9 +305,13 @@ public struct RuleParser {
             let head = String(s[..<idx.lowerBound]).trimmingCharacters(in: .whitespaces)
             let tail = String(s[idx.lowerBound...])
             if !head.isEmpty {
-                let (pattern, reps) = parseRegexRule(tail)
-                let joined = reps.isEmpty ? "" : reps.joined(separator: "##")
-                return (head, .regex(joined.isEmpty ? pattern : pattern + "##" + joined))
+                // ⭐ **存 tail 原文（含前导 `##`）** —— 这样才能区分
+                //   `##正则`      ⇒ 删除匹配部分
+                //   `##正则##替换` ⇒ 替换
+                // 以前在这里把 tail 拆开又拼回去 ⇒ 「无替换」的信息丢了
+                // ⇒ `applyPost` 拿到空 pattern ⇒ **整条规则变空**（真书源
+                //   `ruleContent.content = "tag.p@html##我爱读者校园网"` 直接踩中）⭐
+                return (head, .regex(tail))
             }
         }
         return nil

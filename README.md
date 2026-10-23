@@ -32,26 +32,53 @@ legado-engine/
 │   │   ├── Rule/
 │   │   │   ├── RuleMode.swift       #   模式判定（§S-CLS，19 条）
 │   │   │   ├── RuleNode.swift       #   AST + 链段分类（§S-SEL-06 ⭐）
-│   │   │   └── RuleParser.swift     #   规则 → AST（§S-FBK / §S-EXCL / §S-RGX）
+│   │   │   ├── RuleParser.swift     #   规则 → AST（§S-FBK / §S-EXCL / §S-RGX / §S-VAL）
+│   │   │   └── RuleCache.swift      #   AST 缓存（§S-EVAL-11）
 │   │   ├── Context/
 │   │   │   └── RuleBase.swift       #   基准分层（§S-RES ⭐⭐⭐）+ 宿主对象
+│   │   ├── DOM/
+│   │   │   ├── DOMNode.swift        #   DOM 协议（含自身查询语义）
+│   │   │   ├── SwiftSoupDOM.swift   #   生产后端（HTML5 容错 + Jsoup 选择器）
+│   │   │   ├── Translators.swift    #   头段/链段分流（§S-DOM-01）
+│   │   │   ├── LegadoSelector.swift #   链求值 + 排除索引
+│   │   │   ├── PseudoFilter.swift   #   `:textEquals` 后置过滤
+│   │   │   └── XPathEngine.swift    #   自研 XPath 子集（§S-DOM-07）
+│   │   ├── Evaluator/
+│   │   │   ├── Evaluator.swift      #   求值器（§S-EVAL）+ 诊断一等输出
+│   │   │   ├── JSONPath.swift       #   自研 JSONPath
+│   │   │   ├── TemplateEngine.swift #   `{{}}` 插值
+│   │   │   └── ValueExtractor.swift #   取值模式（§S-VAL-01）
+│   │   ├── Host/
+│   │   │   ├── URLBuilder.swift     #   URL 规则（§S-HOST-01）
+│   │   │   ├── HTTPTransport.swift  #   传输协议 + PageFetcher
+│   │   │   └── CookieJar.swift      #   Cookie 罐（§S-HOST-02）
+│   │   ├── Model/BookSource.swift   #   书源模型（容错解码，§S-PIPE-06）
+│   │   ├── Pipeline/                #   ⭐ 编排层（Phase 3，§S-PIPE）
+│   │   │   ├── Models.swift         #   Category / Book / BookInfo / Chapter / Page
+│   │   │   └── SourceEngine.swift   #   五条流水线
 │   │   ├── Support/
 │   │   │   ├── JSONValue.swift      #   最小 JSON 值（区分 int/double/bool）
-│   │   │   └── RuleValue.swift      #   值系统（字段→String / 列表→[RuleValue]）
+│   │   │   ├── RuleValue.swift      #   值系统（字段→String / 列表→[RuleValue]）
+│   │   │   └── SourceError.swift    #   编排层错误（每条都带「哪层哪个字段」）
 │   │   └── Diagnostics/
 │   │       └── EngineDiagnostic.swift  # 诊断是一等公民（§S-DIA）
 │   └── Conformance/main.swift       # 对拍运行器（Swift 侧）
-├── Tests/LegadoCoreTests/           # XCTest（7 项，0.1 秒）
+├── Tests/LegadoCoreTests/           # XCTest（49 项，~0.9 秒）
+│   ├── EndToEndSourceTests.swift    #   ⭐ 端到端（真书源 + 离线快照跑五段流水线）
+│   └── RuleSemanticsTests.swift     #   ⭐ 规则语义（专治「断言看着有、其实验不到」）
 ├── reference/js/                    # ⭐ 轻阅现有 JS 引擎（**只读参考，不改**）
 ├── conformance/
-│   ├── fixtures/semantics-cases.json  # 79 条语义用例（两边共用同一份）
+│   ├── fixtures/semantics-cases.json  # 125 条语义用例（两边共用同一份）
+│   ├── fixtures/e2e/               #   端到端 fixture（真页面离线快照）
 │   ├── js-runner.js                 # 对拍运行器（JS 侧）
 │   └── out/report.md                # 对拍报告（自动生成）
 ├── docs/
-│   ├── legado-semantics.md          # ⭐ 语义规格（17 域 81 条）
+│   ├── legado-semantics.md          # ⭐ 语义规格（21 域 129 条）
 │   ├── 现状符合度报告.md              # 轻阅现状 vs 规格
 │   └── architecture.md               # 目标架构
-└── tools/conformance-diff.sh        # 一键对拍
+├── tools/
+│   ├── conformance-diff.sh          #   一键对拍
+│   └── fetch-fixtures.sh            #   重抓 e2e 快照（站方改版时）
 ```
 
 ---
@@ -115,7 +142,7 @@ npm install --registry=https://registry.npmmirror.com
 export LD_LIBRARY_PATH=/workspace/.toolchain/swift/usr/lib/swift/linux:$LD_LIBRARY_PATH
 
 swift build                      # 编译语义内核（~4 秒）
-swift test                       # 跑 29 项规格测试（~0.14 秒）
+swift test                       # 跑 49 项测试（~0.9 秒）
 bash tools/conformance-diff.sh   # 双实现对拍 → conformance/out/report.md
 swift run conformance --bench    # 量 AST 缓存的收益（无缓存 vs 有缓存）
 ```
@@ -126,19 +153,20 @@ swift run conformance --bench    # 量 AST 缓存的收益（无缓存 vs 有缓
 
 | 切片 | 状态 | 说明 |
 |---|---|---|
-| **Phase 0** 语义规格 | ✅ | 17 域 81 条 + 79 条 fixture + 符合度报告 |
-| **Phase 1** 规则前端（AST） | ✅ **进行中** | 模式判定、顶层切分、链段分类、排除语法、AST 结构 |
-| Phase 2 求值器 + DOM | ⬜ | 需要注入 DOM 后端（SwiftSoup / jsoup） |
-| Phase 3 JS 后端 | ⬜ | JSC + 宿主绑定 + 同步 document 代理 |
-| Phase 4 编排层 | ⬜ | 搜索/发现/详情/目录/正文 五条流水线 |
+| **Phase 0** 语义规格 | ✅ | 21 域 **129 条** + **125 条** fixture + 符合度报告 |
+| **Phase 1** 规则前端（AST） | ✅ | 模式判定、顶层切分、链段分类、排除语法、AST 结构、AST 缓存 |
+| **Phase 2** 求值器 + DOM | ✅ | 值系统 / JSONPath / 模板插值 / `@put`+`@get` / SwiftSoup 后端 / 自研 XPath 子集 |
+| **Phase 2e** 宿主适配 | ✅ | URL 规则 + HTTP 传输协议 + Cookie 罐 |
+| **Phase 3** 编排层 | ✅ | 分类/发现/搜索/详情/目录/正文 六段流水线 + **端到端门禁** |
+| Phase 4 JS 后端（JSC） | ⬜ | JSC + 宿主绑定 + 同步 document 代理 ⇒ **只能在 Apple 平台编译** ⇒ CI 要另开 macOS job |
 | Phase 5 切默认 | ⬜ | 宿主换成自研引擎 |
 
 ### 对拍现状
 
 ```
-用例总数 110 · 两边一致 91 · 存在差异 19
-Swift（自研）：110 通过 / 0 不符合   ✅
-JS（轻阅参考）：91 通过 / 19 不符合
+用例总数 125 · 两边一致 106 · 存在差异 19
+Swift（自研）：125 通过 / 0 不符合   ✅
+JS（轻阅参考）：106 通过 / 19 不符合
 ```
 
 **18 条差异全部是「轻阅的 bug」**，其中 12 条同一个根因：
