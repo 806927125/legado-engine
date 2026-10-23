@@ -26,11 +26,20 @@ public struct BookSource: Codable, Sendable {
     public var ruleBookInfo: RuleFields?
     public var ruleToc: RuleFields?
     public var ruleContent: RuleFields?
+    /// ⭐⭐ **登录脚本**（`loginUrl`）—— 一段 JS，**加载到全局**（定义 `function login()` 等）
+    public var loginUrl: String?
+    /// ⭐ **登录界面定义**（`loginUi`）—— JSON 数组 **或** `@js:` 脚本
+    public var loginUi: String?
+    /// ⭐ **登录态检测脚本**（`loginCheckJs`）—— 对当前页跑
+    public var loginCheckJs: String?
+    /// ⭐ **登录信息**（`loginInfo`）—— key → value 的 map（站方 `source.getLoginInfoMap()` 读它）
+    public var loginInfo: [String: String]?
 
     private enum CodingKeys: String, CodingKey {
         case bookSourceName, bookSourceUrl, bookSourceGroup, bookSourceComment
         case enabled, enabledExplore, header, exploreUrl, searchUrl
         case ruleSearch, ruleExplore, ruleBookInfo, ruleToc, ruleContent
+        case loginUrl, loginUi, loginCheckJs, loginInfo
     }
 
     public init(from decoder: Decoder) throws {
@@ -51,6 +60,10 @@ public struct BookSource: Codable, Sendable {
         ruleBookInfo = try? c.decode(RuleFields.self, forKey: .ruleBookInfo)
         ruleToc = try? c.decode(RuleFields.self, forKey: .ruleToc)
         ruleContent = try? c.decode(RuleFields.self, forKey: .ruleContent)
+        loginUrl = try? c.decode(String.self, forKey: .loginUrl)
+        loginUi = try? c.decode(String.self, forKey: .loginUi)
+        loginCheckJs = try? c.decode(String.self, forKey: .loginCheckJs)
+        loginInfo = try? c.decode([String: String].self, forKey: .loginInfo)
     }
 
     public init(bookSourceName: String, bookSourceUrl: String) {
@@ -76,6 +89,7 @@ public struct RuleFields: Codable, Sendable {
     public var lastChapter: String?
     public var bookUrl: String?
     public var wordCount: String?
+
     public var searchUrl: String?
     // 列表
     public var bookList: String?

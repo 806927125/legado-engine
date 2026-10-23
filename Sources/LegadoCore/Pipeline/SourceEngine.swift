@@ -512,6 +512,128 @@ public final class SourceEngine {
         return text
     }
 
+    // MARK: - ⑥ 登录链路
+
+    /// ⭐⭐⭐ **加载站方的登录脚本**（`loginUrl`）⇒ 加载到 **JS 全局**。
+    ///
+    /// 站方真实用法（125 源实测）：
+    /// - 猫眼看书：`loginUrl` 是一大段 JS（定义 `function login()` / `get_type()` …）
+    /// - 番茄小说TS：`loginUrl` 定义 `function login(){}` + 各种 state helper
+    ///
+    /// ⚠️⚠️ **加载完必须重设全局基线** —— 否则「每次求值前清全局」会把站方定义的
+    ///   `function get_type()` **删掉** ⇒ 站方后续调用就炸 ⭐
+    ///   （这正是 JSC 上下文复用的代价：全局要么清、要么留 ⇒ 得由调用方声明）
+    @discardableResult
+    public func loadLoginScript() throws -> Bool {
+        guard let code = source.loginUrl, !code.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return false
+        }
+        guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接，无法加载登录脚本") }
+        let runCtx = JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl, varBox: varBox)
+        _ = try js.run(code, context: runCtx)
+        // ⭐⭐ **重设基线** ⇒ 站方 loginUrl 定义的全局被长期保留
+        js.markGlobalsAsBaseline()
+        return true
+    }
+
+    /// ⭐⭐ **登录界面定义**（`loginUi`）⇒ 交给宿主渲染。
+    ///
+    /// **两种形态都要认**（125 源实测）：
+    /// - **JSON 数组**（猫眼看书）：`[{name, type, action}, …]`
+    /// - **`@js:` 脚本**（番茄小说TS）：跑完得到 JSON 串
+    public func loginUI() throws -> [LoginField] {
+        guard let raw = source.loginUi, !raw.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return []
+        }
+        let text: String
+        let t = raw.trimmingCharacters(in: .whitespaces)
+        if t.hasPrefix("@js:") || t.hasPrefix("@JS:") {
+            guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
+            let out = try js.run(String(t.dropFirst(4)),
+                                context: JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl,
+                                                      varBox: varBox))
+            text = out.scalarString
+        } else {
+            text = raw
+        }
+        return Self.parseLoginUI(text)
+    }
+
+    /// ⭐ **解析 `loginUi` 的 JSON 数组**（容错：坏 JSON ⇒ 空数组，不抛）
+    public static func parseLoginUI(_ text: String) -> [LoginField] {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard t.hasPrefix("["), let data = t.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return [] }
+        return arr.map { d in
+            LoginField(
+                name: d["name"] as? String ?? "",
+                type: d["type"] as? String ?? "text",
+                hint: d["hint"] as? String,
+                action: d["action"] as? String,
+                viewName: d["viewName"] as? String,
+                defaultValue: d["default"] as? String ?? d["defaultValue"] as? String
+            )
+        }
+    }
+
+    /// ⭐ **执行站方的登录动作**（`function login()`）⇒ 返回它的返回值。
+    ///
+    /// ⚠️ 站方常返回 **JSON 串**（猫眼：`return JSON.stringify(loginUI)`）
+    /// ⇒ 宿主自己解析。
+    public func performLogin() throws -> String {
+        guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
+        let out = try js.run("login()",
+                            context: JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl,
+                                                  varBox: varBox))
+        return out.scalarString
+    }
+
+    /// ⭐ **执行按钮的动作**（站方 `loginUi` 里 `action` 的 JS 表达式）
+    public func performLoginAction(_ action: String) throws -> String {
+        guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
+        let out = try js.run(action,
+                            context: JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl,
+                                                  varBox: varBox))
+        return out.scalarString
+    }
+
+    /// ⭐ **登录态检测**（站方 `loginCheckJs`）⇒ 对给定页面跑，返回**原始结果字符串**。
+    ///
+    /// ⚠️ **语义留给宿主判断** —— 站方写法各异（有的返回 true、有的返回页面 HTML）
+    /// ⇒ 引擎只负责「跑」+ 交出结果。
+    public func checkLogin(pageText: String, pageURL: String) throws -> String {
+        guard let code = source.loginCheckJs, !code.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return ""
+        }
+        guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
+        let out = try js.run(code,
+                            context: JSRunContext(base: .page(pageText), baseUrl: pageURL,
+                                                  raw: pageText, varBox: varBox))
+        return out.scalarString
+    }
+
+    // MARK: - 登录信息（`loginInfo`）—— 站方 `source.getLoginInfoMap()` 读它
+
+    /// ⭐ **登录信息**的存储键（宿主 `KeyValueStorage`）
+    public static let loginInfoKey = "loginInfo"
+
+    /// ⭐ **保存登录信息**（⇒ 存进宿主的 `KeyValueStorage`）
+    public func saveLoginInfo(_ info: [String: String]) {
+        guard let json = try? JSONSerialization.data(withJSONObject: info),
+              let text = String(data: json, encoding: .utf8) else { return }
+        storage?.setString(text, forKey: Self.loginInfoKey)
+    }
+
+    /// ⭐ **读取登录信息**
+    public func loadLoginInfo() -> [String: String] {
+        guard let text = storage?.string(forKey: Self.loginInfoKey),
+              let data = text.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+        else { return [:] }
+        return obj
+    }
+
     // MARK: - 内部
 
     /// 抓一页

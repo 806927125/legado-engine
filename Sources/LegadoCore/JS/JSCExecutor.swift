@@ -62,6 +62,14 @@ public final class JSCExecutor: JSExecutor {
     /// 全局 `var` 的属性 **configurable = false** ⇒ **`delete` 删不掉**
     /// ⇒ 只能「赋值成 undefined」⇒ 属性还在（`"x" in globalThis` 仍 true）⭐
     /// ⇒ ⇒ **彻底干净只能重建 context**
+    /// ⭐⭐⭐ **把当前全局标为基线**（站方 `loginUrl` 加载后调 ⇒ 它的全局被保留）
+    public func markGlobalsAsBaseline() {
+        contextLock.lock()
+        defer { contextLock.unlock() }
+        guard let js = cachedContext else { return }
+        baselineGlobals = Self.currentGlobals(in: js)
+    }
+
     public func invalidate() {
         contextLock.lock()
         defer { contextLock.unlock() }

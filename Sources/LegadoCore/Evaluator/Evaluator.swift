@@ -31,6 +31,14 @@ public protocol JSExecutor {
     ///   （⇒ 引擎只抢它真正实现的那几个，其余仍归宿主）
     func setEngineAPI(_ handler: JSEngineAPIHandler?)
 
+    /// ⭐⭐⭐ **把当前全局标为【基线】**（之后不再清理它们）
+    ///
+    /// ⚠️ **什么时候必须调**：**站方 `loginUrl`（或 jsLib）跑完之后**
+    ///   —— 它定义的 `function get_type()` / `function login()` **要长期留在全局** ⭐
+    ///   ⇒ 而「每次求值前清掉相对基线新增的全局」会把它们**删掉** ⇒ 站方 JS 后续调用就炸
+    /// ⇒ ⇒ 加载完站方脚本 ⇒ 调一次本方法 ⇒ 新基线 ⇒ 之后照常清理 ⭐
+    func markGlobalsAsBaseline()
+
     /// ⭐⭐⭐ **作废 JS 上下文**（下次求值重建一个干净的）
     ///
     /// ⚠️ **站方书源 jsLib 跑完必须调**（它定义的全局 `var host` / `function getArguments`
@@ -47,6 +55,8 @@ extension JSExecutor {
     public func setEngineAPI(_ handler: JSEngineAPIHandler?) {}
     /// 默认实现 = **无可作废的上下文**（无状态执行器）
     public func invalidate() {}
+    /// 默认实现 = **无可保留的全局**（无状态执行器）
+    public func markGlobalsAsBaseline() {}
 }
 
 /// JS 执行的上下文（**同步**）

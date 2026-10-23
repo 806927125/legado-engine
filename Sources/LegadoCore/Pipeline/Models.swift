@@ -99,3 +99,35 @@ public struct Page {
         self.url = url; self.text = text; self.document = document; self.isJSON = isJSON
     }
 }
+
+/// ⭐ **登录界面里的一个元素**（站方 `loginUi` 的一条）
+///
+/// **站方真实形态**（125 源实测：猫眼看书 / 番茄小说TS）：
+/// ```json
+/// [ { "name": "🐈猫眼①", "type": "button", "action": "Source('first')" },
+///   { "name": "服务器", "type": "text", "viewName": "host" } ]
+/// ```
+public struct LoginField: Sendable, Equatable {
+    /// 显示名（站方写得很花哨 ⇒ 原样保留）
+    public var name: String
+    /// 元素类型：`text`（输入框）/ `button`（按钮）/ `check`（勾选）
+    public var type: String
+    /// 输入框的提示
+    public var hint: String?
+    /// ⭐ **按钮的动作**（站方 JS 表达式，由引擎在 JS 环境里求值）
+    public var action: String?
+    /// ⭐ **输入框的键**（站方用它读 `source.getLoginInfoMap()`）
+    public var viewName: String?
+    /// 输入框的默认值
+    public var defaultValue: String?
+
+    public init(name: String = "", type: String = "text", hint: String? = nil,
+                action: String? = nil, viewName: String? = nil, defaultValue: String? = nil) {
+        self.name = name
+        self.type = type
+        self.hint = hint
+        self.action = action
+        self.viewName = viewName
+        self.defaultValue = defaultValue
+    }
+}

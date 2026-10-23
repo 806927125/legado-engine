@@ -1486,3 +1486,36 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 **规范**：`docs/HOST-API-GUIDE.md` 由 `tools/gen_host_api_guide.py` 从
 **契约 + 引擎实现 + 真实用量**扫出来 ⇒ 改代码后重跑即同步 ⇒ **不会过期**。
 **现状**：✅。
+
+## 28. S-LOGIN 登录链路
+
+### S-LOGIN-01 ⭐ 书源要认 `loginUrl` / `loginUi` / `loginCheckJs` / `loginInfo`
+**规范**：这四个字段在**书源顶层**（不是 rule 段里）。
+**依据**：🟢 125 源实测（猫眼看书 / 番茄小说TS / 聚合书库 —— **只有 3 个源用登录**）。
+**现状**：✅（2026-10-23 补）。
+
+⚠️ 以前模型里**完全没这些字段** ⇒ **整条登录链路都不存在**。
+
+### S-LOGIN-02 ⭐ `loginUrl` 加载后必须**重设全局基线**
+**规范**：`loginUrl` 是一段 JS（定义 `function login()` / `get_type()` …）⇒ 加载到 **JS 全局**。
+⚠️⚠️ **但 JSC 上下文复用的代价是「每次求值前清掉相对基线新增的全局」**
+   ⇒ 不处理 ⇒ **站方定义的函数被删掉** ⇒ 登录按钮点了就炸 ⭐
+⇒ ⇒ 加载完调 `markGlobalsAsBaseline()` ⇒ 新基线 ⇒ 之后照常清理。
+⇒ 规格：`JSExecutor.markGlobalsAsBaseline()`。
+
+### S-LOGIN-03 ⭐ `loginUi` 的两种形态都要认
+**规范**：① **JSON 数组**（猫眼看书）② **`@js:` 脚本**（番茄小说TS，跑完得 JSON 串）。
+**现状**：✅。
+
+元素：`{name, type(text/button/check), hint, action, viewName, default}`
+⇒ `action` 是**站方 JS 表达式**（由引擎在 JS 环境求值）⇒ `viewName` 是**输入框的键**
+（站方用它读 `source.getLoginInfoMap()`）。
+
+### S-LOGIN-04 ⭐ `loginInfo` 存进 `KeyValueStorage`
+**规范**：站方 `source.getLoginInfoMap()` 读它 ⇒ 引擎存进宿主的键值存储（键 `loginInfo`）。
+**现状**：✅。
+
+### S-LOGIN-05 ⭐ `loginCheckJs` 的**语义留给宿主判断**
+**规范**：引擎只负责「对给定页面跑 JS + 交出结果字符串」。
+**依据**：站方写法各异（有的返回 true、有的返回页面 HTML、有的用 Rhino 专属 API）。
+**现状**：✅。
