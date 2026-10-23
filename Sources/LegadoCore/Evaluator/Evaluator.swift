@@ -467,16 +467,38 @@ public struct Evaluator {
         }
         // ⭐ **倒序替换** —— 正序会把后面的匹配位置推偏
         let ns = NSMutableString(string: text)
+        let src = text as NSString
         for (i, m) in matches.enumerated().reversed() {
-            let rep: String
+            let tmpl: String
             if replacements.isEmpty {
-                rep = ""
+                tmpl = ""
             } else if i < replacements.count {
-                rep = replacements[i]
+                tmpl = replacements[i]
             } else {
-                rep = replacements[replacements.count - 1]
+                tmpl = replacements[replacements.count - 1]
             }
-            ns.replaceCharacters(in: m.range, with: rep)
+            // ⭐⭐ **替换串里的 `$1`..`$n` 要展开成【实际捕获组文本】**
+            //    （站方大量这么写：`##clickChargeBook\('(.*?)',(.*?)\)##novel.m?gid=$1&nid=$2`）
+            //    ⚠️ 以前直接 `replaceCharacters(in:with:)` ⇒ **不展开** ⇒ URL 里留着字面量 `$1`
+            var out = ""
+            var p = tmpl.startIndex
+            while p < tmpl.endIndex {
+                if tmpl[p] == "$" {
+                    let q = tmpl.index(after: p)
+                    if q < tmpl.endIndex, tmpl[q] == "$" { out += "$"; p = tmpl.index(after: q); continue }
+                    var k = q, digits = ""
+                    while k < tmpl.endIndex, tmpl[k].isNumber { digits.append(tmpl[k]); k = tmpl.index(after: k) }
+                    if !digits.isEmpty, let n = Int(digits), n < m.numberOfRanges {
+                        let r = m.range(at: n)
+                        out += (r.location == NSNotFound) ? "" : src.substring(with: r)
+                        p = k
+                        continue
+                    }
+                }
+                out.append(tmpl[p])
+                p = tmpl.index(after: p)
+            }
+            ns.replaceCharacters(in: m.range, with: out)
         }
         diag.branch = "尾部正则"
         return .string(ns as String)
