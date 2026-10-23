@@ -234,8 +234,8 @@ public enum JSScopeBuilder {
             let params = (0..<4).map { "a\($0)" }.joined(separator: ",")
             out.append("""
             try { \(obj).\(name) = function(\(params)){ \
-              var __r = __hostJSON('\(obj)','\(name)',JSON.stringify([\(params)])); \
-              try { return JSON.parse(__r); } catch(e) { return undefined; } \
+              var __r = JSON.parse(__hostJSON('\(obj)','\(name)',JSON.stringify([\(params)]))); \
+              return (__r && __r.length !== undefined) ? __r[0] : undefined; \
             }; } catch(e) {}
             """)
         }
