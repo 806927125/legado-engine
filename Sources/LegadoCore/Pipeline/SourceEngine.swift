@@ -469,11 +469,11 @@ public final class SourceEngine {
         info.author = value(rules?.author, in: nil, page: p, base: base)
         info.intro = value(rules?.intro, in: nil, page: p, base: base)
         info.kind = value(rules?.kind, in: nil, page: p, base: base)
-        info.coverUrl = Self.absolute(value(rules?.coverUrl, in: nil, page: p, base: base), base: p.url)
+        info.coverUrl = Self.absolute(valueURL(rules?.coverUrl, in: nil, page: p, base: base), base: p.url)
         info.lastChapter = value(rules?.lastChapter, in: nil, page: p, base: base)
         // ⭐ **字数**（44 个源在用）
         info.wordCount = value(rules?.wordCount, in: nil, page: p, base: base)
-        let toc = value(rules?.tocUrl, in: nil, page: p, base: base)
+        let toc = valueURL(rules?.tocUrl, in: nil, page: p, base: base)
         // ⚠️ 该源没给 tocUrl ⇒ **目录规则在详情页上跑**（Legado 语义：空 = 用 bookUrl）
         info.tocUrl = toc.isEmpty ? "" : Self.absolute(toc, base: p.url)
         info.raw["bookUrl"] = book.bookUrl
@@ -521,7 +521,20 @@ public final class SourceEngine {
             let pageURL = queue.removeFirst()
             guard !seen.contains(pageURL) else { continue }
             seen.insert(pageURL)
-            let p = try fetch(pageURL)
+            // ⚠️⚠️ **翻页抓失败不许炸掉整个目录**（2026-10-23 对拍挖出来的）
+            //   站方的 `nextTocUrl` 有时给出**不是页面**的 URL（`javascript:;` 占位等）
+            //   ⇒ 以前一个坏分页 ⇒ **整本目录 0 章**（老引擎是 promise 链 ⇒ 天然皮实）⭐
+            //   ⇒ 现在：跳过这一页 + 记诊断 ⇒ 目录其余部分照常
+            let p: Page
+            do {
+                p = try fetch(pageURL)
+            } catch {
+                var d = EngineDiagnostic(rule: "nextTocUrl", branch: "目录翻页")
+                d.failure = .network("翻页页抓取失败：\(error)")
+                diagnostics.append(d)
+                logger?.log("目录翻页：跳过 \(pageURL)（\(error)）")
+                continue
+            }
             pages += 1
 
             // ⚠️ 翻页页**没命中不许炸**（后面某页没内容是常态）⇒ 跳过继续
@@ -534,7 +547,7 @@ public final class SourceEngine {
                 for node in nodes {
                     let item = ListItem.node(node)
                     let name = value(rules.chapterName, in: item, page: p)
-                    let rawURL = value(rules.chapterUrl, in: item, page: p)
+                    let rawURL = valueURL(rules.chapterUrl, in: item, page: p)
                     let chapterURL = rawURL.isEmpty ? "" : Self.absolute(rawURL, base: p.url)
                     let isVolume: Bool
                     if !isVolumeRule.isEmpty {
@@ -1180,6 +1193,17 @@ public final class SourceEngine {
 
     // MARK: - 内部
 
+    /// ⭐⭐ **这个 URL 是不是「页面」**（能发 HTTP 请求的那种）
+    ///
+    /// ⚠️ 站方规则会给出**不是页面**的 URL：`javascript:;`（占位）/ `mailto:` / `tel:` …
+    /// ⇒ 真去 fetch ⇒ 报「unsupported URL」⇒ **整个目录炸掉** ⭐
+    /// ⇒ `data:` **是例外**（聚合源用它装载荷 ⇒ 载荷当页面内容）
+    public static func isPageURL(_ url: String) -> Bool {
+        let u = url.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if u.hasPrefix("data:") { return true }   // 载荷当页面内容（宿主负责解）
+        return u.hasPrefix("http://") || u.hasPrefix("https://")
+    }
+
     /// 抓一页
     private func fetch(_ urlRule: String, base: String? = nil, page: Int = 1,
                        key: String = "") throws -> Page {
@@ -1190,6 +1214,12 @@ public final class SourceEngine {
         ctx.key = key
         let rule = TemplateEngine.render(urlRule, ctx: ctx)
 
+        // ⚠️⚠️ **不是「页面」的 URL**（`javascript:;` / `mailto:` …）⇒ 别发请求
+        //   ⇒ 报一个**说人话**的错（以前报「unsupported URL」⇒ 整个目录炸）⭐
+        let plainURL = URLBuilder.absolutize(rule, baseUrl: baseURL)
+        if !Self.isPageURL(plainURL) {
+            throw SourceError.invalidSource("不是页面 URL：\(plainURL)")
+        }
         let resp: HTTPResponse
         do {
             // ⭐⭐ **带上源级请求头**（54 个源在用）
@@ -1228,8 +1258,8 @@ public final class SourceEngine {
                 name: value(rules.name, in: item, page: page),
                 author: value(rules.author, in: item, page: page),
                 // ⚠️ 相对地址相对**列表页 URL** 绝对化
-                bookUrl: Self.absolute(value(rules.bookUrl, in: item, page: page), base: page.url),
-                coverUrl: Self.absolute(value(rules.coverUrl, in: item, page: page), base: page.url),
+                bookUrl: Self.absolute(valueURL(rules.bookUrl, in: item, page: page), base: page.url),
+                coverUrl: Self.absolute(valueURL(rules.coverUrl, in: item, page: page), base: page.url),
                 intro: value(rules.intro, in: item, page: page),
                 kind: value(rules.kind, in: item, page: page),
                 lastChapter: value(rules.lastChapter, in: item, page: page),
@@ -1344,6 +1374,58 @@ public final class SourceEngine {
         return out
             .map { Self.absolute($0.trimmingCharacters(in: .whitespacesAndNewlines), base: page.url) }
             .filter { !$0.isEmpty }
+    }
+
+    // MARK: - ⭐⭐⭐ URL 字段专用求值（bookUrl / tocUrl / chapterUrl / coverUrl）
+
+    /// ⭐⭐⭐ **URL 字段的求值** —— 「选择器求值不通 ⇒ 按 URL 规则再试一次」
+    ///
+    /// ⚠️⚠️⚠️ **为什么必须单独一条路**（2026-10-23 真实源对拍挖出来的）：
+    ///   站方**大量**把 URL 直接写在字段规则里：
+    ///     `ruleToc.chapterUrl  = 'https://xs.zzxsa.com/read/@get:{xid}/{{$.num}}?app_name=…'`
+    ///     `ruleBookInfo.tocUrl = 'https://n.cmread.com/nap/p/catalogForWap.jsp?bid=@get:{bid}'`
+    ///     `ruleBookInfo.bookUrl = '/novel/chapterList?novel_id={{$.novel_id}}'`   ← **以 `/` 开头**
+    ///   ⇒ 规则以 `/` 开头会被**模式判定当成 XPath** ⇒ 查不到 ⇒ **章节 URL / 目录 URL 全空** ⭐
+    ///   ⇒ **老引擎也这样**（轻阅的老债 ⇒ 那几个源目录 0 章）
+    ///   ⇒ **新引擎要做得更好**：URL 字段就该按 URL 规则处理 ⭐
+    ///
+    /// ⭐ **顺序：先常规求值，命中就用；不通再按 URL 规则** ⇒
+    ///   `a@href`（选择器）照常 ✔，`/novel/x?id={{$.id}}`（URL）兜底命中 ✔
+    private func valueURL(_ rule: String?, in item: ListItem?, page: Page,
+                          base overrideBase: RuleBase? = nil) -> String {
+        guard let rule, !rule.isEmpty else { return "" }
+        // ① 常规求值（选择器 / JSONPath / JS …）—— ⚠️ **init 基准要传进去**
+        let normal = value(rule, in: item, page: page, base: overrideBase)
+        if !normal.isEmpty { return normal }
+        // ② ⭐ 兜底：当 URL 规则处理（插值 + 绝对化）
+        let t = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard Self.looksLikeURL(t) else { return normal }
+        // ②a 模板插值（基准 = 当前项 ⇒ `{{$.id}}` 能取到列表项的字段）⭐
+        let ctx = EvalContext(base: overrideBase ?? item?.base ?? .page(page.text),
+                              baseUrl: page.url, raw: page.text,
+                              book: bookObject, source: sourceObject, chapter: chapterObject,
+                              varBox: varBox, isJSON: page.isJSON, document: page.document)
+        let rendered = TemplateEngine.render(t, ctx: ctx)
+        // ②b 绝对化（相对**当前页**的最终 URL，不是书源首页）
+        return Self.absolute(rendered, base: page.url)
+    }
+
+    /// ⭐⭐⭐ **这条规则长得像「URL」吗**（相对 URL / 绝对 URL / 带模板）
+    ///
+    /// ⚠️ **必须排除 XPath**：XPath 也以 `/` 开头（`//div`、`/html/body`）
+    /// ⇒ 判据：带 `{{`（模板）/ 带 `?`（查询串）/ 带 http(s) ⇒ 一定是 URL
+    public static func looksLikeURL(_ rule: String) -> Bool {
+        let t = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty { return false }
+        if t.hasPrefix("http://") || t.hasPrefix("https://") { return true }
+        if t.contains("{{") || t.contains("@get:") || t.contains("@put:") { return true }
+        // 以 `/` 开头：**要像路径而不是 XPath**
+        if t.hasPrefix("/") && !t.hasPrefix("//") {
+            if t.contains("?") { return true }
+            let head = t.split(separator: "?").first.map(String.init) ?? t
+            if head.contains(".") && !head.contains("::") { return true }
+        }
+        return false
     }
 
     /// **字段规则求值** —— `scope` 非空 ⇒ 在该节点**内部**相对求值。
