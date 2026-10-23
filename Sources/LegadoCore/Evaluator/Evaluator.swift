@@ -30,6 +30,13 @@ public protocol JSExecutor {
     /// - Returns: **返回 nil = 「我不接管」** ⇒ 执行器落回宿主实现
     ///   （⇒ 引擎只抢它真正实现的那几个，其余仍归宿主）
     func setEngineAPI(_ handler: JSEngineAPIHandler?)
+
+    /// ⭐⭐⭐ **作废 JS 上下文**（下次求值重建一个干净的）
+    ///
+    /// ⚠️ **站方书源 jsLib 跑完必须调**（它定义的全局 `var host` / `function getArguments`
+    /// 会留在 context 里 ⇒ 污染后续规则/其他源）⭐
+    /// ⇒ 宿主在「加载书源 jsLib」前后调一次即可。
+    func invalidate()
 }
 
 /// ⭐ **引擎侧 `java.*` 的实现签名**
@@ -38,6 +45,8 @@ public typealias JSEngineAPIHandler = (String, [JSONValue], RuleBase) -> JSONVal
 extension JSExecutor {
     /// 默认实现 = **不接管**（宿主自己实现全部 `java.*`）
     public func setEngineAPI(_ handler: JSEngineAPIHandler?) {}
+    /// 默认实现 = **无可作废的上下文**（无状态执行器）
+    public func invalidate() {}
 }
 
 /// JS 执行的上下文（**同步**）

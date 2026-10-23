@@ -52,6 +52,24 @@ public final class JSCExecutor: JSExecutor {
         self.engineAPI = handler
     }
 
+    /// ⭐⭐⭐ **作废当前 context**（下次 `run` 重建一个干净的）
+    ///
+    /// ⚠️ **什么时候必须调**：**站方书源的 jsLib 跑完之后**
+    ///   （jsLib 定义的是全局 `var host` / `function getArguments` ⇒ 污染 context）
+    /// ⇒ 宿主在「加载书源 jsLib」前后调一次 ⇒ 彻底隔离 ⭐
+    ///
+    /// ⚠️ **为什么不能只靠「每次跑前清全局」**：
+    /// 全局 `var` 的属性 **configurable = false** ⇒ **`delete` 删不掉**
+    /// ⇒ 只能「赋值成 undefined」⇒ 属性还在（`"x" in globalThis` 仍 true）⭐
+    /// ⇒ ⇒ **彻底干净只能重建 context**
+    public func invalidate() {
+        contextLock.lock()
+        defer { contextLock.unlock() }
+        cachedContext = nil
+        hostChannelReady = false
+        baselineGlobals = []
+    }
+
     public func run(_ code: String, context: JSRunContext) throws -> JSONValue {
         // ⭐⭐ **上下文复用** ⇒ 整个 run 加锁（JSContext 非线程安全）
         contextLock.lock()
@@ -254,9 +272,20 @@ public final class JSCExecutor: JSExecutor {
         return Set(text.components(separatedBy: "\u{1}"))
     }
 
-    /// ⭐ **删掉不在 `keep` 里的全局**（⇒ 站方 jsLib 的全局不会串源）
+    /// ⭐ **清掉不在 `keep` 里的全局**（⇒ 站方 jsLib 的全局不会串源）
     ///
-    /// ⚠️ 全局 `var` / `function` 声明的属性是**可配置**的 ⇒ `delete` 可行 ✔
+    /// ⚠️⚠️⚠️ **不能用 `delete`！**（macOS CI 探针实证）
+    /// ```
+    /// [probe] count=76 inNames=true cfg=false,enum=true after=string
+    /// ```
+    /// ⇒ 全局代码里 `var` / `function` 声明创建的属性是
+    /// **【configurable = false】** ⇒ **`delete` 无效**（delete 之后 `typeof` 仍是 "string"）⭐
+    /// ⚠️ `for...in` 反而**能**枚举到它们（`enum=true`）⇒ 用 `Object.getOwnPropertyNames` 更保险
+    ///
+    /// ✅ 所以改成**赋值成 `undefined`**（属性 writable ⇒ 可赋值）
+    /// ⇒ 站方 `typeof x !== 'undefined'` / `x ? … : …` 都能正常判空 ✔
+    /// ⚠️ 但**属性本身还在**（`"x" in globalThis` 仍为 true）⇒
+    /// ⇒ **要彻底干净得调 `invalidate()` 重建 context**（见下）⭐
     private static func removeGlobals(notIn keep: Set<String>, in js: JavaScriptCore.JSContext) {
         let extras = currentGlobals(in: js).subtracting(keep)
         guard !extras.isEmpty else { return }
@@ -265,7 +294,8 @@ public final class JSCExecutor: JSExecutor {
                 .replacingOccurrences(of: "\"", with: "\\\"")
             return "\"" + escaped + "\""
         }.joined(separator: ",")
-        _ = js.evaluateScript("(function(){var g=this;[\(list)].forEach(function(k){try{delete g[k];}catch(e){}});})()")
+        // ⚠️ **赋值 undefined，不是 delete**（delete 对 configurable=false 无效）
+        _ = js.evaluateScript("(function(){var g=this;[\(list)].forEach(function(k){try{g[k]=undefined;}catch(e){}});})()")
     }
 
     /// JSONValue → Foundation 值（要能过 `JSONSerialization`）
