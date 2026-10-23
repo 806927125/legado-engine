@@ -86,11 +86,23 @@ public struct PageFetcher: Sendable {
     ///   - rule: URL 规则（可能带 `,{json}` 选项）
     ///   - baseUrl: 基准 URL
     ///   - timeout: 超时
-    public func fetch(rule: String, baseUrl: String, timeout: TimeInterval = 30) throws -> HTTPResponse {
+    /// - Parameters:
+    ///   - headers: **源级请求头**（`BookSource.header`）—— 54 个源在用
+    public func fetch(rule: String, baseUrl: String, headers: [String: String] = [:],
+                      timeout: TimeInterval = 30) throws -> HTTPResponse {
         let built = URLBuilder.parse(rule, baseUrl: baseUrl)
         var request = HTTPRequest(built: built, timeout: timeout)
+        // ⭐⭐ **源级请求头**（54 个源在用 ⇒ 缺了 UA/Referer/Cookie 就会被拒）
+        //
+        // ⚠️⚠️ **语义：URL 级的 `,{"headers":…}` = 【替换】源级 header，不是合并**
+        //   （Legado / 栖阅都是「替换」⇒ 站方在单个 URL 上写了头 ⇒ 就是只用那套）
+        if built.headers.isEmpty {
+            request.headers = headers
+        }
         // ⭐ cookie 由 CookieJar 提供（站方聚合源登录态靠它）
-        if let jar = cookieJar, let c = jar.cookieHeader(for: built.url), !c.isEmpty {
+        // ⚠️ **源级 / URL 级已经带了 `Cookie` ⇒ 不用 CookieJar 的**（站方明确给了的优先）
+        if !request.headers.keys.contains(where: { $0.lowercased() == "cookie" }),
+           let jar = cookieJar, let c = jar.cookieHeader(for: built.url), !c.isEmpty {
             request.cookie = c
         }
         let resp = try transport.send(request)

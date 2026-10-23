@@ -27,6 +27,11 @@ public final class SourceEngine {
     public let source: BookSource
     /// 抓页面的入口
     public let fetcher: PageFetcher
+    /// ⭐⭐ **源级请求头**（`BookSource.header`）—— 125 源里 **54 个**在用
+    ///
+    /// ⚠️ 以前编排层**一次都没用** ⇒ 这 54 个源的请求全缺 UA / Referer / Cookie
+    /// ⇒ 很多站会直接 403 / 跳验证 / 返回空页。
+    public let sourceHeaders: [String: String]
     /// 求值器
     public var evaluator: Evaluator
 
@@ -52,6 +57,8 @@ public final class SourceEngine {
                 logger: EngineLogger? = nil) {
         self.source = source
         self.fetcher = fetcher
+        // ⭐⭐ **源级请求头**（54 个源在用 ⇒ 缺了就 403 / 空页）
+        self.sourceHeaders = Self.parseSourceHeader(source.header)
         self.evaluator = Evaluator(js: js)
         self.storage = storage
         self.files = files
@@ -267,6 +274,52 @@ public final class SourceEngine {
         }
     }
 
+    /// ⭐⭐ **解析源级请求头**（`BookSource.header`）—— 站方有三种写法，**都要认**：
+    ///
+    /// ① **JSON 对象**：`{"User-Agent":"…","Referer":"…"}`
+    /// ② **JSON 字符串**（Legado 官方写法）：`"{\"User-Agent\":\"…\"}"`
+    /// ③ **原始 HTTP 头格式**（每行 `key: value`）
+    ///
+    /// ⚠️ 解析不出来 ⇒ **返回空 + 不报错**（不该因为一个 header 就让整个源挂掉）
+    public static func parseSourceHeader(_ raw: String?) -> [String: String] {
+        guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [:] }
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // ② JSON 字符串 ⇒ 先解一层外壳
+        //
+        // ⚠️⚠️ **别写成 `try? jsonObject(…) as? String`** ——
+        //   `try?` 套 `as?` 会产生**嵌套 optional** ⇒ `guard let` 解一层后仍是 optional
+        //   ⇒ `as?` 直接失败 ⇒ 分支永远走不到（**静默返回空**）⭐
+        // ⇒ 拆成两步：`try?` 拿 `Any`，再单独 `as?`。
+        if t.hasPrefix("\"") {
+            guard let data = t.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data, options: [.allowFragments]),
+                  let inner = obj as? String
+            else { return [:] }
+            return parseSourceHeader(inner)
+        }
+        // ① JSON 对象
+        if t.hasPrefix("{") {
+            guard let data = t.data(using: .utf8),
+                  let anyObj = try? JSONSerialization.jsonObject(with: data),
+                  let obj = anyObj as? [String: Any]
+            else { return [:] }
+            var out: [String: String] = [:]
+            for (k, v) in obj { out[k] = String(describing: v) }
+            return out
+        }
+        // ③ 原始头格式：`key: value` 每行一条
+        var out: [String: String] = [:]
+        for line in t.components(separatedBy: .newlines) {
+            let l = line.trimmingCharacters(in: .whitespaces)
+            guard !l.isEmpty, let idx = l.firstIndex(of: ":") else { continue }
+            let k = String(l[l.startIndex..<idx]).trimmingCharacters(in: .whitespaces)
+            let v = String(l[l.index(after: idx)...]).trimmingCharacters(in: .whitespaces)
+            if !k.isEmpty { out[k] = v }
+        }
+        return out
+    }
+
     // MARK: - 内部
 
     /// 抓一页
@@ -281,7 +334,8 @@ public final class SourceEngine {
 
         let resp: HTTPResponse
         do {
-            resp = try fetcher.fetch(rule: rule, baseUrl: baseURL)
+            // ⭐⭐ **带上源级请求头**（54 个源在用）
+            resp = try fetcher.fetch(rule: rule, baseUrl: baseURL, headers: sourceHeaders)
         } catch {
             throw SourceError.requestFailed(rule, String(describing: error))
         }
