@@ -58,7 +58,7 @@ public final class JSCExecutor: JSExecutor {
         //   JS 侧：包函数把参数 JSON 化 ⇒ 调 `__hostJSON(obj, method, argsJSON)`
         //   Swift 侧：解析 args ⇒ 调宿主 ⇒ 结果 JSON 化回字符串
         //   JS 侧再 `JSON.parse` 还原 ⇒ 站方拿到原类型
-        if let hostBlock = makeHostBlock(in: js) {
+        if let hostBlock = makeHostBlock(in: js, base: base) {
             js.setObject(unsafeBitCast(hostBlock, to: AnyObject.self),
                           forKeyedSubscript: "__hostJSON" as NSString)
         }
@@ -153,9 +153,12 @@ public final class JSCExecutor: JSExecutor {
     ///
     /// ⚠️ **只用 String 参数/返回** ⇒ ObjC block 一定能桥接
     /// （Swift 数组/对象在 block 里会被 JSC 拒 ⇒ "Cannot convert primitive value"）
-    private func makeHostBlock(in js: JavaScriptCore.JSContext)
+    private func makeHostBlock(in js: JavaScriptCore.JSContext, base: RuleBase)
         -> (@convention(block) (String, String, String) -> String)? {
         let provider = self.api
+        // ⭐⭐ **当前基准** —— `java.getString('$.x')` 的 JSONPath 要对基准求值
+        //    ⚠️ block 只收 `object/method/argsJSON` ⇒ 基准得**捕获进来**（不能引用 context）
+        let currentBase = base
         // ⭐⭐ **引擎侧优先接管 `java.*`**（宿主不用实现引擎能做的那些）
         let engineAPI = self.engineAPI
         let block: @convention(block) (String, String, String) -> String = { object, method, argsJSON in
@@ -169,7 +172,7 @@ public final class JSCExecutor: JSExecutor {
             //
             // ⭐ **返回 nil = 「我不接管」** ⇒ 落回宿主实现
             //   （⇒ 引擎只抢它真做的那几个，其余仍归宿主）
-            if object == "java", let engineAPI, let r = engineAPI(method, args, context.base) {
+            if object == "java", let engineAPI, let r = engineAPI(method, args, currentBase) {
                 // ⚠️ 顶层标量不能 JSON 序列化 ⇒ 统一包一层数组（JS 侧取 `[0]`）
                 let any = Self.toFoundation(r)
                 guard let data = try? JSONSerialization.data(withJSONObject: [any]),
