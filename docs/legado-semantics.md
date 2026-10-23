@@ -1609,3 +1609,41 @@ LEGADO_ENGINE_DIR=/tmp/qy215/ipa/Payload/QingYue.app bash tools/conformance-diff
 **规范**：`exploreUrl` 的 JSON 解析要**容错**（把字符串内的真控制字符转义掉）。
 **依据**：🟢 全免小说（`@js:` 后面是真换行 ⇒ 整段不是合法 JSON ⇒ 解析全失败 ⇒ 分类空）。
 **现状**：✅（`lenientJSONObject`）。
+
+## 32. S-JSON-09 ⭐⭐ `result.` 前缀的语义（**活体验证暴露 · 待修**）
+
+### 现状
+**规格 §S-JSON-03** 说：`result.` / `result[` ⇒ 改写成 `$` / `[`（根别名）。
+⇒ 轻阅的 `rewriteResultPath` **也是这样**（注释里直接点名纵横中文）。
+
+### ⭐⭐ 活体验证暴露的矛盾（2026-10-23）
+纵横中文的真实接口：
+```
+POST https://www.zongheng.com/api/rank/details
+body: cateFineId=0&cateType=0&pageNum=1&pageSize=20&period=0&rankNo=&rankType=3
+⇒ {"code":0,"result":{"resultList":[…20 本书…]}}
+```
+站方规则：`ruleExplore.bookList = "result.resultList||result.bookList"`
+
+实测（真响应）：
+| 规则 | 结果 |
+|---|---|
+| `result.resultList` ⇒ 改写成 `$.resultList` | ❌ **count=0** |
+| `$.result.resultList` | ✅ **count=20** |
+
+⇒ ⇒ **站方要的是「顶层 `result` 字段下的 `resultList`」**
+⇒ ⇒ **改写成 `$.` 会把 `result` 这一段吞掉** ⇒ ⇒ **命中不了**
+
+### ⚠️ 但 fixture `json-06` 说的是相反的
+`rule = 'result.bookName'`，基准 = `{"bookName":"斗破苍穹"}` ⇒ 期望命中
+⇒ ⇒ 那种基准下 `result.` = **根别名**（`$.`）是对的
+
+### ⇒⇒ **两种语义都真实存在**（取决于响应 JSON 顶层有没有 `result` 字段）
+⇒⇒ **待修方案（未实施）**：JSONPath 求值时 ⇒
+① 先按「根别名」改写（`$.`）试
+② 命中不了 ⇒ **再按「顶层字段名」试**（不吞 `result` 这一段）⇒ 命中就用
+⇒⇒ 两种站方形态都覆盖 ⇒ **不破坏已有 132 条对拍**
+
+⚠️ **改动前必须**：① 量化影响面（125 源里 `result.` 的 130 处分布）
+② 补 fixture 用例（两种基准各一条）③ 变异验证
+⚠️⚠️ **⚠️ 现有 fixture `json-06` 是【按错误理解写的】** ⇒ 实施时要一并修正
