@@ -475,7 +475,12 @@ public final class SourceEngine {
         info.wordCount = value(rules?.wordCount, in: nil, page: p, base: base)
         let toc = valueURL(rules?.tocUrl, in: nil, page: p, base: base)
         // ⚠️ 该源没给 tocUrl ⇒ **目录规则在详情页上跑**（Legado 语义：空 = 用 bookUrl）
-        info.tocUrl = toc.isEmpty ? "" : Self.absolute(toc, base: p.url)
+        //
+        // ⭐⭐⭐ **「不是页面 URL」的 tocUrl ⇒ 也当空**（2026-10-23 对拍挖出来的）
+        //   站方有些源给 `javascript:;` 这种占位 ⇒ 真去抓 ⇒ 整个目录炸掉
+        //   ⇒ 当成「没给」⇒ 目录回退到 bookUrl（老引擎的行为）⭐
+        let tocURL = Self.absolute(toc, base: p.url)
+        info.tocUrl = (toc.isEmpty || !Self.isPageURL(tocURL)) ? "" : tocURL
         info.raw["bookUrl"] = book.bookUrl
         return info
         }
@@ -1406,8 +1411,11 @@ public final class SourceEngine {
                               book: bookObject, source: sourceObject, chapter: chapterObject,
                               varBox: varBox, isJSON: page.isJSON, document: page.document)
         let rendered = TemplateEngine.render(t, ctx: ctx)
-        // ②b 绝对化（相对**当前页**的最终 URL，不是书源首页）
-        return Self.absolute(rendered, base: page.url)
+        // ②b ⭐ 走 `URLBuilder.parse` ⇒ **剥掉 `,{json}` 选项后缀** + 绝对化
+        //   （站方真实写法：`https://chuangshi.qq.com/chapter/26150754,{"headers":{…}}`
+        //     ⇒ 不剥后缀 ⇒ 服务器收到一坨带逗号的 URL ⇒ 404 ⇒ **目录 0 章** ⭐）
+        //   相对基准 = **当前页的最终 URL**（不是书源首页）
+        return URLBuilder.parse(rendered, baseUrl: page.url).url
     }
 
     /// ⭐⭐⭐ **这条规则长得像「URL」吗**（相对 URL / 绝对 URL / 带模板）

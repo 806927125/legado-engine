@@ -276,11 +276,50 @@ public struct Evaluator {
     /// ⭐ **按换行拆多条规则** —— 整块语法（`{{…}}` / `<js>…</js>` / `@js:`）**不拆**。
     ///
     /// ⚠️ 轻阅的口径叫 `isBlockRule`：整条含块语法就当一整块。
+    /// ⭐⭐⭐ **整条规则是不是一个「块规则」**（⇒ 不按行拆）
+    ///
+    /// ⚠️⚠️ **判据照抄老引擎 `isBlockRule`**（事实标准，2026-10-23 对拍挖出来的）：
+    /// ```js
+    /// if (t.indexOf('{{') >= 0) return true;            // 模板
+    /// if (/^@js:/i.test(t)) return true;                 // @js:
+    /// if (/^<[jJ][sS]>/.test(t)) {
+    ///   var close = t.toLowerCase().indexOf('</js>');
+    ///   if (close < 0) return true;                       // 没闭合的（被截断的）也别切
+    ///   var after = t.slice(close + 5);
+    ///   if (!after.trim()) return true;                   // 整块就是这条规则
+    ///   if (after.indexOf('\n') < 0) return true;         // 同一行的尾巴 ⇒ 复合规则 <js>…</js>$.data
+    ///   return false;                                     // 后面还有别的规则行 ⇒ 切
+    /// }
+    /// ```
+    /// ⚠️⚠️ **最后一条最容易搞错**：`</js>` 后面**有换行** ⇒ **要切**
+    ///   （红薯小说：`ruleSearch.bookList = "<js>…</js>\n@j"` ⇒ 切 ⇒ 第一行是完整块 ⇒ 命中 ⭐
+    ///    ⇒ 不切 ⇒ 尾部 `@j` 被当成选择器 ⇒ 0 命中 ⇒ **列表 0 本**）
+    public static func isWholeBlockRule(_ rule: String) -> Bool {
+        let t = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.contains("{{") { return true }
+        let lower = t.lowercased()
+        if lower.hasPrefix("@js:") { return true }
+        guard lower.hasPrefix("<js>") else { return false }
+        guard let close = lower.range(of: "</js>") else { return true }   // 没闭合 ⇒ 别切
+        // `</js>` 之后的部分
+        let afterStart = t.index(t.startIndex, offsetBy: lower.distance(from: lower.startIndex, to: close.upperBound))
+        let after = String(t[afterStart...])
+        if after.trimmingCharacters(in: .whitespaces).isEmpty { return true }  // 整块
+        if !after.contains("\n") { return true }                              // 同行尾巴 = 复合规则
+        return false                                                          // 后面还有别的规则行 ⇒ 切
+    }
+
     public static func splitRuleLines(_ rule: String) -> [String] {
-        if rule.contains("{{") || rule.contains("<js>") || rule.contains("<JS>")
-            || rule.contains("@js:") || rule.contains("@get:") || rule.contains("@put:") {
+        if rule.contains("{{") || rule.contains("@js:") || rule.contains("@get:") || rule.contains("@put:") {
             return [rule]
         }
+        // ⭐⭐⭐ **块规则**：整条是 `<js>…</js>`（开头且结尾）⇒ **不按行切**
+        //
+        // ⚠️⚠️ **但「块后面还跟着东西」⇒ 要切**（老引擎口径，2026-10-23 对拍挖出来的）：
+        //   红薯小说：`ruleSearch.bookList = "<js>…</js>\n@j"`
+        //   ⇒ 整条**不是**块（结尾是 `@j`）⇒ 按行切 ⇒ 第一行 = 完整块 ⇒ **命中** ⭐
+        //   ⇒ 不切的话 ⇒ 尾部 `@j` 被当成选择器 ⇒ 0 命中 ⇒ **列表 0 本**
+        if isWholeBlockRule(rule) { return [rule] }
         // ⭐⭐ **快速路径**：规则里**没有换行** ⇒ 不用 split（省 3 次数组/String 分配）
         //   （站方绝大多数规则都是单行 ⇒ 每次求值都白 split 一遍）
         if !rule.contains("\n") && !rule.contains("\r") { return [rule] }
@@ -889,7 +928,17 @@ public struct Evaluator {
 
     private func baseJSON(_ base: RuleBase, ctx: EvalContext) -> JSONValue? {
         switch base {
-        case .json(let j):        return j
+        case .json(let j):
+            // ⭐⭐⭐ **基准是「JSON 字符串」⇒ 先解析再用**（老引擎口径）
+            //   站方常见：复合规则 `<js>…</js>` 的 JS 返回**一段 JSON 文本**
+            //   ⇒ 后续字段规则 `@json:$.catename` 要在这段文本上查 ⇒ **必须先解析** ⭐
+            //   （不解析 ⇒ 基准是个字符串 ⇒ JSONPath 永远 0 命中 ⇒ 列表 0 本）
+            if case .string(let text) = j,
+               let data = text.data(using: .utf8),
+               let obj = try? JSONSerialization.jsonObject(with: data) {
+                return JSONValue.from(obj)
+            }
+            return j
         case .page(let raw):
             // ⭐ 只有响应**确实是 JSON**（ctx.isJSON）时才当 JSON 基准
             //    否则 ⇒ 返回 nil ⇒ 触发「基准类型不符」的真错误诊断

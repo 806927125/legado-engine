@@ -67,11 +67,21 @@ final class RuleSemanticsTests: XCTestCase {
     }
 
     /// 含整块语法的规则**不按行拆**（`{{…}}` / `<js>` / `@js:`）
+    ///
+    /// ⚠️⚠️ **2026-10-23 修正**：`<js>` 的判据**不是「含就行」**，而是照抄老引擎 `isBlockRule`：
+    ///   - `</js>` 之后**没有换行** ⇒ 块（同一行的尾巴 = 复合规则 `<js>…</js>$.data`）⇒ **不拆**
+    ///   - `</js>` 之后**有换行** ⇒ 后面是别的规则行 ⇒ **要拆** ⭐
+    ///     （红薯小说 `ruleSearch.bookList = "<js>…</js>\n@j"` ⇒ 拆 ⇒ 第一行是完整块 ⇒ 命中）
+    ///   ⇒ 旧期望值（"含 `<js>` 就不拆"）是**按直觉写的**，与老引擎实现**相反** ⇒ 已改 ⭐
     func testBlockRulesAreNotSplitByNewline() {
         XCTAssertEqual(Evaluator.splitRuleLines("{{baseUrl}}/a\n{{baseUrl}}/b").count, 1,
                        "含模板的整条规则不该被拆")
-        XCTAssertEqual(Evaluator.splitRuleLines("<js>x</js>\nfoo").count, 1,
-                       "含 `<js>` 的整条规则不该被拆")
+        XCTAssertEqual(Evaluator.splitRuleLines("<js>x</js>").count, 1,
+                       "整块 `<js>…</js>` 不该被拆")
+        XCTAssertEqual(Evaluator.splitRuleLines("<js>x</js>$.data").count, 1,
+                       "同行尾巴 = 复合规则 ⇒ 不该被拆")
+        XCTAssertEqual(Evaluator.splitRuleLines("<js>x</js>\nfoo").count, 2,
+                       "⭐ `</js>` 后面有换行 ⇒ 后面是别的规则行 ⇒ 要拆（红薯小说）")
         XCTAssertEqual(Evaluator.splitRuleLines("a\nb").count, 2)
     }
 
