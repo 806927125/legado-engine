@@ -104,5 +104,27 @@ final class JSCContextReuseTests: XCTestCase {
         print("[perf-reuse] 复用 = \(perReuse * 1000) ms/次，新建 = \(perNew * 1000) ms/次")
         XCTAssertLessThan(perReuse, perNew, "⭐ 复用必须比每次新建快")
     }
+
+    // MARK: - 探针（查「delete 为什么没删掉全局」）
+
+    /// ⚠️ **一次性探针** ⇒ 查清「全局删不掉」的根因
+    func testZZProbeGlobalDeletion() throws {
+        let exec = JSCExecutor(api: FakeAPI())
+        let c = ctx()
+        _ = try exec.run("var myGlobal = 'A'; function myFn(){return 1;}", context: c)
+        let probe = try exec.run("""
+        (function(){
+          var names = Object.getOwnPropertyNames(this);
+          var desc = Object.getOwnPropertyDescriptor(globalThis, 'myGlobal');
+          var cfg = desc ? ('cfg=' + desc.configurable + ',enum=' + desc.enumerable) : 'no-desc';
+          var del = 'n/a';
+          try { delete globalThis.myGlobal; del = 'after=' + (typeof globalThis.myGlobal); }
+          catch(e) { del = 'err:' + e; }
+          var myGlobalIn = (names.indexOf('myGlobal') >= 0);
+          return 'count=' + names.length + ' inNames=' + myGlobalIn + ' ' + cfg + ' ' + del
+                 + ' | names=' + names.slice(0, 30).join(',');
+        })()
+        """, context: c)
+        print("[probe]", probe.scalarString)
+    }
 }
-#endif
