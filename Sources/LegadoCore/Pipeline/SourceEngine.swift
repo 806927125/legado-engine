@@ -131,11 +131,15 @@ public final class SourceEngine {
     /// ⚠️⚠️ **`@js:` 里不做 `{{}}` 插值**（Legado / 栖阅语义）
     ///   （`{{...}}` 是 JS 展开语法 ⇒ 插值会吃成空串 ⇒ **整个 JS 语法坏掉**）
     public func exploreKinds() throws -> (kinds: [SourceCategory], filters: [SourceFilter]) {
-        guard let exploreUrl = source.exploreUrl,
-              !exploreUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        // ⭐⭐ **兜底**：顶层 `exploreUrl` 空 ⇒ 试 **规则块里的** `ruleExplore.exploreUrl`
+        //   （老引擎：`ruleText(src.exploreUrl) || ruleText(src.ruleExplore && src.ruleExplore.exploreUrl)`）
+        //   ⇒ 少了这条 ⇒ 一批源直接「该书源没有发现规则」⭐
+        let topURL = (source.exploreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let ruleURL = (source.ruleExplore?.exploreUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !topURL.isEmpty || !ruleURL.isEmpty else {
             throw SourceError.ruleMissing("exploreUrl")
         }
-        let spec = exploreUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        let spec = (topURL.isEmpty ? ruleURL : topURL)
 
         // ① JS 形态 ⇒ 跑 JS 拿分类数组
         var rawItems: [JSONValue] = []
@@ -370,11 +374,31 @@ public final class SourceEngine {
     // MARK: - ② 发现
 
     /// **发现** —— 抓分类页，列出书。
+    ///
+    /// ⭐⭐ **兜底**：`ruleExplore.bookList` 为空 ⇒ **回退 `ruleSearch`**
+    ///   （老引擎 `pickListRule(src, false)`：Legado `BookList.kt` 同款）
+    ///   ⇒ 少了这条 ⇒ 那些「只有搜索规则」的源在发现页**一本都不出**⭐
     public func explore(_ url: String, page: Int = 1) throws -> [Book] {
         try notifying {
             let p = try fetch(url, page: page)
-            return try books(from: p, rules: source.ruleExplore, field: "bookList")
+            return try books(from: p, rules: listRuleForExplore(), field: "bookList")
         }
+    }
+
+    /// ⭐⭐ **发现页用的列表规则**（`ruleExplore.bookList` 空 ⇒ 回退 `ruleSearch`）
+    ///
+    /// ⚠️ 照抄老引擎 `pickListRule(src, isSearch=false)`：
+    /// ```js
+    /// if (isSearch) return search;
+    /// var explore = src.ruleExplore || {};
+    /// if (!ruleText(explore.bookList).trim()) return search;   // ← 回退
+    /// return explore;
+    /// ```
+    public func listRuleForExplore() -> RuleFields? {
+        let explore = source.ruleExplore
+        let exploreList = (explore?.bookList ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if exploreList.isEmpty { return source.ruleSearch }
+        return explore
     }
 
     // MARK: - ③ 搜索
@@ -389,6 +413,7 @@ public final class SourceEngine {
                 .replacingOccurrences(of: "{{key}}", with: keyword)
                 .replacingOccurrences(of: "{{page}}", with: String(page))
             let p = try fetch(rule, base: source.bookSourceUrl, page: page, key: keyword)
+            // ⭐ 搜索**永远**用 ruleSearch（老引擎 `pickListRule(src, true)`）
             return try books(from: p, rules: source.ruleSearch, field: "bookList")
         }
     }

@@ -91,6 +91,11 @@ public struct RuleFields: Codable, Sendable {
     public var wordCount: String?
 
     public var searchUrl: String?
+    /// ⭐⭐ **`ruleExplore.exploreUrl`** —— 站方会把发现页 URL 写在**规则块里**（不是顶层）
+    ///
+    /// ⚠️ **老引擎的兜底**：`ruleText(src.exploreUrl) || ruleText(src.ruleExplore && src.ruleExplore.exploreUrl)`
+    /// ⇒ 顶层空 ⇒ **试规则块里的** ⇒ 少了这条 ⇒ 一批源直接「该书源没有发现规则」⭐
+    public var exploreUrl: String?
     // 列表
     public var bookList: String?
     // 详情
@@ -122,7 +127,7 @@ public struct RuleFields: Codable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case name, author, kind, intro, coverUrl, lastChapter, bookUrl, wordCount
-        case searchUrl, bookList, tocUrl
+        case searchUrl, exploreUrl, bookList, tocUrl
         case chapterList, chapterName, chapterUrl, isVolume, isVip, nextTocUrl, nextUrl
         case content, nextContentUrl, replaceRegex, sourceRegex
         case initRule = "init"
@@ -156,6 +161,7 @@ public struct RuleFields: Codable, Sendable {
         bookUrl = r(.bookUrl)
         wordCount = r(.wordCount)
         searchUrl = r(.searchUrl)
+        exploreUrl = r(.exploreUrl)
         bookList = r(.bookList)
         tocUrl = r(.tocUrl)
         chapterList = r(.chapterList)
