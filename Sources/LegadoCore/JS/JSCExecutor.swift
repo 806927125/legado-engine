@@ -54,6 +54,20 @@ public final class JSCExecutor: JSExecutor {
     /// ⭐ **JSContext 不是线程安全的** ⇒ 整个 `run` 加锁（引擎全同步 ⇒ 本来就是串的）
     private let contextLock = NSLock()
 
+    /// ⭐⭐⭐⭐⭐ **站方 JS 执行的看门狗阈值**（秒）
+    ///
+    /// ⚠️⚠️ **JSC 没有「中断正在跑的脚本」的 API** ⇒ 一旦站方 JS 死循环:
+    ///   · 那个线程**永远烧 CPU**(在 App 进程里 ⇒ 设备发烫)
+    ///   · `contextLock` **永远拿不到** ⇒ 后面每个 op 都排队 ⇒ **整个引擎永久报废**
+    ///   ⇒ 真机(🍅大灰狼:8 条线路挨个试)日志:`Thermal serious` + `scene-update watchdog` ⭐⭐⭐
+    ///
+    /// ⇒ 所以:**至少要能说出来**「这次 JS 跑了 N 秒」⇒ 宿主据此**回退老引擎**
+    ///   (老引擎的 JS 跑在 **独立 WebContent 进程** ⇒ 死循环只影响那个进程 ⇒ App 不死)⭐
+    /// ⇒ 真正的根治是「别让站方 JS 进死循环」:
+    ///   · 宿主侧**先测速挑一条通的线路** ⇒ 每个 op 只 1 个请求 ⇒ 不进长链 ⭐
+    ///   · 引擎侧**单次请求超时 8 秒** ⇒ 死线路快速失败(见 `HTTPTransport`)⭐
+    public static var slowScriptThreshold: TimeInterval = 30
+
     public init(api: JSHostAPIProvider) {
         self.api = api
     }
@@ -146,7 +160,15 @@ public final class JSCExecutor: JSExecutor {
         let scope = JSScopeBuilder.build(context)
         let codeLiteral = JSScopeBuilder.jsonLiteral(.string(code))
         let source = scope + "\n" + "(function(){ return eval(" + codeLiteral + "); })()"
+        // ⭐⭐⭐⭐⭐ **看门狗**:JS 跑太久 ⇒ **明确报出来**(是「站方 JS 卡住了」,不是「网络慢」)
+        let t0 = Date()
         let value = js.evaluateScript(source)
+        let elapsed = Date().timeIntervalSince(t0)
+        if elapsed > Self.slowScriptThreshold {
+            throw JSCError.scriptException(
+                "站方 JS 执行 \(Int(elapsed)) 秒(超过 \(Int(Self.slowScriptThreshold)) 秒)"
+                + "⇒ 疑似死循环/极慢(宿主应回退老引擎:老引擎的 JS 在独立进程里 ⇒ 不会拖死 App)")
+        }
         // ⭐ 站方 JS 抛异常 ⇒ 必须**报出来**（不能静默空）
         if let msg = caught.value {
             throw JSCError.scriptException(msg)

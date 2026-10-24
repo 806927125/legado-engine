@@ -22,13 +22,13 @@ public struct HTTPRequest: Sendable, Equatable {
     public var cookie: String?
 
     public init(url: String, method: String = "GET", headers: [String: String] = [:],
-                body: Data? = nil, timeout: TimeInterval = 30, cookie: String? = nil) {
+                body: Data? = nil, timeout: TimeInterval = 8, cookie: String? = nil) {
         self.url = url; self.method = method; self.headers = headers
         self.body = body; self.timeout = timeout; self.cookie = cookie
     }
 
     /// 从 `URLBuilder` 的产物构造
-    public init(built: URLBuilder.Built, timeout: TimeInterval = 30, cookie: String? = nil) {
+    public init(built: URLBuilder.Built, timeout: TimeInterval = 8, cookie: String? = nil) {
         self.url = built.url
         self.method = built.method
         self.headers = built.headers
@@ -88,8 +88,15 @@ public struct PageFetcher: Sendable {
     ///   - timeout: 超时
     /// - Parameters:
     ///   - headers: **源级请求头**（`BookSource.header`）—— 54 个源在用
+    /// ⚠️⚠️ **默认超时 30 → 8 秒**（2026-10-24 真机「大灰狼卡死」实证）
+    ///   🍅大灰狼的 jsLib 里 `host` 数组有 **8 条线路** ⇒ 站方 catch 循环会**挨个试**
+    ///   ⇒ 死线路（服务器不回包）每条都要等满超时
+    ///   ⇒ 30 秒 × 8 = **4 分钟** ⇒ 站方 JS 一直卡在那儿 ⇒ 引擎锁死 + 设备发烫 ⭐⭐⭐
+    ///   ⇒ 8 秒 × 8 = 64 秒（还是慢，但**不会把 App 拖死**）⇒
+    ///   ⇒ 真正的根治是**宿主先测速挑一条通的**（宿主侧 `ensureFastLine`）⇒ 只打 1 条 ⇒ 秒回 ⭐
+    ///   ⇒ ⚠️ 取内容的请求（详情/目录/正文）另走 300 秒预算（宿主侧分档）⇒ 这里只管单次请求
     public func fetch(rule: String, baseUrl: String, headers: [String: String] = [:],
-                      timeout: TimeInterval = 30) throws -> HTTPResponse {
+                      timeout: TimeInterval = 8) throws -> HTTPResponse {
         let built = URLBuilder.parse(rule, baseUrl: baseUrl)
         var request = HTTPRequest(built: built, timeout: timeout)
         // ⭐⭐ **源级请求头**（54 个源在用 ⇒ 缺了 UA/Referer/Cookie 就会被拒）
