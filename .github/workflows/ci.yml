@@ -32,6 +32,14 @@ jobs:
           set -euo pipefail
           if command -v swift >/dev/null 2>&1; then
             echo "✅ 用 runner 自带的 Swift：$(command -v swift)"
+            # ⚠️⚠️ **绝不能让两套工具链并存**（本轮栽过）：
+            #   上一轮下载的那套还在 PATH 里 ⇒ `swift`（runner 的）驱动时从 PATH 找 `swift-build`
+            #   ⇒ 找下载那套 ⇒ **Ubuntu 26.04 没有 libxml2.so.2**（apt 里叫 libxml2t64）
+            #   ⇒ `swift-build: error while loading shared libraries` ⇒ **exit 127** ⭐
+            if [ -d "$HOME/swift-toolchain" ]; then
+              echo "🧹 删掉上一轮下载的工具链（不许两套并存）"
+              rm -rf "$HOME/swift-toolchain"
+            fi
           else
             echo "⬇️ runner 没自带 ⇒ 下载官方 tarball（6.1.2 · 与沙盒同版本）"
             SWIFT_VERSION=6.1.2
@@ -59,15 +67,13 @@ jobs:
               libxml2 libcurl4 libsqlite3-0 libatomic1 libedit2 zlib1g || true
             export PATH="$HOME/swift-toolchain/usr/bin:$PATH"
             echo "$HOME/swift-toolchain/usr/bin" >> "$GITHUB_PATH"
+            # ⭐ 下载那套**必须当场能跑**（跑不动就当场炸，别等 build 步骤）
+            "$HOME/swift-toolchain/usr/bin/swift" --version
           fi
           # ⭐ 必须**真的跑一下** ⇒ 装坏了要当场炸，不能悄悄跳过门禁
           swift --version
           swift package --version
-          # ⚠️ **两套工具链混用的自检**：`swift` 和 `swift-build` 必须在同一个目录
-          echo "swift       → $(command -v swift)"
-          echo "swift-build → $(command -v swift-build)"
-          [ "$(dirname "$(command -v swift)")" = "$(dirname "$(command -v swift-build)")" ] \
-            || { echo "❌ swift 与 swift-build 不在同一套工具链里（会 exit 127）"; exit 1; }
+          echo "swift → $(command -v swift)"
 
       - uses: actions/setup-node@v4
         with:

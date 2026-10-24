@@ -21,7 +21,7 @@ jsc:
     - uses: actions/upload-artifact@v4   # 日志归档（排查用）
 ```
 
-## ⚠️ 踩到的 9 个坑（**全在 Linux 沙盒里看不出来**）
+## ⚠️ 踩到的 13 个坑（**全在 Linux 沙盒里看不出来**）
 
 | # | 坑 | 症状 | 修法 |
 |---|---|---|---|
@@ -34,6 +34,28 @@ jsc:
 | 7 | **Swift 闭包不能直接当 `Any!` 传给 JSC** | 运行时 `TypeError: Cannot convert primitive value` | `unsafeBitCast(block, to: AnyObject.self)`；**且参数只能用 ObjC 可桥接的类型** ⇒ 数组/对象不行 ⇒ 改走 **JSON 字符串通道** |
 | 8 | **Swift 6.2+ 不允许对 IUO 用 `!`** | `using '!' is not allowed here` | block 返回类型改 `JSValue?`；`guard let` 解包 |
 | 9 | **`forKeyedSubscript` 不支持 `a.b` 路径** / **`JSONSerialization` 只接受容器** | 属性设不进去 / 顶层标量序列化失败 | 属性：先 `objectForKeyedSubscript` 拿对象再逐个 set；标量：**包一层数组**返回，JS 侧取 `[0]` |
+| 10 | ⚠️⭐⭐ **门禁自己写错 ⇒ 假红**（2026-10-24） | macOS CI 红在 `testJsLibGlobalsRemainVisible`（「stationHost is not a function」）⇒ 查下来是**门禁自己**直接调了底层 `runGlobal`、**没做 `loadJsLib` 里的 `markGlobalsAsBaseline()`** ⇒ 门禁自己把 jsLib 的全局清掉了 | 门禁要**走引擎的真实入口**（`SourceEngine.loadJsLib`）⇒ 跟真机同一条路 ⇒ 才有意义 ⭐（**「红」先怀疑门禁自己**）|
+| 11 | ⚠️⭐⭐ **CI 镜像升级 ⇒ 整个 job 静默死掉** | `ubuntu-latest` 变成 **Ubuntu 26.04** ⇒ `swift-actions/setup-swift@v2` 报「Error: Version "26.04" of Ubuntu is not supported」⇒ **job 一步没跑** | 改用 **runner 自带的 Swift**（⇒ 不依赖任何 action 的 OS 表）⚠️ 最坏的一种失败：**门禁"绿"其实是没跑** ⇒ 什么都不知道 ⭐ |
+| 12 | ⚠️⭐ **两套工具链混用 ⇒ exit 127** | `swift`（runner 自带 6.4）驱动时从 PATH 里找 `swift-build`（下载那套 6.1.2）⇒ **Ubuntu 26.04 没有 `libxml2.so.2`**（apt 里包名改成了 `libxml2t64`）⇒ `error while loading shared libraries` ⇒ **exit 127**；而 `swift --version` **却成功**（跑的是 runner 那套）⇒ **装坏了没当场炸** | **要么全用 runner 的、要么全用下载的** ⇒ 再加一道自检：`swift` 与 `swift-build` 必须在**同一目录**，否则当场炸 ⭐ |
+| 13 | ⚠️⭐ **`Bundle.module` 在 App / CI 里可能读不到** | 站方 JS 的 Java 兼容层（`JavaImporter` / `Packages.*`）**没注入** ⇒ 站方 jsLib 第一行 `new JavaImporter()` 抛错 ⇒ **jsLib 整个加载失败** ⇒ 站方 JS 走兜底分支 ⇒ 分类变成「**未分组**」假分类 ⇒ 整本书打不开 | 兼容层源码**编进 Swift**（`JavaCompat.swift`，89KB）⇒ 零 bundle 依赖 ⇒ App 的静态链接下也稳 ⭐ |
+
+## ⭐ 真书源门禁（今天加的 ⇒ 三个根因一起钉死）
+
+`Tests/LegadoCoreTests/StationDahulangJSTests.swift` —— 拿**真站方 jsLib（32KB）+ 真 exploreUrl（12KB）**跑：
+
+| 门禁 | 逮什么 |
+|---|---|
+| 真 jsLib 能加载 | 坑 13（兼容层）+ 坑 12（间接 eval）+ 宿主通道注入顺序 |
+| jsLib 的全局可见（`host` / `getArguments` / `JavaImporter`） | 注入顺序 / 全局治理 |
+| 发现页出 **7 个筛选栏 + 2 个分类**（不是「未分组」） | 整条「假分类」链 |
+
+⭐ **期望值的来路**：**Node 端到端实测**（同一份 jsLib/exploreUrl + 同样的注入顺序）
+⇒ 9 项（线路/模式/频道/平台/字数/状态/排序/登录大灰狼书源/登录番茄）
+⇒ 与真机观测一致（轻阅交接文档：「发现页分类 ✅ 9 个」）
+⇒ **不是拍脑袋写的数字** ⇒ 门禁才有意义 ⭐
+
+⚠️ **另一半门禁放沙盒**（`StationDahulangTests.swift`，不依赖 JSC）⇒ 验分类/筛选栏拆分
+⇒ 门禁**分平台放**：能在 Linux 跑的**别塞进 `#if canImport(JavaScriptCore)`** ⭐
 
 ## ⭐ 求值形态（最要紧的一条）
 
@@ -70,3 +92,9 @@ Swift 侧：  __hostJSON(obj, method, argsJSON) -> String
 4. ⭐ **引擎自己的类型名要避开系统同名**（`JSContext` / `Category` / `Task` / `Page`…）
 5. ⭐ **跨平台库升级会删 API**（Xcode 26 的 JSC）⇒ 只依赖最基础、最稳定的那些
 6. ⭐ **失败要如实标**（`XCTSkip` + 文档写清根因）⇒ **不许让门禁「假装绿」**
+7. ⭐⭐ **门禁红了先怀疑门禁自己**（坑 10）⇒ 门禁要走**真实入口**，别自造一条简化路径
+8. ⭐⭐ **CI「绿」也要确认它真的跑过**（坑 11）⇒ job 一步没跑 = 最坏的假绿
+9. ⭐⭐ **别混用两套工具链**（坑 12）⇒ 装工具链的步骤要**当场自检**（跑一下 + 比目录）
+10. ⭐⭐ **能用真书源当门禁输入，就别用自己编的样例** ⇒ 真语料一改就红，样例永远绿
+11. ⭐ **门禁分平台放**：能在 Linux 跑的**别塞进 `#if canImport(JavaScriptCore)`** ⇒
+    否则那道门禁在沙盒里等于不存在
