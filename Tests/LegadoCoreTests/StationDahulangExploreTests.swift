@@ -132,8 +132,8 @@ final class StationDahulangExploreTests: XCTestCase {
                       "⭐⭐ bookUrl 必须是 `data:;base64,` 伪 URL（站方形态）\n实际：\(url)\n引擎日志：\(logger.all.joined(separator: "\n"))")
 
         // ⭐⭐⭐ **载荷必须解得出真的 book_id**（`java.base64Encode` 没接上时会是 `undefined`）
-        let payload = String(url.dropFirst("data:;base64,".count))
-            .components(separatedBy: ",{\"type\"").first ?? payload
+        let raw = String(url.dropFirst("data:;base64,".count))
+        let payload = raw.components(separatedBy: ",{\"type\"").first ?? raw
         let decoded = Crypto.base64Decode(payload) ?? ""
         XCTAssertFalse(decoded.isEmpty,
                        "⭐⭐ 载荷解不出来 ⇒ `java.base64Encode` 没接上（引擎侧能力没接管）\n实际：\(url)")
