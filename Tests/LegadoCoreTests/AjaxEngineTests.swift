@@ -96,15 +96,23 @@ final class AjaxEngineTests: XCTestCase {
 
     // MARK: - ④ `data:` 伪 URL ⇒ **绝不能发请求**
 
-    /// ⭐⭐ **`data:` 伪 URL 不发请求**，载荷当响应体
+    /// ⭐⭐ **`data:` 伪 URL 不发请求**，**原始载荷**当响应体
     /// （站方聚合源用它装载荷 ⇒ 发出去会炸「illegal base64」）
+    ///
+    /// ⭐⭐⭐ **2026-10-24 真机「大灰狼详情空白」实证：载荷要【原样】给站方**
+    ///   站方的 init 规则自己会解：`JSON.parse(java.hexDecodeToString(result))`
+    ///   ⇒ **引擎先解一遍 = 解两次** ⇒ 站方拿到的是「解过一次的文本」⇒ `JSON.parse` 炸
+    ///   ⇒ **整条 init 规则挂掉** ⇒ 详情字段全空 ⭐⭐⭐
+    ///   ⇒ 与轻阅参考实现逐字一致
+    ///   （`reference/js/java-api.js` 的 `rawRequest` / `reference/js/engine.js` 的 `fetchPage`）⭐
     func testDataURLDoesNotSendRequest() throws {
         let transport = MemTransport()
         let engine = try makeEngine(transport)
         // 载荷 = {"tab":"小说","url":""}
         let payload = "data:;base64,eyJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian\"}"
         let body = engine.ajax(url: payload, options: nil)
-        XCTAssertEqual(body, "{\"tab\":\"小说\",\"url\":\"\"}", "⭐ 载荷应解出来当响应体")
+        XCTAssertEqual(body, "eyJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==",
+                       "⭐ 载荷要【原样】给站方（站方自己 `hexDecodeToString` 解）⇒ 不能先解一遍")
         XCTAssertEqual(transport.requests.count, 0, "⭐⭐ data: URL **一个请求都不该发**")
     }
 

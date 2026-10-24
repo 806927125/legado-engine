@@ -886,7 +886,13 @@ public struct Evaluator {
                 //   ⇒ 症状：大灰狼「详情空白 + 目录 0 章 + 正文空」⭐⭐⭐
                 json = Self.jsonObject(fromText: s)
             default:
-                diag.failure = .baseTypeMismatch(expected: "JSON", actual: "其它")
+                // ⭐⭐⭐ **不许覆盖已经有的失败**（2026-10-24 真机「大灰狼详情空白」实证）
+                //   站方 JS 抛异常时 `runJS` 已经记了 `.jsError` ⇒ 这里再写 `baseTypeMismatch`
+                //   ⇒ **真凶被「类型不符」盖掉** ⇒ 现场只看到「不是 JSON」
+                //   ⇒ 只能靠猜（上次窗口就在这上面白查了两轮）⭐⭐⭐
+                if diag.failure == nil {
+                    diag.failure = .baseTypeMismatch(expected: "JSON", actual: "其它")
+                }
                 return .void
             }
             guard let hits = JSONPath.select(json, sel) else {
@@ -908,7 +914,10 @@ public struct Evaluator {
         // ⚠️⚠️ **必须同时认 `.json(.string)`**（JSC 路径下站方 JS 的完成值是字符串
         //   ⇒ `runJS` 包成 `.json(.string(html))` ⇒ 只认 `.string` 会把它判成类型不符 ⭐
         guard let html = Self.textPayload(value) else {
-            diag.failure = .baseTypeMismatch(expected: "HTML 字符串", actual: "其它")
+            // ⭐ 同上：**已有失败（JS 报错）时别覆盖**（真凶不许被盖掉）⭐
+            if diag.failure == nil {
+                diag.failure = .baseTypeMismatch(expected: "HTML 字符串", actual: "其它")
+            }
             return .void
         }
         guard let doc = try? SwiftSoupDocument(html: html, baseURL: ctx.baseUrl) else {

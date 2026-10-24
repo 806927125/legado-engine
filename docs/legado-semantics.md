@@ -547,20 +547,32 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 **现状**：✅ build207 修。
 ⚠️ 原生 `URLSession` 会去解 data: URL 的 base64 ⇒ 抛「illegal base64 data at input byte 9」。
 
-### S-DAT-02 载荷当**页面内容**
+### S-DAT-02 载荷当**页面内容**（⭐ **原样，不解码**）
 **规范**：伪 URL 的载荷 = 页面内容，直接返回给规则。
-**依据**：🟢 `fetchPage`。
-**现状**：✅。
+⭐⭐⭐ **而且必须是【原始载荷】，不许先解码**（2026-10-24 真机「大灰狼详情空白」实证）：
+站方自己会解（`JSON.parse(java.hexDecodeToString(result))`）⇒ **引擎先解一遍 = 解两次**
+⇒ 站方拿到的是「解过一次的文本」⇒ `JSON.parse` 炸 ⇒ **整条 init 规则挂掉**
+⇒ 详情字段（书名/作者/简介）全空 ⭐⭐⭐
+**依据**：🟢 `fetchPage` / `rawRequest`（**两处都返回原始载荷**）。
+**现状**：✅（2026-10-24 修）。
 
-### S-DAT-03 剥掉 `,{json}` 选项后缀
+### S-DAT-03 剥掉 `,{json}` 选项后缀（⭐ **两种形态都认**）
 **规范**：`data:;base64,<载荷>,{"type":"qingtian2"}` 的尾部选项要去掉。
-**依据**：🟡 build146 第 6 项。
+⭐ **百分号编码过的形态也要认**：`,%7B%22type%22%3A%22qingtian%22%7D`
+（`URL(string:).absoluteString` 就是这么改的 ⇒ build210 轻阅真机栽在这）。
+**依据**：🟡 build146 第 6 项；🟢 build210 `dataUrlContent`。
 **现状**：✅。
 
 ### S-DAT-04 载荷要按 **UTF-8** 解
 **规范**：base64 解出来的字节要按 UTF-8 解释。
 **依据**：🟢 build210（`atob` 返回 Latin-1 ⇒「小说」变「å°è¯´」）。
 **现状**：✅ build210 修。
+
+### S-DAT-06 ⭐ **`data:` 伪 URL 不许过 `absolutize`**
+**规范**：伪 URL 必须**原样**用（不能走 `URLBuilder.absolutize` / `URL(string:)` 规范化）——
+否则 `absoluteString` 会把选项后缀百分号编码、把载荷里的 `+` `/` 改掉 ⇒ 站方解不出 JSON。
+**依据**：🟢 `dataUrlContent`（轻阅 build210/212）。
+**现状**：✅（2026-10-24 修：`fetch()` 里用**原样的 rule**）。
 
 ### S-DAT-05 宿主要把书的原始字段补进载荷
 **规范**：站方生成的 `data:` 载荷里若缺 `book_id` 等字段，宿主应把**书籍对象的原始字段**
@@ -1393,6 +1405,9 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 
 ⚠️⚠️ **解不了 base64 ⇒ 明确失败（nil）**，不许返回乱码
 （乱码 ⇒ 站方 `JSON.parse` 炸 ⇒ 整条规则挂掉）⭐
+⚠️ **但「解得了」的载荷要【原样】返回**（**不许解码**）⇒ 站方自己
+`java.hexDecodeToString(result)` 解 ⇒ 引擎先解 = 解两次 ⇒ 站方炸 ⭐⭐⭐
+（⚠️ 载荷可能其实是 **hex** ⇒ 「hex 或 base64 任一解得了」就算解得了）
 
 ## 26. S-JS-CALC 引擎侧 `java.*` 的归属与契约
 

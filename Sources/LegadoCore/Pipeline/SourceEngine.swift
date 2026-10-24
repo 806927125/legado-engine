@@ -455,12 +455,24 @@ public final class SourceEngine {
         info.bookUrl = book.bookUrl
         info.sourceName = source.bookSourceName
 
+        // ⭐⭐⭐ **宿主对象必须在 init 规则【之前】就建好**（2026-10-24 真机「大灰狼详情空白」）
+        //   站方 `ruleBookInfo.init` 的 JS 第一句就是
+        //   `getArguments(source.getVariable(), "server")` / `String(book.getVariable('custom'))`
+        //   ⇒ 宿主对象晚建 ⇒ 站方 JS 拿不到 ⇒ **抛异常** ⇒ init 输出为空
+        //   ⇒ 详情字段（书名/作者/简介）全空 ⭐⭐⭐
+        //   ⇒ 与 `toc()` / `content()` 的顺序保持一致（那边本来就在规则之前建）⭐
+        bookObject = Self.makeBookObject(book, variables: variables)
+        sourceObject = Self.makeSourceObject(source, varBox: varBox,
+                                              loginInfo: loadLoginInfo(),
+                                              storage: storage)
+
         // ⭐⭐⭐ **`ruleBookInfo.init`** —— 在详情页结果上跑一次，
         //   **输出当后面所有字段规则的基准**（JSON 接口源几乎全靠它：
         //   `init: "$.data"` 把 `{code,msg,data:{…}}` 缩成 `{…}`）⭐
         let base: RuleBase
         if let initRule = rules?.initRule, !initRule.isEmpty {
             let initCtx = EvalContext(base: .page(p.text), baseUrl: p.url, raw: p.text,
+                                     book: bookObject, source: sourceObject,
                                      varBox: varBox, isJSON: p.isJSON, document: p.document)
             let e = evaluator.evalOne(initRule, base: initCtx.base, ctx: initCtx)
             diagnostics.append(e.diagnostic)
@@ -480,11 +492,7 @@ public final class SourceEngine {
             base = .page(p.text)
         }
 
-        // ⭐ 站方 JS 里的 `book` 对象（`book.getVariable('custom')`）
-        bookObject = Self.makeBookObject(book, variables: variables)
-        sourceObject = Self.makeSourceObject(source, varBox: varBox,
-                                              loginInfo: loadLoginInfo(),
-                                              storage: storage)
+        // ⭐ 站方 JS 里的 `book` / `source` 对象**上面已经建好了**（init 规则之前）⭐
 
         info.name = value(rules?.name, in: nil, page: p, base: base)
         info.author = value(rules?.author, in: nil, page: p, base: base)
@@ -803,6 +811,8 @@ public final class SourceEngine {
 
         // ① ⚠️⚠️ **`data:` 伪 URL 绝不能真去 fetch**
         //    （站方聚合源用它装载荷 ⇒ 载荷就是「页面内容」⇒ 当响应体返回）
+        //    ⭐⭐⭐ **返回【原始载荷】，不解码**（站方自己用 `hexDecodeToString` 解）
+        //    ⇒ 与轻阅 `reference/js/java-api.js` 的 `rawRequest` **逐字一致** ⭐
         if u.lowercased().hasPrefix("data:") {
             return Self.dataPayload(u)
         }
@@ -864,28 +874,45 @@ public final class SourceEngine {
     /// ⚠️ **`data:` 伪 URL 的载荷**（站方聚合源用它装页面内容）。
     ///
     /// 格式：`data:;base64,<载荷>,{"type":"qingtian2"}`
-    /// ⇒ 载荷在 `;base64,` 之后、`,` 之前。
+    /// ⇒ 载荷在 `;base64,` 之后、`{` 之前。
     ///
-    /// ⚠️ **解不了要明确失败（返回 nil）**，不许返回乱码
-    /// （乱码 ⇒ 站方 `JSON.parse` 炸 ⇒ 整条规则挂掉）⭐
+    /// ⭐⭐⭐ **返回【原始载荷】，不解码**（2026-10-24 真机「大灰狼详情空白」实证）：
+    ///   站方的语义 = 「**`data:` 伪 URL 的载荷 = 页面内容**」⇒ **站方自己会解**
+    ///   （`JSON.parse(java.hexDecodeToString(result))`）⭐
+    ///   ⇒ 宿主先解一遍 = **解两次** ⇒ 站方拿到的是「解过一次的文本」⇒ `JSON.parse` 炸
+    ///   ⇒ **整条 init 规则挂掉** ⇒ 详情字段全空 ⭐⭐⭐
+    ///   ⇒ 与轻阅参考实现**逐字一致**
+    ///   （`reference/js/engine.js` 的 `dataUrlContent` / `reference/js/java-api.js` 的 `rawRequest`）⭐
+    ///
+    /// ⚠️ **URL 选项后缀要剥掉**（两种形态都认）：`,{"type":"x"}` 与 `,%7B"type":"x"%7D`
+    ///   （`URL(string:).absoluteString` 会把后缀**百分号编码** ⇒ 轻阅 2026-10-21 真机栽在这）⭐
     public static func dataPayload(_ raw: String) -> String? {
-        let rest = String(raw.dropFirst("data:".count))
+        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard s.lowercased().hasPrefix("data:") else { return nil }
+        let rest = String(s.dropFirst("data:".count))
         // ⭐ **标准 `data:` 格式**：`data:[<mediatype>][;base64],<data>`
         //   ⇒ **第一个逗号前 = mediatype**（可能含 `;base64`），**逗号后 = data**
         guard let firstComma = rest.firstIndex(of: ",") else { return rest }
         let mediatype = rest[rest.startIndex..<firstComma]
         let isBase64 = mediatype.lowercased().contains("base64")
-        let data = String(rest[rest.index(after: firstComma)...])
-        // ⚠️⚠️ **站方在 data 后面又接了自己的尾巴**：`,{"type":"qingtian"}`
-        //   ⇒ base64 时载荷到**下一个逗号**为止；明文时**整个 data 都是载荷**（明文里可能有逗号）
-        var payload = data
-        if isBase64, let comma = data.firstIndex(of: ",") {
-            payload = String(data[data.startIndex..<comma])
+        var payload = String(rest[rest.index(after: firstComma)...])
+        // ① 站方的选项后缀（`,{` / `,%7B`）—— 轻阅同语义
+        if let m = payload.range(of: #",\s*(?=\{|%7B)"#, options: [.regularExpression, .caseInsensitive]) {
+            payload = String(payload[payload.startIndex..<m.lowerBound])
+        } else if isBase64, let comma = payload.firstIndex(of: ",") {
+            // ② base64 载荷里**不可能有逗号** ⇒ 后面那个逗号之后一定是站方的选项 ⇒ 切掉
+            payload = String(payload[payload.startIndex..<comma])
         }
-        if isBase64 {
-            // ⚠️ `Data(base64Encoded:)` **默认严格**（非法字符 ⇒ nil）⇒ 正好「明确失败」
-            guard let data = Data(base64Encoded: payload, options: []) else { return nil }
-            return String(data: data, encoding: .utf8)
+        // ⚠️⭐ **解不了 ⇒ 明确失败（nil）**，不许返回乱码
+        //   （乱码 ⇒ 站方 `JSON.parse` 炸 ⇒ 整条规则挂掉）⭐
+        //
+        // ⚠️ **载荷可能其实是 hex**（站方 `java.hexDecodeToString` 内部会
+        //   「不是合法 hex 就按 base64 再试一次」）⇒ **两种都解不了**才失败 ⭐
+        //   ⇒ 解不了就返回 nil ⇒ 站方拿到 undefined ⇒ 立刻炸（而不是拿乱码慢慢炸）⭐
+        if isBase64,
+           Crypto.hexDecode(payload) == nil,
+           Crypto.base64Decode(payload) == nil {
+            return nil
         }
         return payload
     }
@@ -1256,6 +1283,15 @@ public final class SourceEngine {
     /// ⚠️ 站方规则会给出**不是页面**的 URL：`javascript:;`（占位）/ `mailto:` / `tel:` …
     /// ⇒ 真去 fetch ⇒ 报「unsupported URL」⇒ **整个目录炸掉** ⭐
     /// ⇒ `data:` **是例外**（聚合源用它装载荷 ⇒ 载荷当页面内容）
+    /// ⭐ **这段文本像 JSON 吗**（`data:` 载荷 / 页面内容的 `isJSON` 判定）
+    ///
+    /// ⚠️ 判据与 `HTTPResponse.isJSON` 一致：首字符是 `{` / `[` 且**真能解析**
+    public static func looksLikeJSON(_ text: String) -> Bool {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let f = t.first, f == "{" || f == "[" else { return false }
+        return (try? JSONSerialization.jsonObject(with: Data(t.utf8))) != nil
+    }
+
     public static func isPageURL(_ url: String) -> Bool {
         let u = url.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if u.hasPrefix("data:") { return true }   // 载荷当页面内容（宿主负责解）
@@ -1272,6 +1308,24 @@ public final class SourceEngine {
         ctx.key = key
         let rule = TemplateEngine.render(urlRule, ctx: ctx)
 
+        // ⭐⭐⭐ **`data:` 伪 URL 绝不能真去 fetch**（2026-10-24 真机「大灰狼详情空白」实证）
+        //   站方聚合源（🍅大灰狼）的 bookUrl / tocUrl / chapterUrl 全是
+        //   `data:;base64,<载荷>,{"type":"qingtian"}`
+        //   ⇒ ① 发请求 = 传输层去解 data: URL ⇒ 抛「illegal base64 data at input byte 9」⭐
+        //   ⇒ ② **站方的语义 = 「载荷就是页面内容」** ⇒ 站方自己用
+        //      `java.hexDecodeToString(result)` 解 ⭐
+        //   ⇒ 轻阅参考实现同语义（`reference/js/engine.js` 的 `fetchPage`）⭐
+        //   ⚠️ **必须用【原样】的 rule**（不能过 `absolutize`）：
+        //   `URL(string:).absoluteString` 会把后缀编码成 `,%7B…%7D` ⇒ 载荷被污染 ⭐
+        let trimmedRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedRule.lowercased().hasPrefix("data:") {
+            guard let payload = Self.dataPayload(trimmedRule), !payload.isEmpty else {
+                throw SourceError.invalidSource("data: 载荷解不开：\(trimmedRule)")
+            }
+            let doc = try? SwiftSoupDocument(html: payload, baseURL: trimmedRule)
+            return Page(url: trimmedRule, text: payload, document: doc?.document,
+                        isJSON: Self.looksLikeJSON(payload))
+        }
         // ⚠️⚠️ **不是「页面」的 URL**（`javascript:;` / `mailto:` …）⇒ 别发请求
         //   ⇒ 报一个**说人话**的错（以前报「unsupported URL」⇒ 整个目录炸）⭐
         let plainURL = URLBuilder.absolutize(rule, baseUrl: baseURL)

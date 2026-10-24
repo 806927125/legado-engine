@@ -117,8 +117,56 @@ public enum Crypto {
     /// ⚠️ **解不了 ⇒ 明确失败（nil）**，不许返回乱码
     /// （乱码 ⇒ 站方 `JSON.parse` 炸 ⇒ 整条规则挂掉）⭐
     public static func base64Decode(_ text: String) -> String? {
-        guard let data = Data(base64Encoded: text, options: []) else { return nil }
+        let normalized = b64Normalize(text)
+        guard let data = Data(base64Encoded: normalized, options: []) else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+
+    /// ⭐⭐⭐ **base64 文本归一化**（轻阅 `reference/js/java-api.js` 的 `b64normalize` **同语义**）
+    ///
+    /// ⚠️⚠️ **为什么必须有**（2026-10-21 真机栽在这）：
+    ///   聚合源（🍅大灰狼）的 `data:` 载荷里有 **`+` 和 `/`**（中文摘要 base64 出来的）
+    ///   ⇒ 这个字符串当 URL 走一圈 ⇒ `'+'` 可能被 URL 解码成**空格**、或被转义成 `%2B`
+    ///   ⇒ 老解码器「空格直接删掉、非法字符静默跳过」⇒ **解出来是乱码（还不报错！）**
+    ///   ⇒ 站方 `JSON.parse(...)` 抛「Unable to parse JSON string」⇒ 整条规则静默失效 ⭐⭐⭐
+    ///
+    /// ① 百分号转义还原（**只还原成 base64 合法字符的那些**）
+    /// ② URL 安全字符（`-` / `_`）⇒ 标准 base64（`+` / `/`）
+    /// ③ **空格 ⇒ `+`**（URL 解码把 `+` 变成空格的经典坑）
+    public static func b64Normalize(_ text: String) -> String {
+        var s = text
+        // ① 百分号转义还原（**只还原成 base64 合法字符的那些** ⇒ 其余保持原样）
+        s = restorePercentEscapes(s)
+        // ② URL 安全字符 ⇒ 标准 base64
+        s = s.replacingOccurrences(of: "-", with: "+")
+        s = s.replacingOccurrences(of: "_", with: "/")
+        // ③ 空格 ⇒ `+`
+        s = s.replacingOccurrences(of: " ", with: "+")
+        return s
+    }
+
+    /// **把 `%XX` 还原成字符**（只还原 base64 合法字符；其余保持原样）
+    private static func restorePercentEscapes(_ s: String) -> String {
+        guard s.contains("%") else { return s }
+        let allowed = Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=-_")
+        var out = ""
+        out.reserveCapacity(s.count)
+        let it = Array(s)
+        var i = 0
+        while i < it.count {
+            if it[i] == "%", i + 2 < it.count,
+               let hi = it[i + 1].hexDigitValue, let lo = it[i + 2].hexDigitValue {
+                let scalar = UnicodeScalar(hi * 16 + lo)
+                if let scalar, allowed.contains(Character(scalar)) {
+                    out.append(Character(scalar))
+                    i += 3
+                    continue
+                }
+            }
+            out.append(it[i])
+            i += 1
+        }
+        return out
     }
 
     // MARK: - Hex
