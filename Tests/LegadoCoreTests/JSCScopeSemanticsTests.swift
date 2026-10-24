@@ -72,13 +72,35 @@ final class JSCScopeSemanticsTests: XCTestCase {
     // MARK: - ④ jsLib 的全局仍然可用（规则要调 jsLib 定义的函数）
 
     func testJsLibGlobalsRemainVisible() throws {
-        let js = makeExecutor()
-        let ctx = JSRunContext(base: .page(""))
-        // ⭐ jsLib 用**间接 eval** 加载 ⇒ 定义进全局
-        _ = try js.runGlobal("function stationHost() { return 'HOST-OK'; } var stationVar = 42;", context: ctx)
-        // ⇒ 之后的规则求值（局部 eval）**照样能看到**全局
-        let v = try js.run("stationHost() + '|' + stationVar", context: ctx)
-        XCTAssertEqual(v.scalarString, "HOST-OK|42", "⭐ jsLib 定义的全局必须能被规则看到")
+        // ⭐⭐⭐ **必须走引擎的真实入口 `loadJsLib`**（而不是底层 `runGlobal`）
+        //
+        // ⚠️ 原因：`loadJsLib` 加载完会调 `markGlobalsAsBaseline()`
+        //   ⇒ jsLib 的全局**进基线** ⇒ 后续每次求值前清全局**不会清掉它们** ⭐
+        //   ⇒ 直接调 `runGlobal` 就少了这一步 ⇒ 门禁自己把全局清了 ⇒ **假红**
+        //   （2026-10-24 真机同款：macOS CI 报「stationHost is not a function」⇒ 其实门禁自己写错了）
+        //
+        // ⇒ 所以这条门禁要**走真实路径**（跟真机一模一样）⇒ 才有意义
+        let source = try JSONDecoder().decode(BookSource.self, from: Data(
+            #"{"bookSourceName":"jsLib 门禁源","bookSourceUrl":"https://x.example.com"}"#.utf8))
+        let engine = SourceEngine(source: source,
+                                  fetcher: PageFetcher(transport: NoopTransport()),
+                                  js: makeExecutor())
+        // ① 站方 jsLib（用间接 eval 定义全局）
+        try engine.loadJsLib("function stationHost() { return 'HOST-OK'; } var stationVar = 42;")
+        // ② 之后连续跑三次普通规则 ⇒ jsLib 的全局必须一直在
+        for _ in 0..<3 {
+            let v = try engine.evaluator.js?.run("stationHost() + '|' + stationVar",
+                                                context: JSRunContext(base: .page("")))
+            XCTAssertEqual(v?.scalarString, "HOST-OK|42",
+                           "⭐ jsLib 定义的全局要长期保留（走真实路径）")
+        }
+    }
+
+    /// 门禁用的空传输（这个测试不联网）
+    private struct NoopTransport: HTTPTransport, @unchecked Sendable {
+        func send(_ request: HTTPRequest) throws -> HTTPResponse {
+            HTTPResponse(statusCode: 200, headers: [:], body: Data(), finalURL: request.url)
+        }
     }
 
     // MARK: - ⑤⭐⭐ Java 兼容层（JavaImporter / Packages.*）
