@@ -40,6 +40,22 @@ final class DataPseudoURLContentTests: XCTestCase {
     private static let realBookURLEncoded =
         "data:;base64,eyJib29rX2lkIjogIjc2NTAzNTQ3ODA2MjUwMjM1MTIiLCAic291cmNlIjogIueVquiMhCIsICJ0YWIiOiAi5bCP6K+0IiwgInVybCI6ICIifQ==,%7B%22type%22%3A%22qingtian%22%7D"
 
+    // MARK: - fixture
+
+    /// ⭐ **读 fixture 文件**（`conformance/fixtures/station/`）
+    private static var fixtureDir: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("conformance/fixtures/station")
+    }
+
+    private func load(_ name: String) throws -> String {
+        let url = Self.fixtureDir.appendingPathComponent(name)
+        return try String(data: Data(contentsOf: url), encoding: .utf8) ?? ""
+    }
+
     // MARK: - 假传输 / 假执行器
 
     /// **记录请求的假传输**
@@ -74,6 +90,15 @@ final class DataPseudoURLContentTests: XCTestCase {
             _hasSource.append(context.source != nil)
             lock.unlock()
             return .string("{}")
+        }
+    }
+
+    /// **返回固定 JSON 文本的假执行器**（模拟站方的复合规则：`data` 是个 JSON 串）
+    private final class JSONTextExecutor: JSExecutor, @unchecked Sendable {
+        private let text: String
+        init(text: String) { self.text = text }
+        func run(_ code: String, context: JSRunContext) throws -> JSONValue {
+            return .string(text)
         }
     }
 
@@ -215,6 +240,44 @@ final class DataPseudoURLContentTests: XCTestCase {
                       "⭐⭐⭐ `data:` 伪 URL 竟然发了请求：\(transport.urls)")
     }
 
+    /// ⭐⭐⭐ **JS 形态的列表规则 ⇒ 走【JSON 列表】路径**（哪怕页面不是 JSON）
+    ///
+    /// ⚠️⚠️ **2026-10-24 真机「大灰狼目录 0 章」的真根因**：
+    ///   引擎的 `listItems` 以前**只按 `page.isJSON` 分流**
+    ///   ⇒ 而大灰狼的**目录页内容是 `data:` 载荷的 base64 文本** ⇒ `isJSON = false`
+    ///   ⇒ 复合规则 `<js>…</js>$.data` 被当 DOM 查 ⇒ 找不到任何节点 ⇒ **0 章** ⭐⭐⭐
+    ///   ⇒ 老引擎的口径 = **按规则形态分流**（`rule.classify` ⇒ JS ⇒ `getJsonList`）⭐
+    ///
+    /// ⇒ 这条门禁在 Linux 就能跑（stub 执行器）⇒ 3 秒反馈 ⭐
+    func testJSListRuleOnNonJSONPageYieldsChapters() throws {
+        let transport = RecordingTransport()
+        // ⭐ **章节 JSON 放 fixture 文件**（不写在 Swift 字面量里 ⇒ 不用跟引号转义打架）⭐
+        let chaptersJSON = try load("chain-chapters.json")
+        let js = JSONTextExecutor(text: chaptersJSON)
+        let source = try makeSource(initRule: "<js>result</js>",
+                                    tocRule: "<js>result</js>$.data")
+        let logger = RecordingLogger()
+        let engine = SourceEngine(source: source,
+                                  fetcher: PageFetcher(transport: transport),
+                                  js: js, logger: logger)
+
+        var info = BookInfo()
+        info.bookUrl = Self.realBookURL
+        info.tocUrl = Self.realBookURL     // 目录页 = data: 载荷（**不是 JSON 页面**）
+
+        let chapters = (try? engine.toc(info, book: Book())) ?? []
+        let diag = engine.diagnostics.map { "\($0.rule) | \($0.branch ?? "-") | \($0.failure.map { String(describing: $0) } ?? "-")" }
+        let log = logger.all.joined(separator: "\n")
+
+        XCTAssertEqual(chapters.count, 2,
+                       "⭐⭐⭐ JS 形态的列表规则在非 JSON 页面上被当 DOM 查了 ⇒ 目录 0 章"
+                       + "\n诊断：\n" + diag.joined(separator: "\n")
+                       + "\n日志：\n" + log)
+        XCTAssertEqual(chapters.first?.name, "第一章 风起")
+        XCTAssertTrue(chapters.first?.url.hasPrefix("data:;base64,") ?? false,
+                      "⭐⭐⭐ 章节 URL 必须是原样的 data: 伪 URL（不许被绝对化改写）")
+    }
+
     // MARK: - 工具
 
     private func makeSource(initRule: String, tocRule: String? = nil) throws -> BookSource {
@@ -225,7 +288,7 @@ final class DataPseudoURLContentTests: XCTestCase {
         ]
         if let tocRule {
             src["ruleToc"] = ["chapterList": tocRule, "chapterName": "$.title",
-                              "chapterUrl": "$.url"]
+                              "chapterUrl": "$.qr_url"]
         }
         return try JSONDecoder().decode(BookSource.self,
                                        from: try JSONSerialization.data(withJSONObject: src))

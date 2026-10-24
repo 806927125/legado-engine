@@ -41,6 +41,16 @@ public enum ListItem: Sendable {
         }
     }
 
+    /// ⭐ **列表项的文本**（兜底用：站方没给章名规则时拿它当章名）
+    ///
+    /// ⚠️ **DOM 节点 ⇒ 节点文本；JSON 对象 ⇒ 标量视图**（对象没有标量 ⇒ 空串）
+    public var text: String {
+        switch self {
+        case .node(let n): return n.text
+        case .json(let j): return j.scalarString
+        }
+    }
+
     /// **是不是空的**（JSON 的 null / 空对象 ⇒ 视为空）
     public var isEmpty: Bool {
         switch self {

@@ -572,14 +572,20 @@ public final class SourceEngine {
             pages += 1
 
             // ⚠️ 翻页页**没命中不许炸**（后面某页没内容是常态）⇒ 跳过继续
-            let nodes = try listNodes(listRule, page: p, field: "chapterList", strict: false)
-            if !nodes.isEmpty {
+            //
+            // ⭐⭐⭐ **用 `listItems`（不是 `listNodes`）**（2026-10-24 真机「大灰狼目录 0 章」）
+            //   站方的章节规则**两种形态都有**：
+            //     ① HTML 源的 DOM 节点（`.article-title a`）
+            //     ② **JSON 源的 JSON 数组**（🍅大灰狼：`<js>…</js>$.data` ⇒ `$.data` 是数组）
+            //   ⇒ 只认 DOM 节点 ⇒ **JSON 那一种一条都出不来** ⇒ 目录 0 章 ⭐⭐⭐
+            //   ⇒ `listItems` 两边都认（老引擎 `getElements`/`getJsonList` 的口径）⭐
+            let items = try listItems(listRule, page: p, field: "chapterList", strict: false)
+            if !items.isEmpty {
                 // ⭐ 卷标题判定：**站方给了 `isVolume` 规则就用它**（相对节点求值）
                 //   （真书源：`.catalog-section-title@text||span@text` ⇒ 命中 h2 卷标题）
                 //   没给 ⇒ 退到「没有章节 URL 就是卷标题」
                 let isVolumeRule = rules.isVolume ?? ""
-                for node in nodes {
-                    let item = ListItem.node(node)
+                for item in items {
                     let name = value(rules.chapterName, in: item, page: p)
                     let rawURL = valueURL(rules.chapterUrl, in: item, page: p)
                     let chapterURL = rawURL.isEmpty ? "" : Self.absolute(rawURL, base: p.url)
@@ -594,7 +600,7 @@ public final class SourceEngine {
                     let isVip = isVipRule.isEmpty ? false
                         : !value(isVipRule, in: item, page: p).isEmpty
                     out.append(Chapter(
-                        name: name.isEmpty ? node.text : name,
+                        name: name.isEmpty ? item.text : name,
                         url: chapterURL,
                         isVolume: isVolume,
                         isVip: isVip,
@@ -1414,7 +1420,19 @@ public final class SourceEngine {
                            strict: Bool = true) throws -> [ListItem] {
         let ctx = EvalContext(base: .page(page.text), baseUrl: page.url, raw: page.text,
                               varBox: varBox, isJSON: page.isJSON, document: page.document)
-        if page.isJSON {
+        // ⭐⭐⭐ **按【规则形态】分流，不只看页面是不是 JSON**（老引擎 `rule.getJsonList` 的口径）
+        //
+        //   老引擎：`specKind = rule.classify(spec); if (specKind === rule.T.JS) → getJsonList`
+        //   ⇒ **JS 规则一律走「JSON 列表」那条路**（不管页面是不是 JSON）⭐
+        //
+        //   ⚠️⚠️ **只按 `page.isJSON` 分流 ⇒ 站方的复合规则在非 JSON 页面上被当 DOM 查**
+        //   ⇒ **0 条** ⭐⭐⭐
+        //   实例（🍅大灰狼）：目录规则 = `<js>…</js>$.data`，
+        //     而**目录页的内容是 `data:` 载荷的 base64 文本** ⇒ `isJSON = false`
+        //     ⇒ 走 DOM 路径 ⇒ 规则分析器找不到任何节点 ⇒ **目录 0 章** ⭐⭐⭐
+        //   ⇒ 修：**JS 形态的规则也走 JSON 列表路径**（和老引擎逐字对齐）
+        let mode = RuleClassifier.classify(rule, isJSON: page.isJSON)
+        if page.isJSON || mode == .js {
             let e = evaluator.evalOne(rule, base: .page(page.text), ctx: ctx)
             diagnostics.append(e.diagnostic)
             logger?.log(Self.diagnosticLine(e.diagnostic))
