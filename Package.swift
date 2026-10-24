@@ -32,7 +32,10 @@ let package = Package(
             //   ⇒ 从轻阅的老引擎原样搬过来（**零依赖的纯 JS** ⇒ 不改一行）
             //   ⇒ 站方 jsLib 的第一行就是 `new JavaImporter()` ⇒ 没有它 ⇒ **jsLib 整个加载失败**
             //      ⇒ 站方 JS 走兜底分支 ⇒ 分类变成「未分组」假分类 ⇒ 整本书打不开 ⭐
-            .copy("Resources")
+            // ⚠️ 用 `.process`（不是 `.copy`）⇒ SwiftPM 会把目录内容**展平**到 bundle 根
+            //   ⇒ `Bundle.module.url(forResource:withExtension:)` 才找得到 ⭐
+            //   （`.copy` 会保留 `Resources/` 子目录 ⇒ 按名字找**找不到** ⇒ 2026-10-23 踩过）
+            .process("Resources")
         ]),
         // ⭐ 参考实现（轻阅的 AnalyzeUrl.swift）—— 只读，用于 URL 规则对拍
         .target(name: "AnalyzeUrlReference", path: "reference/swift"),

@@ -225,11 +225,20 @@ public final class JSCExecutor: JSExecutor {
     ///   ⇒ 站方 JS 走兜底分支 ⇒ 分类里冒出「未分组」假分类 ⇒ **整本书打不开** ⭐
     static func javaCompatSources() -> [String] {
         // ⚠️ 资源读不到（不该发生）⇒ 返回空 ⇒ 至少不崩，站方 JS 会报「JavaImporter is not defined」
-        guard let stubURL = Bundle.module.url(forResource: "packages_stub", withExtension: "js"),
-              let nativeURL = Bundle.module.url(forResource: "packages_native", withExtension: "js"),
+        // ⚠️ 两个路径都试（`.process` 会展平 ⇒ 根目录；但保险起见）
+        func find(_ name: String) -> URL? {
+            Bundle.module.url(forResource: name, withExtension: "js")
+                ?? Bundle.module.url(forResource: name, withExtension: "js", subdirectory: "Resources")
+        }
+        guard let stubURL = find("packages_stub"),
+              let nativeURL = find("packages_native"),
               let stub = try? String(contentsOf: stubURL, encoding: .utf8),
               let native = try? String(contentsOf: nativeURL, encoding: .utf8)
-        else { return [] }
+        else {
+            // ⚠️ 读不到 ⇒ 明确记一笔（不然站方 JS 报「JavaImporter is not defined」，看不出真因）
+            NSLog("[legado-engine] ⚠️ Java 兼容层资源读不到（packages_stub.js / packages_native.js）")
+            return []
+        }
         return [stub, native]
     }
 
