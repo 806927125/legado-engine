@@ -156,5 +156,34 @@ final class StationDahulangExploreTests: XCTestCase {
         XCTAssertEqual(book.raw["book_id"], "7412345678901234567",
                        "⭐⭐ 列表项的原始字段必须一路带下去（少了整本书崩）")
     }
+    // MARK: - ⭐ 探针：java.base64Encode 到底断在哪一环？（2026-10-24 真机载荷是 "undefined"）
+
+    func testProbeJavaBase64Channel() throws {
+        let logger = RecordingLogger()
+        let (engine, _) = try makeEngine(logger)
+        let js = try XCTUnwrap(engine.evaluator.js, "必须有 JS 后端")
+
+        // ① 引擎侧（纯 Swift，不经 JS）
+        let direct = engine.engineJava("base64Encode", [.string("hi")])
+        print("PROBE ① 引擎侧 engineJava(base64Encode) =", direct?.scalarString ?? "<nil>")
+
+        // ② JS 侧：函数在不在
+        let t1 = try js.run("typeof java.base64Encode", context: JSRunContext(base: .page("")))
+        print("PROBE ② typeof java.base64Encode =", t1.scalarString)
+
+        // ③ JS 侧：直接调它
+        let t2 = try js.run("String(java.base64Encode('hi'))", context: JSRunContext(base: .page("")))
+        print("PROBE ③ java.base64Encode('hi') =", t2.scalarString)
+
+        // ④ 原始通道：__hostJSON 回了什么
+        let t3 = try js.run("String(__hostJSON('java','base64Encode',JSON.stringify(['hi'])))",
+                            context: JSRunContext(base: .page("")))
+        print("PROBE ④ __hostJSON 直调 =", t3.scalarString)
+
+        // ⑤ 宿主 API 侧（不接引擎能力时它回什么）
+        print("PROBE ⑤ 宿主 callJava(base64Encode) =",
+              String(describing: StationHostAPI().callJava("base64Encode", [.string("hi")])))
+    }
+
 }
 #endif

@@ -31,8 +31,13 @@ final class JSExploreKindsTests: XCTestCase {
     }
 
     private static func jsLiteral(_ code: String) -> String {
+        // ⚠️ 2026-10-24：**不能**用 `jsonObject(with:) as! [String]`
+        //   ⇒ macOS/新 Foundation 返回的是 **NSString** ⇒ `as! [String]` **必崩**
+        //   ⇒ 这些用例以前被 `--filter JSC` 滤掉了 ⇒ **从没跑过** ⇒ 没人发现 ⭐
+        // ⇒ 改成：把 JSON 文本里的第一个字符串**解码出来**（用 JSONDecoder 拿真 String）
         let data = try! JSONSerialization.data(withJSONObject: [code])
-        return (try! JSONSerialization.jsonObject(with: data) as! [String])[0]
+        let arr = try! JSONDecoder().decode([String].self, from: data)
+        return arr[0]
     }
 
     final class T: HTTPTransport, @unchecked Sendable {

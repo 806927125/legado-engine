@@ -44,7 +44,9 @@ final class JSLoginTests: XCTestCase {
     /// 把 JS 源码安全地塞进 JSON 字符串
     private static func jsLiteral(_ code: String) -> String {
         let data = try! JSONSerialization.data(withJSONObject: [code])
-        let arr = try! JSONSerialization.jsonObject(with: data) as! [String]
+        // ⚠️ 2026-10-24：`jsonObject(with:) as! [String]` 在 macOS 上必崩（返回 NSString）
+        //   ⇒ 这些用例以前被 `--filter JSC` 滤掉 ⇒ 从没跑过 ⇒ 没人发现 ⭐
+        let arr = try! JSONDecoder().decode([String].self, from: data)
         return arr[0]
     }
 
