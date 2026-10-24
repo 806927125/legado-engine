@@ -85,7 +85,10 @@ final class StationDahulangChainParityTests: XCTestCase {
         // ⭐⭐⭐ **必须加载站方 jsLib**（老引擎那边会自动 `ensureJsLib`）
         //   站方的 `getArguments` / `host` / `getFanqieCookie` / `getSessionId` **都在 jsLib 里**
         //   ⇒ 不加载 ⇒ init 规则第一句就「getArguments is not defined」⇒ **详情全空** ⭐⭐⭐
-        if let jsLib = source.jsLib, !jsLib.isEmpty {
+        //   ⚠️ **引擎的 `BookSource` 没有 `jsLib` 字段**（App 那边是单独带进来的）⇒ 这里单独解 ⭐
+        struct WithJsLib: Decodable { let jsLib: String? }
+        let jsLib = try JSONDecoder().decode(WithJsLib.self, from: srcData).jsLib
+        if let jsLib, !jsLib.isEmpty {
             try engine.loadJsLib(jsLib)
         }
 
