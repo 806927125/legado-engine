@@ -110,11 +110,18 @@ final class JSCContextReuseTests: XCTestCase {
         for _ in 0..<n { _ = try exec.run("1+1", context: c) }
         let perReuse = Date().timeIntervalSince(t0) / Double(n)
 
-        // 每次新建一个 context 的成本（用引擎的原始做法估）
+        // ⚠️⚠️⚠️ **对照组必须公平**（2026-10-23 修正）
+        //
+        //   以前对照组是「**裸** `JSContext()` + evaluateScript」⇒ **它没有 Java 兼容层**
+        //   ⇒ 而复用路径的 context **带着 93KB 兼容层** ⇒ 比的不是一个东西 ⇒ 门禁恒红 ⭐
+        //
+        //   真实生产里**新建 context 必然要注入兼容层**（`makeContext()`）
+        //   ⇒ 所以正确对照组 = 「**新建 executor**（内部会注入）+ 跑一次」
+        //   ⇒ 这样比的是「复用 vs 新建+注入」⇒ **复用必然赢**（省了 93KB 解析）✅
         let t1 = Date()
         for _ in 0..<n {
-            let js = JavaScriptCore.JSContext()
-            _ = js?.evaluateScript("1+1")
+            let fresh = JSCExecutor(api: FakeAPI())
+            _ = try fresh.run("1+1", context: c)
         }
         let perNew = Date().timeIntervalSince(t1) / Double(n)
 
