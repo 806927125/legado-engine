@@ -97,16 +97,18 @@ final class JSCScopeSemanticsTests: XCTestCase {
     }
 
     /// ⭐⭐ **大灰狼实际用到的那几个类**（真实语料统计）
+    ///
+    /// ⚠️ **`Packages.io.legato.kazusa.*` 老引擎**也没有**（那是站方服务器上的类）
+    /// ⇒ 站方自己 `try/catch` 吞掉 ⇒ **不影响主流程** ⇒ 不该断言它存在
     func testPackagesClassesUsedByAggregateSource() throws {
         let js = makeExecutor()
         let ctx = JSRunContext(base: .page(""))
         let v = try js.run(
-            "typeof Packages.io.legato.kazusa.utils.TimeoutCancellationException + '|' + "
-            + "typeof Packages.android.util.Base64.encodeToString + '|' + "
+            "typeof Packages.android.util.Base64.encodeToString + '|' + "
             + "typeof Packages.java.lang.Thread.sleep",
             context: ctx)
-        XCTAssertEqual(v.scalarString, "function|function|function",
-                       "⭐ 大灰狼用到的 3 个 Packages 类必须都在")
+        XCTAssertEqual(v.scalarString, "function|function",
+                       "⭐ 大灰狼用到的 Packages 类必须都在")
     }
 
     // MARK: - ⑥ jsLib 的全局不会被「每次求值前清全局」清掉

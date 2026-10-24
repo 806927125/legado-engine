@@ -118,17 +118,8 @@ public final class JSCExecutor: JSExecutor {
                 js.setObject(unsafeBitCast(hostBlock, to: AnyObject.self),
                               forKeyedSubscript: "__hostJSON" as NSString)
             }
-            // ② ⭐⭐⭐ **站方 JS 的 Java 兼容层**（JavaImporter / Packages.*）
-            //
-            // ⚠️ **必须先于站方 jsLib 注入** —— 大灰狼的 jsLib 第一行就是：
-            //      `var javaImport = CompatibilityUtils.safeImport(new JavaImporter());`
-            //    ⇒ 没有 `JavaImporter` ⇒ `new` 抛错 ⇒ **jsLib 整个加载失败** ⭐
-            //    ⇒ 站方 JS 走兜底分支 ⇒ 分类变成「未分组」假分类 ⇒ 整本书打不开
-            //
-            // ⇒ 这两个文件从轻阅的老引擎**原样搬过来**（零依赖的纯 JS ⇒ 一行没改）⭐
-            for src in Self.javaCompatSources() {
-                _ = js.evaluateScript(src)
-            }
+            // ② ⭐⭐⭐ **Java 兼容层已在 context 创建时注入**（见 `cachedContext` 那段）
+            //   ⇒ 「每次求值前清全局」不会把它清掉（它在基线里）⭐
             // ③ 先把宿主对象**建出来**（包装函数要往它们身上挂）
             _ = js.evaluateScript("var source={},book={},chapter={},cookie={},cache={},java={};")
 
@@ -200,6 +191,12 @@ public final class JSCExecutor: JSExecutor {
             js = cached
         } else {
             guard let created = JavaScriptCore.JSContext() else { throw JSCError.contextUnavailable }
+            // ⭐⭐⭐ **Java 兼容层在 context 创建时就注入**（不是第一次 run 时）
+            //   ⇒ ① 语义对（它是**基础设施**，不是规则的一部分）
+            //   ⇒ ② 性能对（否则「每次求值前清全局」+ 首次注入 93KB ⇒ 复用门禁变慢）⭐
+            for src in Self.javaCompatSources() {
+                _ = created.evaluateScript(src)
+            }
             cachedContext = created
             js = created
         }
