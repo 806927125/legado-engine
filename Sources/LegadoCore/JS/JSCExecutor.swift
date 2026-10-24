@@ -47,6 +47,18 @@ public final class JSCExecutor: JSExecutor {
     /// ⇒ ⇒ 宿主通道可以在 **context 创建时**注入 ⇒ **jsLib 加载时 source/java 就已经在了** ⭐
     private var currentBase: RuleBase = .page("")
 
+    /// ⭐⭐⭐⭐⭐ **本次求值的宿主对象**（`source` / `book` / `chapter`）
+    ///
+    /// ⚠️⚠️ **为什么必须有**（2026-10-24 真机「大灰狼详情空白」实证）：
+    ///   引擎**自己**建了宿主对象（`makeSourceObject` / `makeBookObject` / `makeChapterObject`）
+    ///   —— 它们带着**引擎侧的状态**（源级变量 / 登录信息 / 书对象）
+    ///   ⇒ 但以前**根本没进 JS** ⇒ JS 只看得到 `api`（宿主/桩）提供的那个对象 ⭐⭐⭐
+    ///   ⇒ 后果：
+    ///     ① 引擎自测里宿主对象是**残的**（缺 `book.setUseReplaceRule` 等）⇒ 站方 JS 抛 TypeError
+    ///     ② 引擎那套宿主实现等于**死代码**
+    ///   ⇒ 修：**ctx 里的宿主对象优先**，`api` 的兜底（cookie 之类只有宿主才有的走 api）⭐
+    private var currentHostObjects: [String: HostObject] = [:]
+
     /// ⭐ **基线全局快照**（注入完宿主通道后的全局名集合）
     /// ⇒ 每次跑之前把「**相对基线新增的**」全删掉 ⇒ 站方 jsLib 的全局不会串源 ⭐
     private var baselineGlobals: Set<String> = []
@@ -132,6 +144,7 @@ public final class JSCExecutor: JSExecutor {
         //   ⇒ jsLib 加载（runGlobal）时 `source` / `java` **就已经在了** ⭐
         //   ⇒ 这一段现在只做两件事：**更新当前基准** + **刷新宿主对象的属性**
         currentBase = context.base
+        currentHostObjects = Self.hostObjects(from: context)
         injectHostProperties(into: js)
         // ⭐⭐ **清理站方残留的全局**（复用 context 的代价 ⇒ 必须治）
         //   站方 jsLib 定义的 `var host` / `function getArguments` 会留在全局
@@ -203,6 +216,7 @@ public final class JSCExecutor: JSExecutor {
         }
         // ⭐⭐⭐ 同样更新基准 + 宿主属性（jsLib 里也会调 `source.getVariable()`）
         currentBase = context.base
+        currentHostObjects = Self.hostObjects(from: context)
         injectHostProperties(into: js)
         let codeLiteral = JSScopeBuilder.jsonLiteral(.string(code))
         let value = js.evaluateScript("(0, eval)(" + codeLiteral + ")")
@@ -256,7 +270,8 @@ public final class JSCExecutor: JSExecutor {
     /// ⇒ 但**壳和包装函数只注入一次**（在 `makeContext` 里）⇒ 快 ⭐
     private func injectHostProperties(into js: JavaScriptCore.JSContext) {
         for name in JSHostAPI.objects {
-            guard let obj = api.hostObject(named: name) else { continue }
+            // ⭐⭐⭐ **ctx 的宿主对象优先**（引擎自己建的那套）⇒ api 的兜底
+            guard let obj = currentHostObjects[name] ?? api.hostObject(named: name) else { continue }
             guard let hostObj = js.objectForKeyedSubscript(name as NSString) else { continue }
             for (prop, value) in obj.properties {
                 if let jv = Self.toJS(value, in: js) {
@@ -264,6 +279,18 @@ public final class JSCExecutor: JSExecutor {
                 }
             }
         }
+    }
+
+    /// ⭐ **从求值上下文里取宿主对象**（`source` / `book` / `chapter`）
+    ///
+    /// ⚠️ **`cookie` / `cache` 不在这里** ⇒ 那些只有宿主（App）才有的能力
+    ///   ⇒ 走 `api` 的兜底 ⇒ 引擎不抢 ⭐
+    private static func hostObjects(from ctx: JSRunContext) -> [String: HostObject] {
+        var out: [String: HostObject] = [:]
+        if let s = ctx.source { out["source"] = s }
+        if let b = ctx.book { out["book"] = b }
+        if let c = ctx.chapter { out["chapter"] = c }
+        return out
     }
 
     /// ⭐⭐⭐ **把 Java 兼容层注入到 JSC 的全局**
@@ -383,7 +410,9 @@ public final class JSCExecutor: JSExecutor {
             if object == "java" {
                 result = provider.callJava(method, args)
             } else {
-                result = provider.hostObject(named: object)?.call(method, args)
+                // ⭐⭐⭐ **ctx 的宿主对象优先**（引擎自建的那套：带引擎侧状态）⇒ api 的兜底 ⭐
+                result = owner.currentHostObjects[object]?.call(method, args)
+                    ?? provider.hostObject(named: object)?.call(method, args)
             }
             // ⭐⭐⭐ **没人实现这个方法 ⇒ 标记给包装函数**（包装函数会**抛 TypeError**）
             //   ⇒ 行为跟老引擎一致（老引擎：方法根本不存在 ⇒ 调用就抛）⭐
