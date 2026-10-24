@@ -73,17 +73,22 @@ const invoke = async (op, payload) => {
 // ── 跑整条链 ───────────────────────────────────────────────────────────
 (async () => {
   const out = { source: src.bookSourceName, steps: {}, requests: [] };
+  // ⭐⭐⭐ **归一化「数据更新于 <当前时间>」**（那是**时钟**，不是语义）
+  //   ⇒ 每次跑都不一样 ⇒ 不归一化的话门禁永远红 ⭐
+  const normalizeStamp = (t) => String(t || '').replace(
+    /数据更新于\s*[^\n]*/g, '数据更新于 <时间戳>');
 
   // ① 详情
   const bi = await invoke('bookInfo', { source: src, bookUrl, book: { bookUrl, name: '测试书名' } });
   const book = (bi && bi.book) || {};
   const fullIntro = book.intro || '';
+  const introNorm = normalizeStamp(fullIntro);
   out.steps.bookInfo = bi.error
     ? { error: bi.error }
     : {
         name: book.name || '',
         author: book.author || '',
-        introLen: (book.intro || '').length,
+        introLen: normalizeStamp(book.intro || '').length,
         tocUrl: book.tocUrl || '',
         coverUrl: book.coverUrl || '',
       };
@@ -127,7 +132,7 @@ const invoke = async (op, payload) => {
     toc: out.steps.toc,
     content: out.steps.content,
     // ⭐ 全文（差异时打出来定位用）
-    full: { intro: fullIntro, content: fullContent },
+    full: { intro: introNorm, content: fullContent },
   };
   fs.writeFileSync(path.join(DIR, 'chain-expected.json'),
                    JSON.stringify(comparable, null, 1));

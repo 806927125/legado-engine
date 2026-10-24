@@ -111,10 +111,18 @@ final class StationDahulangChainParityTests: XCTestCase {
             content = (try? engine.content(ch, book: book)) ?? ""
         }
 
+        // ⭐⭐⭐ **归一化「数据更新于 <当前时间>」**（那是**时钟**，不是语义）
+        //   ⇒ 站方简介最后一行会打当前时间 ⇒ 两次跑必然不同 ⇒ 不归一化的话门禁永远红 ⭐
+        let normalizeStamp: (String) -> String = { t in
+            t.replacingOccurrences(of: #"数据更新于\s*[^\n]*"#, with: "数据更新于 <时间戳>",
+                                   options: .regularExpression)
+        }
+        let introNorm = normalizeStamp(info.intro)
+
         // ⑦ 逐项比对（**指名道姓**，不许只说「不一致」）
         let actual = ChainOutput(
             bookInfo: ChainBookInfo(name: info.name, author: info.author,
-                                    introLen: info.intro.count,
+                                    introLen: introNorm.count,
                                     tocUrl: info.tocUrl, coverUrl: info.coverUrl),
             toc: ChainToc(count: chapters.count,
                           chapters: chapters.map {
@@ -131,7 +139,7 @@ final class StationDahulangChainParityTests: XCTestCase {
             extra = "\n⭐ 老引擎的正文全文：\n" + ef.content.replacingOccurrences(of: "\n", with: "\\n")
                 + "\n⭐ 新引擎的正文全文：\n" + content.replacingOccurrences(of: "\n", with: "\\n")
                 + "\n⭐ 老引擎的简介全文：\n" + ef.intro.replacingOccurrences(of: "\n", with: "\\n")
-                + "\n⭐ 新引擎的简介全文：\n" + info.intro.replacingOccurrences(of: "\n", with: "\\n")
+                + "\n⭐ 新引擎的简介全文：\n" + introNorm.replacingOccurrences(of: "\n", with: "\\n")
         }
         XCTAssertTrue(diff.isEmpty,
                       "⭐⭐⭐ 整条链和老引擎不一致 ⇒ **这里就是要搬的规则语义**\n"
