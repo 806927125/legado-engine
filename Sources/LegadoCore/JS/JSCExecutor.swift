@@ -190,16 +190,10 @@ public final class JSCExecutor: JSExecutor {
         if let cached = cachedContext {
             js = cached
         } else {
-            guard let created = JavaScriptCore.JSContext() else { throw JSCError.contextUnavailable }
-            // ⭐⭐⭐ **Java 兼容层在 context 创建时就注入**（不是第一次 run 时）
-            //   ⇒ ① 语义对（它是**基础设施**，不是规则的一部分）
-            //   ⇒ ② 性能对（否则「每次求值前清全局」+ 首次注入 93KB ⇒ 复用门禁变慢）⭐
-            //
-            // ⚠️⚠️⚠️ **必须用「间接 eval」注入**（`(0, eval)(src)`）——
-            //   **JSC 的 `evaluateScript` 顶层 `var` 不进全局**（JSC 与 WebKit 的差异！）
-            //   ⇒ 直接 evaluateScript ⇒ `var JavaImporter` 是脚本局部 ⇒ 站方 jsLib 拿不到 ⇒ 全废 ⭐
-            //   ⇒ 间接 eval ⇒ **全局作用域** ⇒ 与老引擎（WKWebView）行为一致 ✔
-            Self.injectJavaCompat(into: created)
+            // ⚠️⚠️⚠️ **必须走 `makeContext()`**（它会注入 Java 兼容层）
+            //   ⇒ 以前只在 `runGlobal` 里注入 ⇒ 普通 `run` 新建 context 时**没注入**
+            //   ⇒ 站方 jsLib 拿不到 `JavaImporter` ⇒ **jsLib 整个加载失败** ⇒ 整条链废（2026-10-23 踩过）⭐
+            let created = try makeContext()
             cachedContext = created
             js = created
         }
@@ -227,6 +221,19 @@ public final class JSCExecutor: JSExecutor {
     ///   ⇒ 没有 `JavaImporter` ⇒ **`new` 抛错** ⇒ **jsLib 整个加载失败**
     ///   ⇒ 站方 JS 走兜底分支 ⇒ 分类里冒出「未分组」假分类 ⇒ **整本书打不开** ⭐
     static func javaCompatSources() -> [String] { JavaCompat.sources }
+
+    /// ⭐⭐⭐ **新建一个 context**（**并注入 Java 兼容层**）
+    ///
+    /// ⚠️⚠️ **两个入口（`run` / `runGlobal`）都必须走这里** ——
+    ///   以前只在 `runGlobal` 里注入 ⇒ 普通规则求值新建的 context **没有兼容层**
+    ///   ⇒ 站方 jsLib 拿不到 `JavaImporter` ⇒ **jsLib 整个加载失败** ⇒ 整本书打不开 ⭐
+    private func makeContext() throws -> JavaScriptCore.JSContext {
+        guard let created = JavaScriptCore.JSContext() else { throw JSCError.contextUnavailable }
+        // ⭐ Java 兼容层是**基础设施** ⇒ 在 context 建立时就注入（不是第一次 run 时）
+        //   ⇒ 性能：复用路径第二次 run 不再注入（否则复用门禁会变慢）⭐
+        Self.injectJavaCompat(into: created)
+        return created
+    }
 
     /// ⭐⭐⭐ **把 Java 兼容层注入到 JSC 的全局**
     ///
