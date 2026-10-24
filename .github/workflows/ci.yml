@@ -23,11 +23,20 @@ jobs:
         run: |
           set -euo pipefail
           SWIFT_VERSION=6.1.2
-          TARBALL="swift-${SWIFT_VERSION}-RELEASE-ubuntu22.04"
-          URL="https://download.swift.org/swift-${SWIFT_VERSION}-release/ubuntu2204/${TARBALL}/${TARBALL}.tar.gz"
-          echo "⬇️ 下载 $URL"
-          curl -fL --retry 3 --retry-delay 5 -o /tmp/swift.tar.gz "$URL"
+          BASE="https://download.swift.org/swift-${SWIFT_VERSION}-release/ubuntu2204"
+          TARBALL="swift-${SWIFT_VERSION}-RELEASE-ubuntu22.04.tar.gz"
           mkdir -p "$HOME/swift-toolchain"
+          ok=0
+          # ⚠️ **两个 URL 都试** ⇒ swift.org 的目录结构改过（踩过 404）
+          for URL in \
+            "$BASE/swift-${SWIFT_VERSION}-RELEASE/$TARBALL" \
+            "$BASE/swift-${SWIFT_VERSION}-RELEASE-ubuntu22.04/$TARBALL" ; do
+            echo "⬇️ 试 $URL"
+            if curl -fL --retry 3 --retry-delay 5 -o /tmp/swift.tar.gz "$URL"; then
+              ok=1; break
+            fi
+          done
+          [ "$ok" = 1 ] || { echo "❌ 工具链下载失败（swift.org 路径变了？）"; exit 1; }
           tar xzf /tmp/swift.tar.gz -C "$HOME/swift-toolchain" --strip-components=1
           echo "$HOME/swift-toolchain/usr/bin" >> "$GITHUB_PATH"
           # ⚠️ 系统依赖（curl/xml2/sqlite…）—— 装不上也不该让整个 job 死
