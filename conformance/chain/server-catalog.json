@@ -1,0 +1,33 @@
+{
+ "code": 0,
+ "msg": "ok",
+ "data": [
+  {
+   "title": "第一章 风起",
+   "item_id": "7400000000000000001",
+   "url": "",
+   "toc_url": "",
+   "is_volume": false,
+   "first_pass_time": "2026-10-01 10:00:00",
+   "word_number": "2100"
+  },
+  {
+   "title": "第二章 云涌",
+   "item_id": "7400000000000000002",
+   "url": "",
+   "toc_url": "",
+   "is_volume": false,
+   "first_pass_time": "2026-10-02 10:00:00",
+   "word_number": "2300"
+  },
+  {
+   "title": "第三章 破晓",
+   "item_id": "7400000000000000003",
+   "url": "",
+   "toc_url": "",
+   "is_volume": false,
+   "first_pass_time": "2026-10-03 10:00:00",
+   "word_number": "2500"
+  }
+ ]
+}

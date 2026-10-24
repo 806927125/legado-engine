@@ -1,0 +1,33 @@
+{
+ "bookInfo": {
+  "name": "测试书名",
+  "author": "测试作者",
+  "introLen": 338,
+  "tocUrl": "data:;base64,eyJib29rX2lkIjoiNzY1MDM1NDc4MDYyNTAyMzUxMiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian2\"}",
+  "coverUrl": "https://example.com/c.jpg"
+ },
+ "toc": {
+  "count": 3,
+  "chapters": [
+   {
+    "title": "第一章 风起",
+    "url": "data:;base64,eyJib29rX2lkIjoiNzY1MDM1NDc4MDYyNTAyMzUxMiIsIml0ZW1faWQiOiI3NDAwMDAwMDAwMDAwMDAwMDAxIiwidGl0bGUiOiLnrKzkuIDnq6Ag6aOO6LW3IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第二章 云涌",
+    "url": "data:;base64,eyJib29rX2lkIjoiNzY1MDM1NDc4MDYyNTAyMzUxMiIsIml0ZW1faWQiOiI3NDAwMDAwMDAwMDAwMDAwMDAyIiwidGl0bGUiOiLnrKzkuoznq6Ag5LqR5raMIiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第三章 破晓",
+    "url": "data:;base64,eyJib29rX2lkIjoiNzY1MDM1NDc4MDYyNTAyMzUxMiIsIml0ZW1faWQiOiI3NDAwMDAwMDAwMDAwMDAwMDAzIiwidGl0bGUiOiLnrKzkuInnq6Ag56C05pmTIiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   }
+  ]
+ },
+ "content": {
+  "len": 25,
+  "head": "这是测试正文的第一段，用来验证正文链路。\n第二段。"
+ }
+}
