@@ -1,0 +1,19 @@
+{
+ "code": 0,
+ "msg": "ok",
+ "data": {
+  "book_id": "7650354780625023512",
+  "book_name": "测试书名",
+  "author": "测试作者",
+  "thumb_url": "https://example.com/c.jpg",
+  "abstract": "测试简介",
+  "word_number": "12万字",
+  "category": "都市",
+  "score": "9.0",
+  "status": "连载中",
+  "source": "番茄",
+  "last_chapter_title": "第1章",
+  "last_update_time": "2026-10-24",
+  "tags": "都市|热血"
+ }
+}
