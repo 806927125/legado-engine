@@ -18,35 +18,56 @@ jobs:
       #   ⇒ 直接报「Error: Version "26.04" of Ubuntu is not supported」
       #   ⇒ **这个 job 一步都没跑** ⇒ 规格门禁 + 双实现对拍**全瞎**
       #     （最坏的一种：门禁"绿"其实是没跑 ⇒ 什么都不知道）⭐
-      # ⇒ 改成**直接下载官方工具链**（不依赖任何 action 的 OS 表 ⇒ 以后镜像再升级也不会断）
-      - name: 装 Swift 工具链（直接下载官方 tarball · 版本与沙盒一致）
+      #
+      # ⭐⭐ **改用 runner 自带的 Swift**（macOS job 一直就是这么做的 ⇒ 与镜像同版本）
+      #   ⇒ 不用下 800MB，也不用担心系统库版本
+      #
+      # ⚠️⚠️ **绝对不能混用两套工具链**（本轮又栽了一次）：
+      #   `swift`（runner 自带 6.4）驱动时去 PATH 里找 `swift-build`
+      #   ⇒ 找下载那套（6.1.2）⇒ **Ubuntu 26.04 没有 `libxml2.so.2`**（apt 里叫 libxml2t64）
+      #   ⇒ `swift-build: error while loading shared libraries` ⇒ **exit 127** ⭐
+      # ⇒ 所以：**要么全用 runner 的，要么全用下载的** ⇒ 下面按这个来
+      - name: 装 Swift 工具链（优先用 runner 自带的 · 缺失才下载官方 tarball）
         run: |
           set -euo pipefail
-          SWIFT_VERSION=6.1.2
-          BASE="https://download.swift.org/swift-${SWIFT_VERSION}-release/ubuntu2204"
-          TARBALL="swift-${SWIFT_VERSION}-RELEASE-ubuntu22.04.tar.gz"
-          mkdir -p "$HOME/swift-toolchain"
-          ok=0
-          # ⚠️ **两个 URL 都试** ⇒ swift.org 的目录结构改过（踩过 404）
-          for URL in \
-            "$BASE/swift-${SWIFT_VERSION}-RELEASE/$TARBALL" \
-            "$BASE/swift-${SWIFT_VERSION}-RELEASE-ubuntu22.04/$TARBALL" ; do
-            echo "⬇️ 试 $URL"
-            if curl -fL --retry 3 --retry-delay 5 -o /tmp/swift.tar.gz "$URL"; then
-              ok=1; break
-            fi
-          done
-          [ "$ok" = 1 ] || { echo "❌ 工具链下载失败（swift.org 路径变了？）"; exit 1; }
-          tar xzf /tmp/swift.tar.gz -C "$HOME/swift-toolchain" --strip-components=1
-          echo "$HOME/swift-toolchain/usr/bin" >> "$GITHUB_PATH"
-          # ⚠️ 系统依赖（curl/xml2/sqlite…）—— 装不上也不该让整个 job 死
-          #   （工具链自带绝大多数运行时库 ⇒ 这步只是保险）
-          sudo apt-get update -qq || true
-          sudo apt-get install -y --no-install-recommends \
-            libcurl4 libxml2 libatomic1 libedit2 libsqlite3-0 libz3-4 || true
+          if command -v swift >/dev/null 2>&1; then
+            echo "✅ 用 runner 自带的 Swift：$(command -v swift)"
+          else
+            echo "⬇️ runner 没自带 ⇒ 下载官方 tarball（6.1.2 · 与沙盒同版本）"
+            SWIFT_VERSION=6.1.2
+            BASE="https://download.swift.org/swift-${SWIFT_VERSION}-release/ubuntu2204"
+            TARBALL="swift-${SWIFT_VERSION}-RELEASE-ubuntu22.04.tar.gz"
+            mkdir -p "$HOME/swift-toolchain"
+            ok=0
+            # ⚠️ **两个 URL 都试** ⇒ swift.org 的目录结构改过（踩过 404）
+            for URL in \
+              "$BASE/swift-${SWIFT_VERSION}-RELEASE/$TARBALL" \
+              "$BASE/swift-${SWIFT_VERSION}-RELEASE-ubuntu22.04/$TARBALL" ; do
+              echo "⬇️ 试 $URL"
+              if curl -fL --retry 3 --retry-delay 5 -o /tmp/swift.tar.gz "$URL"; then
+                ok=1; break
+              fi
+            done
+            [ "$ok" = 1 ] || { echo "❌ 工具链下载失败（swift.org 路径变了？）"; exit 1; }
+            tar xzf /tmp/swift.tar.gz -C "$HOME/swift-toolchain" --strip-components=1
+            # ⚠️ Ubuntu 24.04+ 的包名加了 **t64** 后缀（libxml2 ⇒ libxml2t64）
+            #   ⇒ 两套名字都试 ⇒ 少了 libxml2.so.2 的话 swift-build 直接 exit 127 ⭐
+            sudo apt-get update -qq || true
+            sudo apt-get install -y --no-install-recommends \
+              libxml2t64 libcurl4t64 libsqlite3-0t64 libatomic1 libedit2t64 zlib1g || \
+            sudo apt-get install -y --no-install-recommends \
+              libxml2 libcurl4 libsqlite3-0 libatomic1 libedit2 zlib1g || true
+            export PATH="$HOME/swift-toolchain/usr/bin:$PATH"
+            echo "$HOME/swift-toolchain/usr/bin" >> "$GITHUB_PATH"
+          fi
           # ⭐ 必须**真的跑一下** ⇒ 装坏了要当场炸，不能悄悄跳过门禁
           swift --version
           swift package --version
+          # ⚠️ **两套工具链混用的自检**：`swift` 和 `swift-build` 必须在同一个目录
+          echo "swift       → $(command -v swift)"
+          echo "swift-build → $(command -v swift-build)"
+          [ "$(dirname "$(command -v swift)")" = "$(dirname "$(command -v swift-build)")" ] \
+            || { echo "❌ swift 与 swift-build 不在同一套工具链里（会 exit 127）"; exit 1; }
 
       - uses: actions/setup-node@v4
         with:
