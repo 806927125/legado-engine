@@ -62,7 +62,9 @@ final class VarBoxJavaTests: XCTestCase {
         e.engineJava("put", [.string("xid"), .string("X-9")], .page(""))
         // ⭐ 走**正常求值路径**（`@get:{xid}`）⇒ 必须读得到
         let ev = Evaluator()
-        let ctx = EvalContext(base: .page(""), varBox: e.varBox)
+        // ⭐ ctx 的 varBox = **java 变量那份**（老引擎：`@put:/@get:` 与 `java.put/get`
+        //   **共用引擎内部的 runtime.vars**）⇒ 而**站方变量是另一份**（`source.getVariable()`）⭐⭐⭐
+        let ctx = EvalContext(base: .page(""), varBox: e.javaVars)
         let out = ev.evalOne("@get:{xid}", base: .page(""), ctx: ctx)
         XCTAssertEqual(out.value.text, "X-9",
                        "⭐⭐ java.put 写的变量，后续规则必须读得到（共享存储）")
@@ -75,10 +77,34 @@ final class VarBoxJavaTests: XCTestCase {
         let e = try engine()
         let ev = Evaluator()
         let base = RuleBase.json(.object(["v": .string("值V")]))
-        let ctx = EvalContext(base: base, varBox: e.varBox)
+        let ctx = EvalContext(base: base, varBox: e.javaVars)
         _ = ev.evalOne("@put:{myKey:$.v}", base: base, ctx: ctx)
         XCTAssertEqual(e.engineJava("get", [.string("myKey")], .page(""))?.scalarString, "值V",
                        "⭐ @put: 与 java.get 必须共用同一份存储")
+    }
+
+    /// ⭐⭐⭐ **`java.put` 不许污染【站方变量】**（老引擎语义 · 2026-10-24 整链对拍实证）
+    ///
+    /// ⚠️⚠️ **为什么是条铁律**：
+    ///   站方（🍅大灰狼）用 `getArguments(source.getVariable(), 'server')` 取线路
+    ///   ⇒ **`source.getVariable()` 解析失败时，站方才用自己的默认表兜底**
+    ///   ⇒ 一旦站方变量变成「**只含一项的裸 JSON**」（比如被 `java.put('book_id',…)` 污染）
+    ///   ⇒ `JSON.parse` **成功了** ⇒ **默认表不再兜底** ⇒ `server`/`proxy`/`fqpara` 全 `undefined` ⭐⭐⭐
+    ///   ⇒ 大灰狼的简介里直接出现「📡 当前服务：undefined」⇒ 详情/目录/正文的参数全废 ⭐
+    ///
+    /// ⇒ 老引擎（= Legado 语义）：`java.put/get` 与 `@put:/@get:` 用**引擎内部**那份，
+    ///   `source.getVariable/setVariable` 用**站方变量**那份 ⇒ **两套，互不污染** ⭐
+    func testJavaPutDoesNotPolluteSourceVariables() throws {
+        let e = try engine()
+        // ① 站方 JS 写引擎内部变量
+        e.engineJava("put", [.string("book_id"), .string("B-1")], .page(""))
+        // ② 站方变量那份**必须还是空的**（⇒ 站方 getArguments 会用默认表兜底）⭐
+        XCTAssertEqual(e.varBox.all.isEmpty, true,
+                       "⭐⭐⭐ `java.put` 污染了站方变量 ⇒ 站方默认表不再兜底 ⇒ server/proxy 全 undefined")
+        // ③ 反过来：站方写站方变量 ⇒ `java.get` **读不到**（两套存储）⭐
+        e.varBox.set("server", "https://v5.langge.uk")
+        XCTAssertEqual(e.engineJava("get", [.string("server")], .page(""))?.scalarString, "",
+                       "⭐⭐⭐ 站方变量不该被 `java.get` 读到（老引擎：两套存储）")
     }
 
     /// ⚠️ `java.getString('key')`（不带 `$`）⇒ **读变量**，不做 JSONPath

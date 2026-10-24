@@ -29,6 +29,19 @@ public final class SourceEngine {
     public let fetcher: PageFetcher
     /// ⭐⭐ **源级变量的共享存储**（站方 `java.put` / `java.get` 读写的就是它）
     public let varBox: VarBox
+
+    /// ⭐⭐⭐ **`java.put/get` 的独立存储**（**不是**站方变量那份！）
+    ///
+    /// ⚠️⚠️ **为什么必须分开**（2026-10-24 整链对拍实证）：
+    ///   · **老引擎**（= Legado 语义）：`java.put/get` 写引擎内部的 `runtime.vars`
+    ///     而 `source.getVariable()` 返回**站方变量**（用户在 UI 里设的那份）⇒ **两套，互不污染** ⭐
+    ///   · **以前的新引擎**：两者**共用 varBox** ⇒ 站方 JS 一句 `java.put('book_id', …)`
+    ///     就把**站方变量**污染成「只含 book_id 的裸 JSON」⭐⭐⭐
+    ///     ⇒ 站方 `getArguments(source.getVariable(), 'server')` ⇒ `JSON.parse` **成功了**
+    ///     ⇒ ⇒ **站方默认表不再兜底** ⇒ `server`/`proxy`/`fqpara` 全 `undefined` ⭐
+    ///     ⇒ 大灰狼简介里「📡 当前服务：undefined」⇒ 详情/目录/正文的参数全废 ⭐⭐⭐
+    ///   ⇒ 修：**`java.put/get` 走 javaVars；`source.getVariable/setVariable` 走 varBox** ⭐
+    public let javaVars: VarBox
     /// ⭐⭐ **DOM 缓存**（同一个页面只解析一次 —— 实测省 ~20ms）
     public let domCache: DOMCache
     /// ⭐⭐ **源级请求头**（`BookSource.header`）—— 125 源里 **54 个**在用
@@ -82,6 +95,7 @@ public final class SourceEngine {
         self.sourceHeaders = Self.parseSourceHeader(source.header)
         // ⭐⭐ 源级变量的**共享**存储（跨规则 / 跨 JS 调用可写）
         self.varBox = VarBox()
+        self.javaVars = VarBox()
         // ⭐ DOM 缓存（每源一个 ⇒ 天然隔离）
         self.domCache = DOMCache()
         self.evaluator = Evaluator(js: js)
@@ -173,7 +187,7 @@ public final class SourceEngine {
             }
             let out = try js.run(jsCode, context: JSRunContext(base: .page(""),
                                                                  baseUrl: source.bookSourceUrl,
-                                                                 varBox: varBox))
+                                                                 varBox: javaVars))
             rawItems = Self.exploreItems(from: out)
         } else {
             // ② 静态形态
@@ -201,7 +215,7 @@ public final class SourceEngine {
                     let code = String(u.dropFirst(4))
                     let out = try js.run(code, context: JSRunContext(base: .page(""),
                                                                      baseUrl: source.bookSourceUrl,
-                                                                     varBox: varBox))
+                                                                     varBox: javaVars))
                     let real = out.scalarString.trimmingCharacters(in: .whitespacesAndNewlines)
                     kinds[i].url = real.isEmpty ? "" : Self.absolute(real, base: source.bookSourceUrl)
                 }
@@ -473,7 +487,7 @@ public final class SourceEngine {
         if let initRule = rules?.initRule, !initRule.isEmpty {
             let initCtx = EvalContext(base: .page(p.text), baseUrl: p.url, raw: p.text,
                                      book: bookObject, source: sourceObject,
-                                     varBox: varBox, isJSON: p.isJSON, document: p.document)
+                                     varBox: javaVars, isJSON: p.isJSON, document: p.document)
             let e = evaluator.evalOne(initRule, base: initCtx.base, ctx: initCtx)
             diagnostics.append(e.diagnostic)
             logger?.log(Self.diagnosticLine(e.diagnostic))
@@ -774,18 +788,20 @@ public final class SourceEngine {
                                              utcOffsetHours: tz))
         case "getString":
             if first.hasPrefix("$") || first.hasPrefix("result") {
-                let ctx = EvalContext(base: base, varBox: varBox)
+                let ctx = EvalContext(base: base, varBox: javaVars)
                 return .string(VarStore.evalVarExpr(first, ctx: ctx))
             }
-            return .string(varBox.get(first) ?? "")
-        // ⭐ `java.get(key)` / `java.get(key, default)` ⇒ **读源级变量**
+            return .string(javaVars.get(first) ?? "")
+        // ⭐ `java.get(key)` / `java.get(key, default)` ⇒ **读 java 变量**（**独立存储**）
+        //   ⚠️⚠️ **不是站方变量那份**（老引擎语义）⇒ 不然会污染 `source.getVariable()` ⭐⭐⭐
         case "get":
             let def = args.count > 1 ? args[1].scalarString : ""
-            return .string(varBox.get(first) ?? def)
-        // ⭐ `java.put(key, value)` ⇒ **写源级变量**（共享存储 ⇒ 后续规则读得到）
+            return .string(javaVars.get(first) ?? def)
+        // ⭐ `java.put(key, value)` ⇒ **写 java 变量**（独立存储 ⇒ 后续规则读得到）
+        //   ⚠️⚠️ **不能写站方变量那份**（老引擎语义）⭐⭐⭐
         case "put":
             let value = args.count > 1 ? args[1].scalarString : ""
-            varBox.set(first, value)
+            javaVars.set(first, value)
             return .string("")
         // ⭐⭐ **宿主侧的出口**（站方 JS 的提示 / 日志 / cookie）
         //
@@ -947,7 +963,7 @@ public final class SourceEngine {
     /// ⇒ 而**普通规则求值用 eval 局部作用域**（否则 `let device_type` 撞全局 ⇒ 炸）⭐
     public func loadJsLib(_ code: String) throws {
         guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
-        let ctx = JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl, varBox: varBox)
+        let ctx = JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl, varBox: javaVars)
         _ = try js.runGlobal(code, context: ctx)
         // ⭐⭐ **必须重设基线** ⇒ 站方 jsLib 定义的全局要长期保留
         //   （否则「每次求值前清全局」会把它们删掉 ⇒ 站方规则一调就炸）⭐
@@ -971,7 +987,7 @@ public final class SourceEngine {
             return false
         }
         guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接，无法加载登录脚本") }
-        let runCtx = JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl, varBox: varBox)
+        let runCtx = JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl, varBox: javaVars)
         // ⭐⭐⭐ **必须走 `runGlobal`（间接 eval）**（2026-10-24 真机栽的）
         //   站方 loginUrl 定义的 `function login()` / `get_type()` **是全局函数**
         //   ⇒ 用 `run`（函数内 eval）⇒ 它们变成**局部** ⇒ 后续调用 `login()`
@@ -998,7 +1014,7 @@ public final class SourceEngine {
             guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
             let out = try js.run(String(t.dropFirst(4)),
                                 context: JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl,
-                                                      varBox: varBox))
+                                                      varBox: javaVars))
             text = out.scalarString
         } else {
             text = raw
@@ -1032,7 +1048,7 @@ public final class SourceEngine {
         guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
         let out = try js.run("login()",
                             context: JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl,
-                                                  varBox: varBox))
+                                                  varBox: javaVars))
         return out.scalarString
     }
 
@@ -1041,7 +1057,7 @@ public final class SourceEngine {
         guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
         let out = try js.run(action,
                             context: JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl,
-                                                  varBox: varBox))
+                                                  varBox: javaVars))
         return out.scalarString
     }
 
@@ -1056,7 +1072,7 @@ public final class SourceEngine {
         guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
         let out = try js.run(code,
                             context: JSRunContext(base: .page(pageText), baseUrl: pageURL,
-                                                  raw: pageText, varBox: varBox))
+                                                  raw: pageText, varBox: javaVars))
         return out.scalarString
     }
 
@@ -1341,7 +1357,7 @@ public final class SourceEngine {
                        key: String = "") throws -> Page {
         let baseURL = base ?? source.bookSourceUrl
         // 模板插值（`{{page}}` / `{{key}}` / `{{baseUrl}}`）
-        var ctx = EvalContext(base: .page(""), baseUrl: baseURL, varBox: varBox)
+        var ctx = EvalContext(base: .page(""), baseUrl: baseURL, varBox: javaVars)
         ctx.page = page
         ctx.key = key
         let rule = TemplateEngine.render(urlRule, ctx: ctx)
@@ -1429,7 +1445,7 @@ public final class SourceEngine {
     private func listItems(_ rule: String, page: Page, field: String,
                            strict: Bool = true) throws -> [ListItem] {
         let ctx = EvalContext(base: .page(page.text), baseUrl: page.url, raw: page.text,
-                              varBox: varBox, isJSON: page.isJSON, document: page.document)
+                              varBox: javaVars, isJSON: page.isJSON, document: page.document)
         // ⭐⭐⭐ **按【规则形态】分流，不只看页面是不是 JSON**（老引擎 `rule.getJsonList` 的口径）
         //
         //   老引擎：`specKind = rule.classify(spec); if (specKind === rule.T.JS) → getJsonList`
@@ -1483,7 +1499,7 @@ public final class SourceEngine {
                             strict: Bool = true) throws -> [DOMNodeRef] {
         let ctx = EvalContext(base: .page(page.text), baseUrl: page.url, raw: page.text,
                               book: bookObject, source: sourceObject, chapter: chapterObject,
-                              varBox: varBox, isJSON: page.isJSON, document: page.document)
+                              varBox: javaVars, isJSON: page.isJSON, document: page.document)
         let nodes = evaluator.evalNodes(rule, base: ctx.base, ctx: ctx)
         // ⚠️ 翻页时 `strict = false` —— 后面某页没命中是常态，**不许炸掉整个目录**
         if nodes.isEmpty, strict { throw SourceError.emptyResult(field) }
@@ -1504,7 +1520,7 @@ public final class SourceEngine {
         guard let rule, !rule.isEmpty else { return [] }
         let base: RuleBase = .page(page.text)
         let ctx = EvalContext(base: base, baseUrl: page.url, raw: page.text,
-                              varBox: varBox, isJSON: page.isJSON, document: page.document)
+                              varBox: javaVars, isJSON: page.isJSON, document: page.document)
         let e = evaluator.evalOne(rule, base: base, ctx: ctx)
         diagnostics.append(e.diagnostic)
         logger?.log(Self.diagnosticLine(e.diagnostic))
@@ -1566,7 +1582,7 @@ public final class SourceEngine {
         let ctx = EvalContext(base: overrideBase ?? item?.base ?? .page(page.text),
                               baseUrl: page.url, raw: page.text,
                               book: bookObject, source: sourceObject, chapter: chapterObject,
-                              varBox: varBox, isJSON: page.isJSON, document: page.document)
+                              varBox: javaVars, isJSON: page.isJSON, document: page.document)
         let rendered = TemplateEngine.render(t, ctx: ctx)
         // ②b ⭐ 走 `URLBuilder.parse` ⇒ **剥掉 `,{json}` 选项后缀** + 绝对化
         //   （站方真实写法：`https://chuangshi.qq.com/chapter/26150754,{"headers":{…}}`
@@ -1606,7 +1622,7 @@ public final class SourceEngine {
         let base: RuleBase = overrideBase ?? item.map { $0.base } ?? .page(page.text)
         let ctx = EvalContext(base: base, baseUrl: page.url, raw: page.text,
                               book: bookObject, source: sourceObject, chapter: chapterObject,
-                              varBox: varBox, isJSON: page.isJSON, document: page.document)
+                              varBox: javaVars, isJSON: page.isJSON, document: page.document)
         let e = evaluator.evalOne(rule, base: base, ctx: ctx)
         diagnostics.append(e.diagnostic)
         // ⭐ 把诊断**同时**送进宿主日志（宿主才能回放给用户看）
@@ -1624,7 +1640,7 @@ public final class SourceEngine {
         let base: RuleBase = .page(page.text)
         let ctx = EvalContext(base: base, baseUrl: page.url, raw: page.text,
                               book: bookObject, source: sourceObject, chapter: chapterObject,
-                              varBox: varBox, isJSON: page.isJSON, document: page.document)
+                              varBox: javaVars, isJSON: page.isJSON, document: page.document)
         let e = evaluator.evalOne(rule, base: base, ctx: ctx)
         diagnostics.append(e.diagnostic)
         logger?.log(Self.diagnosticLine(e.diagnostic))

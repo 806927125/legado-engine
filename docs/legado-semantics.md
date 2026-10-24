@@ -1425,7 +1425,22 @@ if (dot >= 0 && (KW[kw] || isHtmlTag(kw))) {   // ← 必须有「kw.」前缀�
 | `java.randomUUID` / `toNumChapter` | 2/1 | **引擎** |
 | `java.toast` / `log` / `getCookie` / `startBrowser` / `searchBook` … | — | **宿主**（本来就不该引擎做）|
 
-⚠️ **`java.getString` / `get` / `put` 是读/写【源级变量】**，不是读文件。
+⚠️ **`java.getString` / `get` / `put` 不是读文件**。
+
+⭐⭐⭐ **2026-10-24 整链对拍实证：变量有【两套】，不能合并**（老引擎 = Legado 语义）：
+| 存储 | 谁在用 | 引擎里的对应 |
+|---|---|---|
+| **引擎内部变量表** | `java.put/get/del` **＋ `@put:` / `@get:`** | `javaVars` |
+| **站方变量** | `source.getVariable/setVariable`（用户在 UI 里设的那份） | `varBox` |
+
+⇒ ⚠️⚠️ **合并的代价**（🍅大灰狼实证）：站方 JS 一句 `java.put('book_id', …)`
+⇒ 把**站方变量**污染成「只含一项的裸 JSON」
+⇒ 站方 `getArguments(source.getVariable(), 'server')` 的 `JSON.parse` **成功了**
+⇒ ⇒ **站方默认表不再兜底** ⇒ `server` / `proxy` / `fqpara` 全 `undefined` ⭐⭐⭐
+⇒ ⇒ 简介里直接出现「📡 当前服务：undefined」⇒ **详情/目录/正文的参数全废** ⭐
+
+⇒ **铁律**：站方变量**必须能是空的**（空 ⇒ 站方才用自己的默认表兜底）⭐
+   ⇒ 宿主侧同理：**变量要以「站方默认表」做底**，再盖用户的改动（只写一项会把源改坏）⭐
 
 ### S-JS-17 ⭐ 契约清单必须 ⊇ 真实用量（且清单本身要从源包**自动扫**）
 **规范**：`JSHostAPI`（契约）必须覆盖书源真实调用的每个 `java.*`。
