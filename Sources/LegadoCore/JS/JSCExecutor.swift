@@ -88,9 +88,11 @@ public final class JSCExecutor: JSExecutor {
         if let cached = cachedContext {
             js = cached
         } else {
-            guard let created = JavaScriptCore.JSContext() else {
-                throw JSCError.contextUnavailable
-            }
+            // ⚠️⚠️⚠️ **必须走 `makeContext()`**（它会注入 **Java 兼容层**）
+            //   ⇒ 少了这一步 ⇒ 站方 jsLib 拿不到 `JavaImporter` ⇒ **jsLib 整个加载失败**
+            //   ⇒ 站方 JS 走兜底分支 ⇒ 分类变成「未分组」假分类 ⇒ **整本书打不开** ⭐
+            //   （真机实证：🍅大灰狼聚合 · 2026-10-23）
+            let created = try makeContext()
             cachedContext = created
             js = created
         }
