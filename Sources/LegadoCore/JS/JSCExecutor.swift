@@ -218,7 +218,7 @@ public final class JSCExecutor: JSExecutor {
         return Self.toJSON(value)
     }
 
-    // MARK: - ⭐⭐⭐ 站方 JS 的 Java 兼容层（资源）
+    // MARK: - ⭐⭐⭐ 站方 JS 的 Java 兼容层（源码编进 Swift ⇒ 不依赖 Bundle.module）
 
     /// ⭐⭐⭐ **Java 兼容层的 JS 源码**（`packages_stub.js` + `packages-native.js`）
     ///
@@ -229,24 +229,7 @@ public final class JSCExecutor: JSExecutor {
     ///   大灰狼的 jsLib 第一行：`var javaImport = CompatibilityUtils.safeImport(new JavaImporter());`
     ///   ⇒ 没有 `JavaImporter` ⇒ **`new` 抛错** ⇒ **jsLib 整个加载失败**
     ///   ⇒ 站方 JS 走兜底分支 ⇒ 分类里冒出「未分组」假分类 ⇒ **整本书打不开** ⭐
-    static func javaCompatSources() -> [String] {
-        // ⚠️ 资源读不到（不该发生）⇒ 返回空 ⇒ 至少不崩，站方 JS 会报「JavaImporter is not defined」
-        // ⚠️ 两个路径都试（`.process` 会展平 ⇒ 根目录；但保险起见）
-        func find(_ name: String) -> URL? {
-            Bundle.module.url(forResource: name, withExtension: "js")
-                ?? Bundle.module.url(forResource: name, withExtension: "js", subdirectory: "Resources")
-        }
-        guard let stubURL = find("packages_stub"),
-              let nativeURL = find("packages_native"),
-              let stub = try? String(contentsOf: stubURL, encoding: .utf8),
-              let native = try? String(contentsOf: nativeURL, encoding: .utf8)
-        else {
-            // ⚠️ 读不到 ⇒ 明确记一笔（不然站方 JS 报「JavaImporter is not defined」，看不出真因）
-            NSLog("[legado-engine] ⚠️ Java 兼容层资源读不到（packages_stub.js / packages_native.js）")
-            return []
-        }
-        return [stub, native]
-    }
+    static func javaCompatSources() -> [String] { JavaCompat.sources }
 
     // MARK: - 宿主对象 → JS 对象
 
