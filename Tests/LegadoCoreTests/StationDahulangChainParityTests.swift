@@ -65,6 +65,8 @@ final class StationDahulangChainParityTests: XCTestCase {
         let expectedData = try Data(contentsOf:
             Self.chainDir.appendingPathComponent("chain-expected.json"))
         let expected = try JSONDecoder().decode(ChainOutput.self, from: expectedData)
+        // ⭐ **老引擎的全文**（在 expected.json 里；没有就空）
+        let expectedFull = (try? JSONDecoder().decode(ChainFull.self, from: expectedData)) ?? nil
 
         // ② 源（真规则 + 真 jsLib）
         let srcData = try Data(contentsOf:
@@ -123,9 +125,16 @@ final class StationDahulangChainParityTests: XCTestCase {
         if ch == nil {
             diff.insert("  · ⭐ **目录里没有可用章节**（章节数=\(chapters.count)）", at: 0)
         }
+        var extra = ""
+        if let ef = expectedFull {
+            extra = "\n⭐ 老引擎的正文全文：\n" + ef.content.replacingOccurrences(of: "\n", with: "\\n")
+                + "\n⭐ 新引擎的正文全文：\n" + content.replacingOccurrences(of: "\n", with: "\\n")
+                + "\n⭐ 老引擎的简介全文：\n" + ef.intro.replacingOccurrences(of: "\n", with: "\\n")
+                + "\n⭐ 新引擎的简介全文：\n" + info.intro.replacingOccurrences(of: "\n", with: "\\n")
+        }
         XCTAssertTrue(diff.isEmpty,
                       "⭐⭐⭐ 整条链和老引擎不一致 ⇒ **这里就是要搬的规则语义**\n"
-                      + diff.joined(separator: "\n")
+                      + diff.joined(separator: "\n") + extra
                       + "\n引擎日志：\n" + logger.all.joined(separator: "\n"))
     }
 
@@ -205,6 +214,12 @@ final class StationDahulangChainParityTests: XCTestCase {
     struct ChainContent: Codable {
         var len: Int
         var head: String
+    }
+
+    /// ⭐ **全文（转义后）** —— 差异时打出来，一眼看出差在哪
+    struct ChainFull: Codable {
+        var intro: String
+        var content: String
     }
 
     // MARK: - 宿主（与老引擎那侧对齐的能力集）

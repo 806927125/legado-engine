@@ -77,6 +77,7 @@ const invoke = async (op, payload) => {
   // ① 详情
   const bi = await invoke('bookInfo', { source: src, bookUrl, book: { bookUrl, name: '测试书名' } });
   const book = (bi && bi.book) || {};
+  const fullIntro = book.intro || '';
   out.steps.bookInfo = bi.error
     ? { error: bi.error }
     : {
@@ -105,6 +106,7 @@ const invoke = async (op, payload) => {
 
   // ③ 正文（第一册非卷章节）
   const ch = chapters.find((c) => c.url && !c.isVolume);
+  let fullContent = '';
   if (!ch) {
     out.steps.content = { error: '没有可用的章节' };
   } else {
@@ -112,6 +114,7 @@ const invoke = async (op, payload) => {
       source: src, chapterUrl: ch.url, chapter: ch, book,
     });
     const text = (ct && ct.content) || '';
+    fullContent = text;
     out.steps.content = ct.error
       ? { error: ct.error }
       : { len: text.length, head: text.slice(0, 60) };
@@ -123,6 +126,8 @@ const invoke = async (op, payload) => {
     bookInfo: out.steps.bookInfo,
     toc: out.steps.toc,
     content: out.steps.content,
+    // ⭐ 全文（差异时打出来定位用）
+    full: { intro: fullIntro, content: fullContent },
   };
   fs.writeFileSync(path.join(DIR, 'chain-expected.json'),
                    JSON.stringify(comparable, null, 1));
