@@ -34,7 +34,18 @@ public final class JSCExecutor: JSExecutor {
     private var cachedContext: JavaScriptCore.JSContext?
 
     /// 宿主通道 / 包装函数**是否已注入**（契约不变 ⇒ 只注入一次）
-    private var hostChannelReady = false
+
+    /// ⭐⭐⭐ **当前基准** —— `java.getString('$.x')` 的 JSONPath 要对它求值
+    ///
+    /// ⚠️⚠️ **为什么改成「可变」**（2026-10-24）：
+    ///   原来 `makeHostBlock` **捕获了 base** ⇒ 每跑一次就得重建 block ⇒
+    ///   ⇒ 宿主通道（source/java/...）**只能在 `run` 里注入** ⇒
+    ///   ⇒ **`runGlobal`（加载 jsLib）时 `source`/`java` 还不存在** ⇒
+    ///   ⇒ **jsLib 半残** ⇒ 站方 JS 走兜底分支 ⇒ 分类变成「未分组」假分类 ⇒ 整本书打不开 ⭐
+    ///
+    /// ⇒ 现在 block 捕获 **self**、读这里的 `currentBase` ⇒ **block 只需注入一次**
+    /// ⇒ ⇒ 宿主通道可以在 **context 创建时**注入 ⇒ **jsLib 加载时 source/java 就已经在了** ⭐
+    private var currentBase: RuleBase = .page("")
 
     /// ⭐ **基线全局快照**（注入完宿主通道后的全局名集合）
     /// ⇒ 每次跑之前把「**相对基线新增的**」全删掉 ⇒ 站方 jsLib 的全局不会串源 ⭐
@@ -74,7 +85,6 @@ public final class JSCExecutor: JSExecutor {
         contextLock.lock()
         defer { contextLock.unlock() }
         cachedContext = nil
-        hostChannelReady = false
         baselineGlobals = []
     }
 
@@ -104,52 +114,17 @@ public final class JSCExecutor: JSExecutor {
             if let exception { caught.value = String(describing: exception) }
         }
 
-        // ① 注入宿主通道
-        //
-        // ⭐⭐ **ObjC block 桥接不了 Swift 数组/对象** ⇒
-        //   `@convention(block) ([JSValue]) -> JSValue?` 在真机上会报
-        //   「TypeError: Cannot convert primitive value」。
-        //
-        // ⇒ 改走 **JSON 字符串通道**（只用 String，ObjC 一定能桥接）：
-        //   JS 侧：包函数把参数 JSON 化 ⇒ 调 `__hostJSON(obj, method, argsJSON)`
-        //   Swift 侧：解析 args ⇒ 调宿主 ⇒ 结果 JSON 化回字符串
-        //   JS 侧再 `JSON.parse` 还原 ⇒ 站方拿到原类型
-        // ①' ⭐⭐ **宿主通道只注入一次**（契约不变 ⇒ 包装函数不用重生成）
-        if !hostChannelReady {
-            if let hostBlock = makeHostBlock(in: js, base: context.base) {
-                js.setObject(unsafeBitCast(hostBlock, to: AnyObject.self),
-                              forKeyedSubscript: "__hostJSON" as NSString)
-            }
-            // ② ⭐⭐⭐ **Java 兼容层已在 context 创建时注入**（见 `cachedContext` 那段）
-            //   ⇒ 「每次求值前清全局」不会把它清掉（它在基线里）⭐
-            // ③ 先把宿主对象**建出来**（包装函数要往它们身上挂）
-            _ = js.evaluateScript("var source={},book={},chapter={},cookie={},cache={},java={};")
-
-            // ③ 注入**属性**（属性不是函数 ⇒ 直接 setObject，不走 block）
-            for name in JSHostAPI.objects {
-                guard let obj = api.hostObject(named: name) else { continue }
-                // ⚠️ `forKeyedSubscript` **不支持 "a.b" 路径** ⇒ 要先拿到那个对象再设属性
-                guard let hostObj = js.objectForKeyedSubscript(name as NSString) else { continue }
-                for (prop, value) in obj.properties {
-                    if let jv = Self.toJS(value, in: js) {
-                        hostObj.setObject(jv, forKeyedSubscript: prop as NSString)
-                    }
-                }
-            }
-
-            // ④ 为契约里的每个**方法**生成 JS 包装函数
-            for src in JSScopeBuilder.hostWrappers() {
-                _ = js.evaluateScript(src)
-            }
-            // ⭐ **基线快照**（注入完之后）⇒ 之后每次跑清掉「相对它新增的」全局
-            baselineGlobals = Self.currentGlobals(in: js)
-            hostChannelReady = true
-        } else {
-            // ⭐⭐ **清理站方残留的全局**（复用 context 的代价 ⇒ 必须治）
-            //   站方 jsLib 定义的 `var host` / `function getArguments` 会留在全局
-            //   ⇒ 下条规则/下个源会被污染（轻阅踩过这个坑）⭐
-            Self.removeGlobals(notIn: baselineGlobals, in: js)
-        }
+        // ⭐⭐⭐ **宿主通道已在 context 创建时注入**（见 `makeContext()`）
+        //   ⇒ jsLib 加载（runGlobal）时 `source` / `java` **就已经在了** ⭐
+        //   ⇒ 这一段现在只做两件事：**更新当前基准** + **刷新宿主对象的属性**
+        currentBase = context.base
+        injectHostProperties(into: js)
+        // ⭐⭐ **清理站方残留的全局**（复用 context 的代价 ⇒ 必须治）
+        //   站方 jsLib 定义的 `var host` / `function getArguments` 会留在全局
+        //   ⇒ 下条规则/下个源会被污染（轻阅踩过这个坑）⭐
+        //   ⚠️ 但 jsLib 自己的全局**不能被清**（它们要在后续规则里用）⇒
+        //   ⇒ 加载 jsLib 后要 `markGlobalsAsBaseline()`（`loadJsLib` 已经这么做了）⭐
+        Self.removeGlobals(notIn: baselineGlobals, in: js)
 
         // ⑤ 求值（scope 变量 + 站方代码 ⇒ 完成值）
         //
@@ -204,6 +179,9 @@ public final class JSCExecutor: JSExecutor {
         js.exceptionHandler = { (ctx: JavaScriptCore.JSContext?, exception: JSValue?) in
             if let exception { caught.value = String(describing: exception) }
         }
+        // ⭐⭐⭐ 同样更新基准 + 宿主属性（jsLib 里也会调 `source.getVariable()`）
+        currentBase = context.base
+        injectHostProperties(into: js)
         let codeLiteral = JSScopeBuilder.jsonLiteral(.string(code))
         let value = js.evaluateScript("(0, eval)(" + codeLiteral + ")")
         if let msg = caught.value { throw JSCError.scriptException(msg) }
@@ -231,10 +209,39 @@ public final class JSCExecutor: JSExecutor {
     ///   ⇒ 站方 jsLib 拿不到 `JavaImporter` ⇒ **jsLib 整个加载失败** ⇒ 整本书打不开 ⭐
     private func makeContext() throws -> JavaScriptCore.JSContext {
         guard let created = JavaScriptCore.JSContext() else { throw JSCError.contextUnavailable }
-        // ⭐ Java 兼容层是**基础设施** ⇒ 在 context 建立时就注入（不是第一次 run 时）
-        //   ⇒ 性能：复用路径第二次 run 不再注入（否则复用门禁会变慢）⭐
+        // ① ⭐⭐⭐ **Java 兼容层**（`JavaImporter` / `Packages.*`）
+        //   ⇒ 必须在 **jsLib 之前**有 ⇒ 否则 jsLib 第一行 `new JavaImporter()` 就炸 ⭐
         Self.injectJavaCompat(into: created)
+        // ② ⭐⭐⭐ **宿主通道**（`source` / `book` / `chapter` / `cookie` / `cache` / `java`）
+        //   ⇒ 同样必须**先于 jsLib** ⇒ 否则站方 jsLib 里的 `source.getVariable()` 全是 undefined
+        //   ⇒ ⇒ jsLib 半残 ⇒ 站方 JS 走兜底 ⇒ 分类变成「未分组」假分类 ⇒ 整本书打不开 ⭐
+        if let hostBlock = makeHostBlock(in: created) {
+            created.setObject(unsafeBitCast(hostBlock, to: AnyObject.self),
+                              forKeyedSubscript: "__hostJSON" as NSString)
+        }
+        _ = created.evaluateScript("var source={},book={},chapter={},cookie={},cache={},java={};")
+        for src in JSScopeBuilder.hostWrappers() {
+            _ = created.evaluateScript(src)
+        }
+        // ③ 基线快照（此刻还没跑站方 JS ⇒ 基线 = 壳 + 兼容层 ⇒ 后面不会被清）
+        baselineGlobals = Self.currentGlobals(in: created)
         return created
+    }
+
+    /// ⭐⭐⭐ **注入宿主对象的属性**（`source.bookSourceUrl` / `book.name` / `chapter.title` …）
+    ///
+    /// ⚠️ **每次 run 都要更新**（编排层会随时设 `sourceObject` / `bookObject`）
+    /// ⇒ 但**壳和包装函数只注入一次**（在 `makeContext` 里）⇒ 快 ⭐
+    private func injectHostProperties(into js: JavaScriptCore.JSContext) {
+        for name in JSHostAPI.objects {
+            guard let obj = api.hostObject(named: name) else { continue }
+            guard let hostObj = js.objectForKeyedSubscript(name as NSString) else { continue }
+            for (prop, value) in obj.properties {
+                if let jv = Self.toJS(value, in: js) {
+                    hostObj.setObject(jv, forKeyedSubscript: prop as NSString)
+                }
+            }
+        }
     }
 
     /// ⭐⭐⭐ **把 Java 兼容层注入到 JSC 的全局**
@@ -323,12 +330,13 @@ public final class JSCExecutor: JSExecutor {
     ///
     /// ⚠️ **只用 String 参数/返回** ⇒ ObjC block 一定能桥接
     /// （Swift 数组/对象在 block 里会被 JSC 拒 ⇒ "Cannot convert primitive value"）
-    private func makeHostBlock(in js: JavaScriptCore.JSContext, base: RuleBase)
+    private func makeHostBlock(in js: JavaScriptCore.JSContext)
         -> (@convention(block) (String, String, String) -> String)? {
         let provider = self.api
         // ⭐⭐ **当前基准** —— `java.getString('$.x')` 的 JSONPath 要对基准求值
         //    ⚠️ block 只收 `object/method/argsJSON` ⇒ 基准得**捕获进来**（不能引用 context）
-        let currentBase = base
+        //    ⇒ 捕获 **self**、读 `self.currentBase` ⇒ block **只需注入一次** ⭐
+        let owner = self
         // ⭐⭐ **引擎侧优先接管 `java.*`**（宿主不用实现引擎能做的那些）
         let engineAPI = self.engineAPI
         let block: @convention(block) (String, String, String) -> String = { object, method, argsJSON in
@@ -342,7 +350,7 @@ public final class JSCExecutor: JSExecutor {
             //
             // ⭐ **返回 nil = 「我不接管」** ⇒ 落回宿主实现
             //   （⇒ 引擎只抢它真做的那几个，其余仍归宿主）
-            if object == "java", let engineAPI, let r = engineAPI(method, args, currentBase) {
+            if object == "java", let engineAPI, let r = engineAPI(method, args, owner.currentBase) {
                 // ⚠️ 顶层标量不能 JSON 序列化 ⇒ 统一包一层数组（JS 侧取 `[0]`）
                 let any = Self.toFoundation(r)
                 guard let data = try? JSONSerialization.data(withJSONObject: [any]),
