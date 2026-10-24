@@ -143,12 +143,14 @@ public struct RuleParser {
 
     /// `<js>…</js>` 整块（可能带尾部选择器：`<js>…</js>$.data`）
     private func parseBlock(_ s: String) -> RuleNode {
-        let body = stripBlockWrapper(s)
-        // 复合规则：`<js>代码</js>$.data` ⇒ JS 跑完再用尾部取值
-        if let (code, tail) = splitJsTail(body) {
+        // ⭐⭐⭐ **复合规则要在【带标签的原文】里找尾部**（2026-10-24 真机栽的）
+        //   以前先 `stripBlockWrapper`（把 `</js>` 也剥了）⇒ 再找 `</js>` **找不到**
+        //   ⇒ 复合规则 `<js>代码</js>$.data` 的**尾巴丢了** ⇒ 尾部取值失效 ⭐
+        //   ⇒ 而大灰狼的 `ruleToc.chapterList` 正是复合规则 ⭐⭐
+        if let (code, tail) = splitJsTail(s) {
             return .jsWithTail(code: code, tail: tail)
         }
-        return .jsWithTail(code: body, tail: nil)
+        return .jsWithTail(code: stripBlockWrapper(s), tail: nil)
     }
 
     // MARK: - 默认规则语法链
@@ -373,18 +375,29 @@ public struct RuleParser {
     private func stripBlockWrapper(_ s: String) -> String {
         var t = s.trimmingCharacters(in: .whitespacesAndNewlines)
         for p in ["<js>", "<JS>"] where t.hasPrefix(p) { t = String(t.dropFirst(p.count)) }
-        for p in ["</js>", "</JS>"] where t.hasSuffix(p) { t = String(t.dropFirst(t.count - p.count)) }
+        // ⚠️⭐⭐⭐ **必须 `dropLast`**（2026-10-24 真机栽的）
+        //   以前写的是 `dropFirst(t.count - p.count)` ⇒ 那是**删前缀、留尾巴**
+        //   ⇒ 整段站方 JS 被扔光，**只剩 `</js>`** ⇒ 喂给 JS 就是 `</js>`
+        //   ⇒ `SyntaxError: Unexpected token '<'` ⇒ **规则的 JS 从来没跑过** ⭐⭐⭐
+        //   ⇒ 大灰狼的 `ruleExplore.bookUrl`（`<js>…</js>`）⇒ bookUrl 恒空
+        //   ⇒ 详情/目录/正文全断 ⭐
+        for p in ["</js>", "</JS>"] where t.hasSuffix(p) { t = String(t.dropLast(p.count)) }
         return t
     }
 
     /// `<js>代码</js>$.data` ⇒ (代码, 尾部)
     private func splitJsTail(_ body: String) -> (String, String)? {
-        // 找 `</js>` 之后的尾巴
+        // 找 `</js>` 之后的尾巴（**body 是带标签的原文** ⇒ 见 parseBlock 的注释）
         guard let close = body.range(of: "</js>", options: .caseInsensitive)
                 ?? body.range(of: "</JS>", options: .caseInsensitive) else { return nil }
-        let code = String(body[..<close.lowerBound])
-        let tail = String(body[close.upperBound...]).trimmingCharacters(in: .whitespaces)
-        return tail.isEmpty ? nil : (code, tail)
+        // ⚠️ **要连换行一起 trim**（`whitespaces` 不含 `\n` ⇒ 尾巴会带着前导换行
+        //   ⇒ 尾巴是 `\n$.data` ⇒ 后面当选择器/JSONPath 用会出问题）⭐
+        let tail = String(body[close.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !tail.isEmpty else { return nil }
+        var code = String(body[..<close.lowerBound])
+        // ⚠️ code 里还带着开头的 `<js>` ⇒ 要去掉
+        for p in ["<js>", "<JS>"] where code.hasPrefix(p) { code = String(code.dropFirst(p.count)) }
+        return (code, tail)
     }
 }
 

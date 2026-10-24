@@ -118,8 +118,13 @@ jobs:
       - name: 编译语义内核
         run: set -o pipefail; swift build 2>&1 | tee jsc-build.log
 
-      - name: JSC 门禁（Linux 上这些用例会被跳过 ⇒ 只能在这里跑）
-        run: set -o pipefail; swift test --filter JSC 2>&1 | tee jsc-test.log
+      # ⭐⭐⭐ **必须跑【全部】测试，不要 `--filter`**（2026-10-24 真机栽的）
+      #   以前是 `swift test --filter JSC` ⇒ **只跑名字带 JSC 的用例**
+      #   ⇒ 我加的「真书源门禁」（`StationDahulang*`）**一次都没跑过**
+      #   ⇒ CI 照样绿 ⇒ **假绿**（最坏的一种：门禁是装饰品）⭐⭐⭐
+      # ⇒ 现在跑全部 ⇒ macOS 上能编的都跑（Linux 编不出来的 Apple-only 那部分照旧）
+      - name: 门禁（macOS：含 JSC 真调用 + 真书源门禁 ⇒ 全部跑）
+        run: set -o pipefail; swift test 2>&1 | tee jsc-test.log
 
       - name: 归档 JSC 编译日志（排查用）
         if: always()
