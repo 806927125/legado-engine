@@ -194,8 +194,14 @@ public final class JSCExecutor: JSExecutor {
             // ⭐⭐⭐ **Java 兼容层在 context 创建时就注入**（不是第一次 run 时）
             //   ⇒ ① 语义对（它是**基础设施**，不是规则的一部分）
             //   ⇒ ② 性能对（否则「每次求值前清全局」+ 首次注入 93KB ⇒ 复用门禁变慢）⭐
+            //
+            // ⚠️⚠️⚠️ **必须用「间接 eval」注入**（`(0, eval)(src)`）——
+            //   **JSC 的 `evaluateScript` 顶层 `var` 不进全局**（JSC 与 WebKit 的差异！）
+            //   ⇒ 直接 evaluateScript ⇒ `var JavaImporter` 是脚本局部 ⇒ 站方 jsLib 拿不到 ⇒ 全废 ⭐
+            //   ⇒ 间接 eval ⇒ **全局作用域** ⇒ 与老引擎（WKWebView）行为一致 ✔
             for src in Self.javaCompatSources() {
-                _ = created.evaluateScript(src)
+                let literal = JSScopeBuilder.jsonLiteral(.string(src))
+                _ = created.evaluateScript("(0, eval)(" + literal + ")")
             }
             cachedContext = created
             js = created
