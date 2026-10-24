@@ -829,13 +829,27 @@ public final class SourceEngine {
         do {
             let resp = try fetcher.fetch(rule: rule, baseUrl: source.bookSourceUrl,
                                         headers: sourceHeaders)
-            guard resp.isSuccess else { return nil }
+            guard resp.isSuccess else {
+                // ⚠️⭐⭐ **失败必须「带上原因和 URL」**（2026-10-24 真机栽的）
+                //   以前这里只记了个**空诊断**（连失败原因都没有）⇒
+                //   站方 JS 拿到 undefined ⇒ **走兜底分支**（分类变成「未分组」）
+                //   而宿主**看不到任何原因** ⇒ 只能靠猜 ⭐⭐
+                let msg = "java.ajax HTTP \(resp.statusCode) ← \(u)"
+                var d = EngineDiagnostic(rule: "java.ajax", branch: "java.ajax")
+                d.failure = .network(msg)
+                diagnostics.append(d)
+                logger?.log(Self.diagnosticLine(d))
+                return nil
+            }
             return resp.text
         } catch {
             // ⚠️ 失败**不抛**（JS 侧拿 undefined ⇒ 站方自己判空）
-            //    ⇒ 但要把失败记进诊断（不许静默）
-            let d = EngineDiagnostic(rule: "java.ajax", branch: "java.ajax")
+            //    ⇒ 但要把失败**连原因和 URL 一起**记进诊断（不许静默）⭐
+            let msg = "java.ajax 失败：\(error) ← \(u)"
+            var d = EngineDiagnostic(rule: "java.ajax", branch: "java.ajax")
+            d.failure = .network(msg)
             diagnostics.append(d)
+            logger?.log(Self.diagnosticLine(d))
             return nil
         }
     }
