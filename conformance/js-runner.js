@@ -195,6 +195,15 @@ function jsonAny(v) {
       } else if (kind === 'evalOne' || kind === 'getElements') {
         const base = buildBase(c.base, ctxSpec);
         const ctx = buildCtx(ctxSpec, c.base || {});
+        // ⭐⭐⭐ **harness 接线（2026-10-25 修）**：老引擎的 `@get:` / `@put:` 走
+        //   `QR.runtime.vars`（`rule-analyzer.js` 的 `applyGetPut`）⇒ 夹具里的
+        //   `ctx.vars` **必须灌进去**，否则 `@get:{k}` 永远取不到 ⇒ 差异是**接线漏了**，
+        //   不是老引擎的语义 ⇒ 别把它误判成「轻阅的 bug」⭐
+        try {
+          if (ctx && ctx.vars && Object.keys(ctx.vars).length) {
+            QR.runtime.vars = Object.assign(QR.runtime.vars || {}, ctx.vars);
+          }
+        } catch (e) { /* 忽略：接线失败就按老引擎原样跑 */ }
         // ⚠️ XPath 规则要**完整求值路径**（`QR.rule.evalOne`）——
         //    `QR.dom.selectAll` 走的 jsoup-compat **不支持 XPath**（当 CSS 处理了）
         let outVals = [];

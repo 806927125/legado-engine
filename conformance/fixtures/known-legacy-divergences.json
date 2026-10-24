@@ -1,0 +1,139 @@
+{
+  "note": "⭐ **已知差异白名单**（老引擎 vs 新引擎的**有意不一致**） ｜ 判据：新引擎 = **Legado（安卓原版）规格**；老引擎（轻阅 reference/js）= 被对照的**参考实现**，不是权威 ⭐ ｜ 改这份清单前先看 `docs/legacy-divergences.md` 的裁决记录 ⭐ ｜ 门禁 `LegacyDivergenceGuardTests`：JS 侧失败的 id **必须**都在这儿 ⇒ 白名单外失败 ⇒ 门禁红 ⭐⭐⭐",
+  "policy": "1) 站方真在用 + Legado 支持 ⇒ 新引擎必须照 Legado（**不照抄老引擎的 bug**） ｜ 2) 老引擎独有且站方不依赖 ⇒ 可以不一致 ｜ 3) 每条都要写清理由 ⇒ 不许『以后再说』⭐",
+  "divergences": [
+    {
+      "id": "chain-01",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "老引擎把 `class.catalog_ls@li` 当**属性**取 ⇒ `evalOne` 返回 [] ⇒ 轻阅上神马小说目录是空的 ⭐⭐⭐ 照抄=复制 bug ⇒ 新引擎按 Legado 规格"
+    },
+    {
+      "id": "chain-02",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "chain-03",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "chain-04",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "chain-05",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "chain-06",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "chain-20",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "chain-22",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "chain-30",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "dom-01",
+      "semantic": "S-SEL-06",
+      "title": "裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "老引擎 `selectAll('class.catalog_ls@li')` ⇒ `['第一章第二章']`（整个 ul 的文本）⇒ 确实没取到子元素 ⭐"
+    },
+    {
+      "id": "dom-05",
+      "semantic": "S-SEL-06",
+      "title": "裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "dom-06",
+      "semantic": "S-SEL-06",
+      "title": "裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "sel-08b",
+      "semantic": "S-SEL-06",
+      "title": "裸标签名 @li ⇒ 子选择器",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "sel-10",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li 必须当【子元素选择器】",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "125 源实测 **123 处 `@li`** ⇒ 这是站方主流写法 ⇒ 老引擎不支持 ⇒ 照抄 ⇒ 目录全空 ⭐⭐⭐"
+    },
+    {
+      "id": "sel-14",
+      "semantic": "S-SEL-06",
+      "title": "链段裸标签名 @li 必须当【子元素选择器】",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "fbk-04",
+      "semantic": "S-FBK-04",
+      "title": "换行多规则 ⇒ 结果合并",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "老引擎只返回第一行 ⇒ 站方多规则写法是**换行** ⇒ 列表出口应合并 ⇒ 老引擎是债 ⭐"
+    },
+    {
+      "id": "json-03",
+      "semantic": "S-JSON-02",
+      "title": "单值路径命中 JSON 对象 ⇒ 对象原样保留",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "老引擎取到 `\"\\tu1\"`（丢结构）⇒ 明显 bug ⇒ 不照抄 ⭐"
+    },
+    {
+      "id": "json-04",
+      "semantic": "S-JSON-02",
+      "title": "单值路径命中 JSON 对象 ⇒ 对象原样保留",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "同上"
+    },
+    {
+      "id": "jsp-04",
+      "semantic": "S-RES-09",
+      "title": "纯 JS：条目级 result = 那个对象的 JSON 视图",
+      "verdict": "老引擎的债（不照抄）",
+      "reason": "老引擎条目级的 `result` 是**节点**不是 JSON 视图 ⇒ `@js:result.bid` 取不到 ⇒ 老引擎是债（新的更宽松）⭐"
+    }
+  ]
+}
