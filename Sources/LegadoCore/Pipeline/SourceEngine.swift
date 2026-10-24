@@ -1086,7 +1086,29 @@ public final class SourceEngine {
         properties["kind"] = .string(book.kind)
         properties["lastChapter"] = .string(book.lastChapter)
         properties["wordCount"] = .string(book.wordCount)
+        // ⭐⭐⭐ **Legado 的 Book 上还有这几个方法**（老引擎 `source-api.js` 的 `wrapBook` 补的）
+        //   站方（🍅大灰狼）的 init 规则就调 `book.setUseReplaceRule(false)`：
+        //     `if (book.readConfig == null || book.readConfig.useReplaceRule == null) { book.setUseReplaceRule(false); }`
+        //   ⇒ 缺方法 ⇒ **TypeError** ⇒ **整条 init 规则挂掉** ⇒ 详情字段全空 ⭐⭐⭐
+        //   ⇒ 125 源实测：`setUseReplaceRule` 3 源 / `readConfig` 3 源 6 处 ⭐
+        for fn in ["setUseReplaceRule", "setUseReplaceJs", "setChapterUpdateMode",
+                   "setSearchTocUrl", "setChapterUrl"] {
+            methods[fn] = { _ in .string("") }
+        }
+        // ⭐⭐ **站方会读的这几个成员**（125 源实测的**真实用量**）：
+        //   `durChapterIndex` 6 源 18 处 · `type` 7 源 36 处 · `imageStyle` 3 源 6 处
+        //   · `variable` 6 源 12 处 · `order` 3 源 3 处 · `durChapterTitle` 3 源 3 处
+        //   ⇒ 缺了不是 undefined 就算完事：**站方会拿它们做判断/比较**（如
+        //     `book.durChapterIndex === chapter.index`）⇒ 形状要跟老引擎一致 ⭐
+        properties["readConfig"] = .object([:])
+        properties["durChapterIndex"] = .int(0)
+        properties["durChapterTitle"] = .string("")
+        properties["type"] = .int(0)
+        properties["imageStyle"] = .string("")
+        properties["order"] = .int(0)
+        properties["variable"] = .string("")
         // ⭐ **原始字段也挂上去**（站方 `book.book_id` 之类）
+        //   ⚠️ 放最后 ⇒ **app 传来的真值盖掉上面的默认值** ⭐
         for (k, v) in book.raw { properties[k] = .string(v) }
         return HostObject(name: "book", methods: methods, properties: properties)
     }

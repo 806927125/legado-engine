@@ -90,12 +90,14 @@ final class StationDahulangChainParityTests: XCTestCase {
         let info = try engine.bookInfo(book)
 
         // ⑤ 目录（用详情算出来的 tocUrl ⇒ 走的是同一条真路径）
-        let chapters = try engine.toc(info, book: book)
+        let chapters = (try? engine.toc(info, book: book)) ?? []
 
-        // ⑥ 正文（第一册非卷章节）
+        // ⑥ 正文（第一册非卷章节）—— ⭐ **不许在这里 bail**（bail 了就看不到别的差异）
         let ch = chapters.first { !$0.isVolume && !$0.url.isEmpty }
-        let text = try XCTUnwrap(ch, "目录里没有可用的章节")
-        let content = try engine.content(text, book: book)
+        var content = ""
+        if let ch {
+            content = (try? engine.content(ch, book: book)) ?? ""
+        }
 
         // ⑦ 逐项比对（**指名道姓**，不许只说「不一致」）
         let actual = ChainOutput(
@@ -108,7 +110,10 @@ final class StationDahulangChainParityTests: XCTestCase {
                           }),
             content: ChainContent(len: content.count, head: String(content.prefix(60)))
         )
-        let diff = Self.diff(expected: expected, actual: actual)
+        var diff = Self.diff(expected: expected, actual: actual)
+        if ch == nil {
+            diff.insert("  · ⭐ **目录里没有可用章节**（章节数=\(chapters.count)）", at: 0)
+        }
         XCTAssertTrue(diff.isEmpty,
                       "⭐⭐⭐ 整条链和老引擎不一致 ⇒ **这里就是要搬的规则语义**\n"
                       + diff.joined(separator: "\n")
