@@ -185,14 +185,48 @@ final class DataPseudoURLContentTests: XCTestCase {
         }
     }
 
+    /// ⭐⭐⭐ **目录页也一样：载荷必须是【原始载荷】**
+    ///
+    /// ⚠️ 站方（大灰狼）的 `ruleToc.chapterList` 是**同一套写法**：
+    ///   `<js> let res = JSON.parse(java.hexDecodeToString(result)); …`
+    ///   ⇒ 目录页的内容也必须是**原始载荷**（站方自己解）⭐
+    ///   ⇒ 引擎要是给了解码后的东西 ⇒ 站方再解一次 ⇒ 炸 ⇒ **目录 0 章** ⭐⭐⭐
+    ///   （`ruleContent.content` 同理 ⇒ 正文也是空的）⭐
+    func testTocPageContentIsAlsoRawPayload() throws {
+        let transport = RecordingTransport()
+        let js = CapturingExecutor()
+        let source = try makeSource(initRule: "<js>result</js>",
+                                    tocRule: "<js>result</js>")
+        let engine = SourceEngine(source: source,
+                                  fetcher: PageFetcher(transport: transport),
+                                  js: js, logger: RecordingLogger())
+
+        var info = BookInfo()
+        info.bookUrl = Self.realBookURL
+        info.tocUrl = Self.realBookURL      // 站方的 tocUrl 也是 data: 伪 URL
+
+        _ = try engine.toc(info)
+
+        // 目录规则看到的必须是**原始载荷**
+        let tocRaw = js.raws.last
+        XCTAssertEqual(tocRaw, Self.realPayload,
+                       "⭐⭐⭐ 目录页的内容必须是【原始载荷】⇒ 不然站方解不动 ⇒ 目录 0 章")
+        XCTAssertTrue(transport.urls.isEmpty,
+                      "⭐⭐⭐ `data:` 伪 URL 竟然发了请求：\(transport.urls)")
+    }
+
     // MARK: - 工具
 
-    private func makeSource(initRule: String) throws -> BookSource {
-        let src: [String: Any] = [
+    private func makeSource(initRule: String, tocRule: String? = nil) throws -> BookSource {
+        var src: [String: Any] = [
             "bookSourceName": "data: 伪 URL 门禁",
             "bookSourceUrl": "https://v5.langge.uk",
             "ruleBookInfo": ["init": initRule, "name": "$.book_name"],
         ]
+        if let tocRule {
+            src["ruleToc"] = ["chapterList": tocRule, "chapterName": "$.title",
+                              "chapterUrl": "$.url"]
+        }
         return try JSONDecoder().decode(BookSource.self,
                                        from: try JSONSerialization.data(withJSONObject: src))
     }
