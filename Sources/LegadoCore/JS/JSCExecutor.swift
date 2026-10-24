@@ -385,7 +385,10 @@ public final class JSCExecutor: JSExecutor {
             } else {
                 result = provider.hostObject(named: object)?.call(method, args)
             }
-            guard let result else { return "null" }
+            // ⭐⭐⭐ **没人实现这个方法 ⇒ 标记给包装函数**（包装函数会**抛 TypeError**）
+            //   ⇒ 行为跟老引擎一致（老引擎：方法根本不存在 ⇒ 调用就抛）⭐
+            //   ⇒ 站方用 try/catch 探测能力/平台 ⇒ 探测结果必须一致 ⇒ 否则**走错分支** ⭐⭐⭐
+            guard let result else { return #"{"__qrNotImplemented":true}"# }
             let any = Self.toFoundation(result)
             // ⚠️ `JSONSerialization` **只接受容器**（数组/字典）⇒ 顶层标量会被拒
             // ⇒ 统一**包一层数组**返回；JS 侧包装函数取 `[0]` 还原 ⇒ 不用在 Swift 侧剥（剥了又会撞标量）

@@ -234,9 +234,15 @@ public enum JSScopeBuilder {
             let obj = e.object
             let name = e.name
             let params = (0..<4).map { "a\($0)" }.joined(separator: ",")
+            // ⭐⭐⭐ **宿主没实现 ⇒ 抛 TypeError**（**老引擎语义**，2026-10-24 真机「大灰狼简介/正文不一样」实证）
+            //   老引擎的 `java` 对象**只有它实现的那几个方法** ⇒ 站方 `java.qread()` 会 **TypeError**
+            //   ⇒ 站方用 try/catch 探测平台（`checkEnv()`：轻阅读/改版/苹果/安卓）⇒ 分支才对 ⭐
+            //   以前这里返回 **undefined**（**不抛**）⇒ 站方以为「有这个能力」⇒ **走错分支** ⭐⭐⭐
+            //   （🍅大灰狼：简介差 27 字、正文差 13 字 ⇒ 就是这一条）
             out.append("""
             try { \(obj).\(name) = function(\(params)){ \
               var __r = JSON.parse(__hostJSON('\(obj)','\(name)',JSON.stringify([\(params)]))); \
+              if (__r && __r.__qrNotImplemented) { throw new TypeError('\(obj).\(name) is not a function'); } \
               return (__r && __r.length !== undefined) ? __r[0] : undefined; \
             }; } catch(e) {}
             """)

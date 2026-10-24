@@ -154,6 +154,31 @@ final class StationDahulangChainParityTests: XCTestCase {
         return out
     }
 
+    /// ⭐⭐⭐ **宿主没实现的 java API ⇒ 调用抛 TypeError**（**老引擎语义**）
+    ///
+    /// ⚠️⚠️ **2026-10-24 真机「大灰狼简介差 27 字 / 正文差 13 字」的根因**：
+    ///   站方的 `checkEnv()` 用 **try/catch 探测平台**：
+    ///   `try { java.qread(); return "轻阅读"; } catch(e) {} …`
+    ///   · 老引擎的 `java` 对象**没有 `qread`** ⇒ 调用 **TypeError** ⇒ 探测往下走 ⇒ 分支正确 ⭐
+    ///   · 新引擎以前**每个 API 都在**（没实现的返回 undefined ⇒ **不抛**）
+    ///     ⇒ 站方以为「有这能力」⇒ 走错分支 ⇒ 简介/正文都不一样 ⭐⭐⭐
+    func testUnimplementedJavaAPICallsThrowLikeLegacyEngine() throws {
+        final class EmptyHost: JSHostAPIProvider, @unchecked Sendable {
+            func hostObject(named name: String) -> HostObject? { nil }
+            func callJava(_ method: String, _ args: [JSONValue]) -> JSONValue? { nil }
+        }
+        let ev = Evaluator(js: JSCExecutor(api: EmptyHost()))
+        let base = RuleBase.page("")
+        let ctx = EvalContext(base: base, baseUrl: "https://x.example", raw: "")
+        // ⭐ 站方那套探测写法
+        let e = ev.evalOne(
+            "<js>try { java.qread(); '没抛'; } catch (err) { '抛了'; }</js>",
+            base: base, ctx: ctx)
+        XCTAssertEqual(e.value.scalarString, "抛了",
+                       "⭐⭐⭐ 宿主没实现的 java API 必须**抛 TypeError**（老引擎语义）"
+                       + "⇒ 不抛 ⇒ 站方的 try/catch 探测走错分支 ⇒ 简介/正文都不一样")
+    }
+
     // MARK: - 输出形状
 
     struct ChainOutput: Codable {
