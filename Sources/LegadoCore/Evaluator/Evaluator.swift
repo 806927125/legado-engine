@@ -669,6 +669,36 @@ public struct Evaluator {
         return parsed.isNull ? .string(text) : parsed
     }
 
+    /// ⭐⭐⭐ **JSON 值里包着一个「长得像 JSON 的字符串」⇒ 真解析**
+    ///
+    /// ⚠️⚠️ **为什么需要这一层**（2026-10-24 真机 + Linux 复现）：
+    ///   JSC 的完成值是字符串 ⇒ `toJSON` 给 `.string(text)` ⇒ `runJS` 包成
+    ///   **`.json(.string(text))`** ⇒ 复合规则的尾巴拿到的是 **`.json` 分支**（不是 `.string`！）
+    ///   ⇒ 只在 `.string` 分支解析 = **修复打在了 JSC 走不到的地方** ⇒ 仍然 0 命中 ⭐⭐⭐
+    ///
+    /// - 非字符串（已是对象/数组）⇒ 原样返回
+    /// - 字符串但不像 JSON ⇒ 原样返回（老行为不变）⭐
+    static func jsonObjectIfJSONText(_ value: JSONValue) -> JSONValue {
+        if case .string(let s) = value { return jsonObject(fromText: s) }
+        return value
+    }
+
+    /// ⭐⭐⭐ **值里的文本载荷**（`.string` 或 `.json(.string)`）
+    ///
+    /// ⚠️ JSC 路径下站方 JS 的完成值是字符串 ⇒ `toJSON` 给 `.string(text)`
+    /// ⇒ `runJS` 再包成 **`.json(.string(text))`**
+    /// ⇒ **只认 `.string` 的地方，在 JSC 路径上全都会走空** ⭐⭐⭐
+    ///   （复合规则的 CSS 尾巴就是其中一处）
+    static func textPayload(_ value: RuleValue) -> String? {
+        switch value {
+        case .string(let s):            return s
+        case .json(let j):
+            if case .string(let s) = j { return s }
+            return nil
+        default:                        return nil
+        }
+    }
+
     /// **JS 基准构造**（尾部 JS 后处理用）—— 主体结果的类型**要原样传下去**。
     private static func jsBase(for value: RuleValue) -> RuleBase {
         switch value {
@@ -833,7 +863,19 @@ public struct Evaluator {
         if sel.hasPrefix("$") {
             let json: JSONValue
             switch value {
-            case .json(let j): json = j
+            case .json(let j):
+                // ⭐⭐⭐ **必须【真解析】**（2026-10-24 真机：大灰狼的 init 规则）
+                //   ⚠️⚠️ **这里才是 JSC 实际走的分支**！
+                //   `JSCExecutor.toJSON`：JS 完成值是字符串 ⇒ `.string(text)`
+                //   ⇒ `runJS` 再包成 **`RuleValue.json(.string(text))`**
+                //   ⇒ 以前 `case .json(let j): json = j` ⇒ **没解析**
+                //   ⇒ JSONPath 在字符串上查 ⇒ **永远 0 命中**
+                //   ⇒ init 输出不是对象 ⇒ 详情字段 / tocUrl 载荷里的 book_id、sources **全丢**
+                //   ⇒ 症状：大灰狼「详情空白 + 目录 0 章 + 正文空」⭐⭐⭐
+                //
+                // ⚠️ 只在「字符串长得像 JSON」时才解析（`{` / `[` 开头且真能解析）
+                //    ⇒ 普通文本仍是普通字符串（老行为不变）⭐
+                json = Self.jsonObjectIfJSONText(j)
             case .string(let s):
                 // ⭐⭐⭐ **必须【真解析】**（2026-10-24 真机：大灰狼的 init 规则）
                 //   站方 `init` 是 `<js>…</js>$.data` ⇒ JS 的完成值 = **页原文（JSON 文本）**
@@ -863,7 +905,9 @@ public struct Evaluator {
             return .list(hits.map { RuleValue.json($0) })
         }
         // CSS 尾部：把结果当 HTML 解析再选
-        guard case .string(let html) = value else {
+        // ⚠️⚠️ **必须同时认 `.json(.string)`**（JSC 路径下站方 JS 的完成值是字符串
+        //   ⇒ `runJS` 包成 `.json(.string(html))` ⇒ 只认 `.string` 会把它判成类型不符 ⭐
+        guard let html = Self.textPayload(value) else {
             diag.failure = .baseTypeMismatch(expected: "HTML 字符串", actual: "其它")
             return .void
         }
