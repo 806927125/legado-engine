@@ -656,6 +656,19 @@ public struct Evaluator {
         }
     }
 
+    /// ⭐⭐⭐ **文本 ⇒ JSON 对象**（复合规则尾巴用）
+    ///
+    /// ⚠️ 站方的 `init` / `chapterList` 常是 `<js>…</js>$.data` 这种形态：
+    ///   JS 跑完得到的是**页原文（JSON 文本）** ⇒ 尾巴（JSONPath）要在**解析后的对象**上取。
+    /// ⇒ 长得像 JSON 就**真解析**；不像就按普通字符串处理（老行为）⭐
+    static func jsonObject(fromText text: String) -> JSONValue {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard t.hasPrefix("{") || t.hasPrefix("[") else { return .string(text) }
+        let parsed = JSONValue(json: t)
+        // ⚠️ 解析失败 ⇒ JSONValue(json:) 给 .null ⇒ 回落成字符串（别把内容弄丢）
+        return parsed.isNull ? .string(text) : parsed
+    }
+
     /// **JS 基准构造**（尾部 JS 后处理用）—— 主体结果的类型**要原样传下去**。
     private static func jsBase(for value: RuleValue) -> RuleBase {
         switch value {
@@ -821,9 +834,17 @@ public struct Evaluator {
             let json: JSONValue
             switch value {
             case .json(let j): json = j
-            case .string(let s): json = JSONValue.from(s)
+            case .string(let s):
+                // ⭐⭐⭐ **必须【真解析】**（2026-10-24 真机：大灰狼的 init 规则）
+                //   站方 `init` 是 `<js>…</js>$.data` ⇒ JS 的完成值 = **页原文（JSON 文本）**
+                //   ⇒ 尾巴 `$.data` 要在**对象**上取
+                //   ⚠️ 以前用 `JSONValue.from(s)` ⇒ **只是「当成普通字符串」**（不解析！）
+                //   ⇒ JSONPath 在字符串上查 ⇒ **永远 0 命中**
+                //   ⇒ init 输出不是对象 ⇒ 详情字段 / tocUrl 载荷里的 book_id、sources **全丢**
+                //   ⇒ 症状：大灰狼「详情空白 + 目录 0 章 + 正文空」⭐⭐⭐
+                json = Self.jsonObject(fromText: s)
             default:
-                diag.failure = .baseTypeMismatch(expected: "JSON", actual: "字符串")
+                diag.failure = .baseTypeMismatch(expected: "JSON", actual: "其它")
                 return .void
             }
             guard let hits = JSONPath.select(json, sel) else {

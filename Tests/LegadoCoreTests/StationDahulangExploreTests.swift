@@ -156,6 +156,38 @@ final class StationDahulangExploreTests: XCTestCase {
         XCTAssertEqual(book.raw["book_id"], "7412345678901234567",
                        "⭐⭐ 列表项的原始字段必须一路带下去（少了整本书崩）")
     }
+    // MARK: - ⭐⭐⭐ 复合规则：JS 返回 **JSON 文本** ⇒ 尾巴要在【解析后的对象】上取
+
+    func testCompositeInitRuleParsesJSONTextBeforeTail() throws {
+        let js = JSCExecutor(api: StationHostAPI())
+        let ev = Evaluator(js: js)
+        // ⭐ 大灰狼的 init 就是这个形态：`<js>…</js>$.data`
+        //   JS 的完成值 = 页原文（**JSON 文本**）⇒ 尾巴 `$.data` 要在对象上取
+        let text = #"{"data":{"book_id":"7412345678901234567","name":"测试书名"}}"#
+        let base = RuleBase.page(text)
+        let ctx = EvalContext(base: base, baseUrl: "https://v5.langge.uk/api/detail",
+                              raw: text, isJSON: true)
+        let e = ev.evalOne("<js>result</js>$.data", base: base, ctx: ctx)
+        XCTAssertNil(e.diagnostic.failure,
+                     "⭐⭐ 复合规则不许报错：\(SourceEngine.diagnosticLine(e.diagnostic))")
+        let j = e.value.jsonValue
+        XCTAssertEqual(j["book_id"]?.scalarString, "7412345678901234567",
+                       "⭐⭐⭐ 尾巴要能在【真解析后的对象】上取（以前当成字符串 ⇒ 永远 0 命中）")
+        XCTAssertEqual(j["name"]?.scalarString, "测试书名")
+    }
+
+    // MARK: - ② 不是 JSON 的文本 ⇒ 仍按普通字符串处理（老行为不变）
+
+    func testCompositeRuleOnPlainTextKeepsOldBehaviour() throws {
+        let js = JSCExecutor(api: StationHostAPI())
+        let ev = Evaluator(js: js)
+        let text = "玄幻::/type/xh&&仙侠::/type/xx"
+        let base = RuleBase.page(text)
+        let ctx = EvalContext(base: base, baseUrl: "https://x.example", raw: text)
+        let e = ev.evalOne("<js>result</js>", base: base, ctx: ctx)
+        XCTAssertEqual(e.value.scalarString, text, "⭐ 不是 JSON 的文本要原样返回")
+    }
+
     // MARK: - ⭐ 探针：java.base64Encode 到底断在哪一环？（2026-10-24 真机载荷是 "undefined"）
 
     func testProbeJavaBase64Channel() throws {
