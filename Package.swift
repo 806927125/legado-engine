@@ -27,6 +27,12 @@ let package = Package(
     targets: [
         .target(name: "LegadoCore", dependencies: [
             .product(name: "SwiftSoup", package: "SwiftSoup")
+        ], resources: [
+            // ⭐⭐⭐ **站方 JS 的 Java 兼容层**（JavaImporter / Packages.*）
+            //   ⇒ 从轻阅的老引擎原样搬过来（**零依赖的纯 JS** ⇒ 不改一行）
+            //   ⇒ 站方 jsLib 的第一行就是 `new JavaImporter()` ⇒ 没有它 ⇒ **jsLib 整个加载失败**
+            //      ⇒ 站方 JS 走兜底分支 ⇒ 分类变成「未分组」假分类 ⇒ 整本书打不开 ⭐
+            .copy("Resources")
         ]),
         // ⭐ 参考实现（轻阅的 AnalyzeUrl.swift）—— 只读，用于 URL 规则对拍
         .target(name: "AnalyzeUrlReference", path: "reference/swift"),

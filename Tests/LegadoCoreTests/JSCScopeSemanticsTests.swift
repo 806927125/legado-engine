@@ -81,7 +81,35 @@ final class JSCScopeSemanticsTests: XCTestCase {
         XCTAssertEqual(v.scalarString, "HOST-OK|42", "⭐ jsLib 定义的全局必须能被规则看到")
     }
 
-    // MARK: - ⑤ jsLib 的全局不会被「每次求值前清全局」清掉
+    // MARK: - ⑤⭐⭐ Java 兼容层（JavaImporter / Packages.*）
+
+    /// ⭐⭐⭐ **站方 JS 的 Java 兼容层必须可用**
+    ///
+    /// ⚠️ **真机栽过**（🍅大灰狼聚合）：大灰狼的 jsLib 第一行是
+    ///   `var javaImport = CompatibilityUtils.safeImport(new JavaImporter());`
+    /// ⇒ 没有 `JavaImporter` ⇒ **`new` 抛错** ⇒ **jsLib 整个加载失败**
+    /// ⇒ 站方 JS 走兜底分支 ⇒ 分类里冒出「未分组」假分类 ⇒ **整本书打不开** ⭐
+    func testJavaCompatLayerIsAvailable() throws {
+        let js = makeExecutor()
+        let ctx = JSRunContext(base: .page(""))
+        let v = try js.run("typeof JavaImporter + '|' + typeof Packages", context: ctx)
+        XCTAssertEqual(v.scalarString, "function|object", "⭐ JavaImporter / Packages 必须存在")
+    }
+
+    /// ⭐⭐ **大灰狼实际用到的那几个类**（真实语料统计）
+    func testPackagesClassesUsedByAggregateSource() throws {
+        let js = makeExecutor()
+        let ctx = JSRunContext(base: .page(""))
+        let v = try js.run(
+            "typeof Packages.io.legato.kazusa.utils.TimeoutCancellationException + '|' + "
+            + "typeof Packages.android.util.Base64.encodeToString + '|' + "
+            + "typeof Packages.java.lang.Thread.sleep",
+            context: ctx)
+        XCTAssertEqual(v.scalarString, "function|function|function",
+                       "⭐ 大灰狼用到的 3 个 Packages 类必须都在")
+    }
+
+    // MARK: - ⑥ jsLib 的全局不会被「每次求值前清全局」清掉
 
     func testJsLibGlobalsSurviveRepeatedRuns() throws {
         let js = makeExecutor()

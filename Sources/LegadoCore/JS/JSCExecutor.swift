@@ -118,7 +118,18 @@ public final class JSCExecutor: JSExecutor {
                 js.setObject(unsafeBitCast(hostBlock, to: AnyObject.self),
                               forKeyedSubscript: "__hostJSON" as NSString)
             }
-            // ② 先把宿主对象**建出来**（包装函数要往它们身上挂）
+            // ② ⭐⭐⭐ **站方 JS 的 Java 兼容层**（JavaImporter / Packages.*）
+            //
+            // ⚠️ **必须先于站方 jsLib 注入** —— 大灰狼的 jsLib 第一行就是：
+            //      `var javaImport = CompatibilityUtils.safeImport(new JavaImporter());`
+            //    ⇒ 没有 `JavaImporter` ⇒ `new` 抛错 ⇒ **jsLib 整个加载失败** ⭐
+            //    ⇒ 站方 JS 走兜底分支 ⇒ 分类变成「未分组」假分类 ⇒ 整本书打不开
+            //
+            // ⇒ 这两个文件从轻阅的老引擎**原样搬过来**（零依赖的纯 JS ⇒ 一行没改）⭐
+            for src in Self.javaCompatSources() {
+                _ = js.evaluateScript(src)
+            }
+            // ③ 先把宿主对象**建出来**（包装函数要往它们身上挂）
             _ = js.evaluateScript("var source={},book={},chapter={},cookie={},cache={},java={};")
 
             // ③ 注入**属性**（属性不是函数 ⇒ 直接 setObject，不走 block）
@@ -202,6 +213,27 @@ public final class JSCExecutor: JSExecutor {
         if let msg = caught.value { throw JSCError.scriptException(msg) }
         guard let value else { return .null }
         return Self.toJSON(value)
+    }
+
+    // MARK: - ⭐⭐⭐ 站方 JS 的 Java 兼容层（资源）
+
+    /// ⭐⭐⭐ **Java 兼容层的 JS 源码**（`packages_stub.js` + `packages-native.js`）
+    ///
+    /// ⚠️ **这两个文件从轻阅的老引擎原样搬来**（**零依赖的纯 JS** ⇒ 一行没改）
+    /// ⇒ 提供 `JavaImporter` / `Packages.*`（Base64 / Thread / 各种 Java 类模拟）
+    ///
+    /// ⚠️⚠️ **为什么必须先于站方 jsLib 注入**（2026-10-23 真机栽的：🍅大灰狼聚合）
+    ///   大灰狼的 jsLib 第一行：`var javaImport = CompatibilityUtils.safeImport(new JavaImporter());`
+    ///   ⇒ 没有 `JavaImporter` ⇒ **`new` 抛错** ⇒ **jsLib 整个加载失败**
+    ///   ⇒ 站方 JS 走兜底分支 ⇒ 分类里冒出「未分组」假分类 ⇒ **整本书打不开** ⭐
+    static func javaCompatSources() -> [String] {
+        // ⚠️ 资源读不到（不该发生）⇒ 返回空 ⇒ 至少不崩，站方 JS 会报「JavaImporter is not defined」
+        guard let stubURL = Bundle.module.url(forResource: "packages_stub", withExtension: "js"),
+              let nativeURL = Bundle.module.url(forResource: "packages_native", withExtension: "js"),
+              let stub = try? String(contentsOf: stubURL, encoding: .utf8),
+              let native = try? String(contentsOf: nativeURL, encoding: .utf8)
+        else { return [] }
+        return [stub, native]
     }
 
     // MARK: - 宿主对象 → JS 对象
