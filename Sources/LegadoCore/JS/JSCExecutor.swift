@@ -199,10 +199,7 @@ public final class JSCExecutor: JSExecutor {
             //   **JSC 的 `evaluateScript` 顶层 `var` 不进全局**（JSC 与 WebKit 的差异！）
             //   ⇒ 直接 evaluateScript ⇒ `var JavaImporter` 是脚本局部 ⇒ 站方 jsLib 拿不到 ⇒ 全废 ⭐
             //   ⇒ 间接 eval ⇒ **全局作用域** ⇒ 与老引擎（WKWebView）行为一致 ✔
-            for src in Self.javaCompatSources() {
-                let literal = JSScopeBuilder.jsonLiteral(.string(src))
-                _ = created.evaluateScript("(0, eval)(" + literal + ")")
-            }
+            Self.injectJavaCompat(into: created)
             cachedContext = created
             js = created
         }
@@ -230,6 +227,33 @@ public final class JSCExecutor: JSExecutor {
     ///   ⇒ 没有 `JavaImporter` ⇒ **`new` 抛错** ⇒ **jsLib 整个加载失败**
     ///   ⇒ 站方 JS 走兜底分支 ⇒ 分类里冒出「未分组」假分类 ⇒ **整本书打不开** ⭐
     static func javaCompatSources() -> [String] { JavaCompat.sources }
+
+    /// ⭐⭐⭐ **把 Java 兼容层注入到 JSC 的全局**
+    ///
+    /// ⚠️⚠️⚠️ **为什么不直接 `evaluateScript(src)`**（2026-10-23 踩了三轮）：
+    ///   · `evaluateScript` 的**顶层 `var` 不进全局**（脚本局部）⇒ `var Packages = {}` 白干
+    ///   · 改成 `(0, eval)(src)` 也**不能完全保险**（JSC 的 eval 作用域行为与 WebKit 不同）
+    ///   ⇒ ⇒ **最稳的做法：eval 完把需要的全局显式挂到 `globalThis`** ⭐
+    ///
+    /// ⚠️ **为什么非要它**：站方 jsLib 第一行 `new JavaImporter()` ⇒ 没有它 ⇒ **jsLib 整个加载失败**
+    ///   ⇒ 站方 JS 走兜底分支 ⇒ 分类变成「未分组」假分类 ⇒ **整本书打不开**（真机实证）
+    private static func injectJavaCompat(into js: JavaScriptCore.JSContext) {
+        for src in javaCompatSources() {
+            let literal = JSScopeBuilder.jsonLiteral(.string(src))
+            // eval 的**完成值** = 最后那个表达式 ⇒ 把 JavaImporter / Packages 带出来
+            let probe = """
+            (function(){ var __g = (0, eval)(__LITERAL__ + "\\n;({JavaImporter:(typeof JavaImporter!='undefined')?JavaImporter:undefined,Packages:(typeof Packages!='undefined')?Packages:undefined});"); if(__g){ if(__g.JavaImporter) globalThis.JavaImporter=__g.JavaImporter; if(__g.Packages) globalThis.Packages=__g.Packages; } return 1; })()
+            """.replacingOccurrences(of: "__LITERAL__", with: literal)
+            let r = js.evaluateScript(probe)
+            if r == nil {
+                // ⚠️ 用 `print` 而不是 NSLog（NSLog 在 macOS CI 里看不到 ⇒ 排查被误导过两轮）⭐
+                print("[legado-engine] ⚠️ Java 兼容层注入失败（eval 返回 nil）")
+            }
+        }
+        // 兜底自检（CI 里能看到 ⇒ 一眼知道有没有注入成功）
+        let ok = js.evaluateScript("(typeof JavaImporter) + '|' + (typeof Packages)")
+        print("[legado-engine] Java 兼容层注入自检：\(ok?.toString() ?? "nil")")
+    }
 
     // MARK: - 宿主对象 → JS 对象
 
