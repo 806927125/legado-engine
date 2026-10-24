@@ -174,7 +174,7 @@ final class StationDahulangChainParityTests: XCTestCase {
         let e = ev.evalOne(
             "<js>try { java.qread(); '没抛'; } catch (err) { '抛了'; }</js>",
             base: base, ctx: ctx)
-        XCTAssertEqual(e.value.scalarString, "抛了",
+        XCTAssertEqual(e.value.jsonValue.scalarString, "抛了",
                        "⭐⭐⭐ 宿主没实现的 java API 必须**抛 TypeError**（老引擎语义）"
                        + "⇒ 不抛 ⇒ 站方的 try/catch 探测走错分支 ⇒ 简介/正文都不一样")
     }
