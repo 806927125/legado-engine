@@ -31,13 +31,12 @@ final class JSExploreKindsTests: XCTestCase {
     }
 
     private static func jsLiteral(_ code: String) -> String {
-        // ⚠️ 2026-10-24：**不能**用 `jsonObject(with:) as! [String]`
-        //   ⇒ macOS/新 Foundation 返回的是 **NSString** ⇒ `as! [String]` **必崩**
-        //   ⇒ 这些用例以前被 `--filter JSC` 滤掉了 ⇒ **从没跑过** ⇒ 没人发现 ⭐
-        // ⇒ 改成：把 JSON 文本里的第一个字符串**解码出来**（用 JSONDecoder 拿真 String）
-        let data = try! JSONSerialization.data(withJSONObject: [code])
-        let arr = try! JSONDecoder().decode([String].self, from: data)
-        return arr[0]
+        // ⚠️⚠️⚠️ 2026-10-24：**必须返回【带引号的 JSON 文本】**
+        //   ⇒ 以前返回的是**解码后的原文** ⇒ 嵌进 JSON 模板 ⇒ **不是合法 JSON** ⇒ 解码必炸
+        //   ⇒ 而且 macOS/新 Foundation 上 `as! [String]` 还会先崩 ⇒ **这些用例从没通过过** ⭐
+        // ⇒ 正确做法：把**单个字符串**序列化成 JSON 文本（自带引号 + 转义）⇒ 直接嵌进模板
+        let data = try! JSONSerialization.data(withJSONObject: code)
+        return String(data: data, encoding: .utf8)!
     }
 
     final class T: HTTPTransport, @unchecked Sendable {

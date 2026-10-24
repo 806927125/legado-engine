@@ -136,7 +136,7 @@ final class StationDahulangExploreTests: XCTestCase {
         let payload = raw.components(separatedBy: ",{\"type\"").first ?? raw
         let decoded = Crypto.base64Decode(payload) ?? ""
         XCTAssertFalse(decoded.isEmpty,
-                       "⭐⭐ 载荷解不出来 ⇒ `java.base64Encode` 没接上（引擎侧能力没接管）\n实际：\(url)")
+                       "⭐⭐ 载荷解不出来 ⇒ 看实际 bookUrl：\(url)\n载荷原文：\(payload)")
         let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(decoded.utf8)) as? [String: Any],
                                 "⭐⭐ 载荷必须是一份 JSON\n解出来：\(decoded)")
         XCTAssertEqual(obj["book_id"] as? String, "7412345678901234567",
@@ -180,8 +180,16 @@ final class StationDahulangExploreTests: XCTestCase {
                             context: JSRunContext(base: .page("")))
         print("PROBE ④ __hostJSON 直调 =", t3.scalarString)
 
-        // ⑤ 宿主 API 侧（不接引擎能力时它回什么）
-        print("PROBE ⑤ 宿主 callJava(base64Encode) =",
+        // ⑤ 真书源的 bookUrl 到底算成了什么（⭐ 关键）
+        let books = try engine.explore("https://v5.langge.uk/api/explore", page: 1)
+        print("PROBE ⑤ 真书源 bookUrl =", books.first?.bookUrl ?? "<nil>")
+        print("PROBE ⑥ 引擎诊断条数 =", engine.diagnostics.count)
+        for d in engine.diagnostics.suffix(6) {
+            print("PROBE ⑥ diag:", SourceEngine.diagnosticLine(d))
+        }
+
+        // ⑦ 宿主 API 侧（不接引擎能力时它回什么）
+        print("PROBE ⑦ 宿主 callJava(base64Encode) =",
               String(describing: StationHostAPI().callJava("base64Encode", [.string("hi")])))
     }
 
