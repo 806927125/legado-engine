@@ -93,6 +93,20 @@ public final class SourceEngine {
         self.cookies = cookies
         // ⭐⭐ cookie 宿主对象（站方 `cookie.getCookie(url)` 等 —— 205 处真实用法）
         if let cookies { self.cookieObject = Self.makeCookieObject(cookies) }
+        // ⭐⭐⭐ **宿主通道必须在【第一次求值】之前就完整**（2026-10-24 真机栽的）
+        //
+        // ⚠️⚠️ **症状**：真机发现页冒出「**未分组**」假分类 ⇒ 整本书打不开
+        //   ⇒ 站方 `exploreUrl` 的第一句就是 `source.getVariable()`
+        //      紧接着 `source.setVariable(JSON.stringify(initData))`
+        //   ⇒ 而 `sourceObject` 以前**只在 bookInfo / toc / content 里才被创建**
+        //   ⇒ **发现页 + jsLib 加载阶段它是 nil**
+        //   ⇒ 宿主拿到的 `source` 对象是空的 ⇒ `source.setVariable` 是 **undefined**
+        //   ⇒ 站方 JS **抛异常** ⇒ 走兜底分支 ⇒ 分类变成假分类 ⭐
+        //
+        // ⇒ 修：**init 里就把 `sourceObject` 建好** ⇒ 宿主通道从第一次调用就完整 ⭐
+        //   （jsLib 里的 `source.getVariable()` / 发现页的 `source.setVariable()` 都活了）
+        sourceObject = Self.makeSourceObject(source, varBox: varBox,
+                                              loginInfo: loadLoginInfo())
         // ⭐⭐ **让引擎接管 `java.ajax`**（站方 JS 抓页面用 —— 125 源里 22 处 / 12 个源）
         //
         // ⭐ 引擎**全同步** ⇒ 这里可以**同步发请求**并直接返回正文

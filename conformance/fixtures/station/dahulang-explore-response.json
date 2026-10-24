@@ -1,0 +1,40 @@
+{
+  "code": 0,
+  "msg": "ok",
+  "data": [
+    {
+      "book_id": "7412345678901234567",
+      "source": "番茄",
+      "tab": "小说",
+      "toc_url": "",
+      "book_name": "测试书名一",
+      "author": "作者一",
+      "thumb_url": "https://example.com/1.jpg",
+      "abstract": "简介一",
+      "category": "都市",
+      "score": 9.2,
+      "status": "连载",
+      "tags": "都市,爽文",
+      "last_chapter_title": "第100章",
+      "last_update_time": "2026-10-20 12:00:00",
+      "word_number": "123456"
+    },
+    {
+      "book_id": "7412345678901234568",
+      "source": "番茄",
+      "tab": "小说",
+      "toc_url": "",
+      "book_name": "测试书名二",
+      "author": "作者二",
+      "thumb_url": "https://example.com/2.jpg",
+      "abstract": "简介二",
+      "category": "玄幻",
+      "score": 8.8,
+      "status": "完结",
+      "tags": "玄幻",
+      "last_chapter_title": "第50章",
+      "last_update_time": "2026-10-21 12:00:00",
+      "word_number": "654321"
+    }
+  ]
+}
