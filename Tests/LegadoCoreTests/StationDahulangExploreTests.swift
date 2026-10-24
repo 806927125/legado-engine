@@ -185,7 +185,7 @@ final class StationDahulangExploreTests: XCTestCase {
         let base = RuleBase.page(text)
         let ctx = EvalContext(base: base, baseUrl: "https://x.example", raw: text)
         let e = ev.evalOne("<js>result</js>", base: base, ctx: ctx)
-        XCTAssertEqual(e.value.scalarString, text, "⭐ 不是 JSON 的文本要原样返回")
+        XCTAssertEqual(e.value.jsonValue.scalarString, text, "⭐ 不是 JSON 的文本要原样返回")
     }
 
     // MARK: - ⭐ 探针：java.base64Encode 到底断在哪一环？（2026-10-24 真机载荷是 "undefined"）
