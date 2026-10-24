@@ -114,6 +114,57 @@ public final class SwiftSoupDocument: DOMDocument {
 
     public var document: DOMNode { SwiftSoupNode(doc) }
 
+    /// ⭐⭐⭐ **HTML ⇒ 纯文本**（照抄老引擎 `reference/js/jsoup-compat.js` 的 `dom.htmlToText`）
+    ///
+    /// · 先删掉 `script/style/noscript/iframe/ins/svg`
+    /// · `<br>` ⇒ 换行
+    /// · `p/div/li/h1..h6/tr/section` ⇒ **末尾追加换行**（段落各占一行）
+    /// · 空白归一 + 三个以上连续换行压成两个
+    ///
+    /// ⚠️ **为什么必须有**（2026-10-24 整链对拍）：老引擎的 content op 拿规则结果后
+    ///   **会做这一步** ⇒ 不做 ⇒ **同一个源的新旧引擎正文不一样**（HTML vs 纯文本）⭐⭐⭐
+    public func htmlToText() -> String {
+        // ① 删掉不该进正文的标签
+        for sel in ["script", "style", "noscript", "iframe", "ins", "svg"] {
+            if let els = try? doc.select(sel) {
+                for e in els { try? e.remove() }
+            }
+        }
+        // ② <br> ⇒ 换行
+        if let brs = try? doc.select("br") {
+            for b in brs { try? b.replaceWith(SwiftSoup.TextNode("\n", "")) }
+        }
+        // ③ 块级元素末尾追加换行（段落各占一行）
+        if let blocks = try? doc.select("p,div,li,h1,h2,h3,h4,h5,h6,tr,section") {
+            for e in blocks { try? e.appendChild(SwiftSoup.TextNode("\n", "")) }
+        }
+        // ⚠️⚠️ **必须用 `wholeText()`，不能用 `text()`**：
+        //   SwiftSoup 的 `text()` 会**把块级元素之间的空白归一成空格**
+        //   （"第一段 第二段"）⇒ 段落换行就没了 ⭐
+        //   而老引擎用的是 jsdom 的 `textContent`（**原样文本**，不归一）⇒ 语义要对齐 ⭐
+        var raw = ""
+        if let body = try? doc.body() {
+            // ⭐ `trimAndNormaliseWhitespace: false` ⇒ **原样文本**（jsdom `textContent` 的语义）
+            raw = (try? body.text(trimAndNormaliseWhitespace: false)) ?? ""
+        }
+        if raw.isEmpty {
+            raw = (try? doc.text(trimAndNormaliseWhitespace: false)) ?? ""
+        }
+        return Self.normalizeWS(raw)
+            .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+    }
+
+    /// ⭐ **空白归一**（照抄老引擎 `dom.normalizeWS`）
+    public static func normalizeWS(_ s: String) -> String {
+        var t = s
+        t = t.replacingOccurrences(of: "\u{00a0}", with: " ")
+        t = t.replacingOccurrences(of: "\u{3000}", with: " ")
+        t = t.replacingOccurrences(of: "\u{200b}", with: " ")
+        t = t.replacingOccurrences(of: #"\s*\n\s*"#, with: "\n", options: .regularExpression)
+        t = t.replacingOccurrences(of: #"[ \t]{2,}"#, with: " ", options: .regularExpression)
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// 相对地址绝对化（Jsoup `absolutize` 语义）
     public func absolutize(_ path: String) -> String {
         guard !path.isEmpty else { return path }

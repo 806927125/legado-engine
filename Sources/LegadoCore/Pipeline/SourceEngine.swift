@@ -663,6 +663,16 @@ public final class SourceEngine {
         }
         var text = parts.joined(separator: "\n")
         text = Self.clean(text, using: rules.replaceRegex)
+        // ⭐⭐⭐ **老引擎的收尾加工**（照抄 `reference/js/engine.js` 的 content op，2026-10-24 整链对拍挖出来的）
+        //   ① 正文里带 HTML 标签 ⇒ **转成纯文本**（br/p 会变成换行）
+        //      （不少源的 content 规则写的是 `@html` ⇒ 不转的话正文里会露出 `<div id=...>` 这种标签）⭐
+        //   ② **清洗**：去掉「上一章/下一章/返回目录/加入书架/推荐本书/txt下载/请记住本站/www./广告」这类短行
+        //      + 三个以上连续换行压成两个 + 首尾去空白
+        //   ⇒ 少了这两步 ⇒ **同一个源的新旧引擎正文不一样**（HTML vs 纯文本）⭐⭐⭐
+        if text.range(of: #"<[a-zA-Z][^>]*>"#, options: .regularExpression) != nil {
+            text = Self.htmlToText(text)
+        }
+        text = Self.cleanContent(text)
         return text
         }
     }
@@ -1699,6 +1709,47 @@ public final class SourceEngine {
     }
 
     /// **正文净化** —— `replaceRegex` 格式：`正则=>替换`，**每行一条**；替换为空 = 删除。
+    // MARK: - ⭐⭐⭐ 正文收尾加工（照抄老引擎 `reference/js/engine.js`）
+
+    /// ⭐⭐⭐ **HTML ⇒ 纯文本**（照抄老引擎 `dom.htmlToText`）
+    ///
+    /// · 先删掉 `script/style/noscript/iframe/ins/svg`
+    /// · `<br>` ⇒ 换行
+    /// · `p/div/li/h1..h6/tr/section` ⇒ **末尾追加换行**（段落各占一行）
+    /// · 空白归一 + 三个以上连续换行压成两个
+    public static func htmlToText(_ html: String) -> String {
+        guard !html.isEmpty,
+              let doc = try? SwiftSoupDocument(html: html, baseURL: "") else { return html }
+        return doc.htmlToText()
+    }
+
+    /// ⭐ **空白归一**（照抄老引擎 `dom.normalizeWS`）
+    public static func normalizeWS(_ s: String) -> String {
+        SwiftSoupDocument.normalizeWS(s)
+    }
+
+    /// ⭐⭐⭐ **正文清洗**（照抄老引擎 `cleanContent`）
+    ///
+    /// · 去掉「上一章 / 下一章 / 返回目录 / 加入书架 / 推荐本书 / txt下载 / 请记住本站
+    ///   / www. / http:// / 请收藏本站 / 广告」这些行（**长度 < 40 才丢** ⇒ 不误伤正文）⭐
+    /// · 三个以上连续换行压成两个 + 首尾去空白
+    public static func cleanContent(_ s: String) -> String {
+        // ⚠️ 用 NSRegularExpression（Swift 的裸正则字面量里 `\/` 这种转义不支持）⭐
+        let pattern = "上一章|下一章|返回目录|加入书架|推荐本书|txt下载|请记住本站|www\\.|http://|请收藏本站|广告"
+        let drop = try? NSRegularExpression(pattern: pattern)
+        let kept = s.split(separator: "\n", omittingEmptySubsequences: false).filter { line -> Bool in
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if t.isEmpty { return true }
+            if let m = drop?.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)), t.count < 40 {
+                return false
+            }
+            return true
+        }
+        return kept.joined(separator: "\n")
+            .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     public static func clean(_ text: String, using replaceRegex: String?) -> String {
         var t = text
         if let rr = replaceRegex, !rr.isEmpty {
