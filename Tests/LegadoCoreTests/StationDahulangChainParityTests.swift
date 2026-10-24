@@ -82,6 +82,12 @@ final class StationDahulangChainParityTests: XCTestCase {
                                   fetcher: PageFetcher(transport: transport),
                                   js: JSCExecutor(api: LegacyHost()),
                                   logger: logger)
+        // ⭐⭐⭐ **必须加载站方 jsLib**（老引擎那边会自动 `ensureJsLib`）
+        //   站方的 `getArguments` / `host` / `getFanqieCookie` / `getSessionId` **都在 jsLib 里**
+        //   ⇒ 不加载 ⇒ init 规则第一句就「getArguments is not defined」⇒ **详情全空** ⭐⭐⭐
+        if let jsLib = source.jsLib, !jsLib.isEmpty {
+            try engine.loadJsLib(jsLib)
+        }
 
         // ④ 详情
         var book = Book()
