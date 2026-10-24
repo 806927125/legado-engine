@@ -1571,6 +1571,22 @@ public final class SourceEngine {
         let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
         if t.isEmpty { return t }
         if t.hasPrefix("http://") || t.hasPrefix("https://") || t.hasPrefix("//") { return t }
+        // ⭐⭐⭐ **带 scheme 的（`data:` / `blob:` / 站方自定义）必须【原样返回】**
+        //   （2026-10-24 真机栽的）
+        //
+        // ⚠️⚠️ **为什么**：`URL(string:)` 会把 `data:;base64,<载荷>,{"type":"qingtian"}`
+        //   里的 `{` `"` **百分号编码**成 `%7B%22type%22...`
+        //   ⇒ 引擎自己的 `,{json}` 选项后缀**剥离失效** ⇒ 站方 `JSON.parse` 炸
+        //   ⇒ 轻阅那边早就踩过（`Book.normalizeURL` 有同样的白名单）⇒ **引擎这边漏了** ⭐⭐
+        //
+        // ⇒ 判据 = **有 scheme**（`^[A-Za-z][A-Za-z0-9+.-]*:`）⇒ 它本来就是绝对 URL ⇒ 不碰它
+        if let colon = t.firstIndex(of: ":") {
+            let head = t[..<colon]
+            if !head.isEmpty, head.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "+" || $0 == "." || $0 == "-" }),
+               head.first?.isLetter == true {
+                return t
+            }
+        }
         guard !base.isEmpty, let b = URL(string: base) else { return t }
         if let u = URL(string: t, relativeTo: b)?.absoluteURL { return u.absoluteString }
         return t

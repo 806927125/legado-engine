@@ -114,3 +114,31 @@ final class JsBlockParsingTests: XCTestCase {
         XCTAssertNotNil(tail, "⭐⭐⭐ 复合规则的尾巴不能丢（大灰狼的 chapterList 是 `<js>…</js>$.data`）")
     }
 }
+
+// MARK: - ⑤⭐⭐⭐ `data:` 伪 URL 绝对化时**不许百分号编码**（真机栽的）
+
+final class DataURLAbsoluteTests: XCTestCase {
+    func testDataURLKeepsRawJSONSuffix() {
+        let raw = "data:;base64,eyJib29rX2lkIjoiNzQxIn0==,{\"type\":\"qingtian\"}"
+        let out = SourceEngine.absolute(raw, base: "https://v5.langge.uk/api/x")
+        XCTAssertEqual(out, raw,
+                       "⭐⭐⭐ `data:` 伪 URL 必须**原样返回** ⇒ `,{\"type\":…}` 不能被百分号编码")
+        XCTAssertFalse(out.contains("%7B"), "⭐ 开头的大括号不能被编码（引擎的 ,{json} 剥离会失效）")
+    }
+
+    func testBlobURLKeepsRaw() {
+        let raw = "blob:https://x.example/abc,{\"a\":1}"
+        XCTAssertEqual(SourceEngine.absolute(raw, base: "https://x.example/"), raw,
+                       "⭐ blob: 同样原样")
+    }
+
+    func testRelativeURLStillAbsolute() {
+        XCTAssertEqual(SourceEngine.absolute("/books?id=1", base: "https://x.example/a/b"),
+                       "https://x.example/books?id=1", "⭐ 普通相对路径还是要绝对化")
+    }
+
+    func testPlainURLUnchanged() {
+        XCTAssertEqual(SourceEngine.absolute("https://a.example/x", base: "https://b.example/"),
+                       "https://a.example/x", "⭐ 绝对 URL 不变")
+    }
+}
