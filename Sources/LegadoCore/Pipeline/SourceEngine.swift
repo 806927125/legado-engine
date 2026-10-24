@@ -1650,29 +1650,38 @@ public final class SourceEngine {
     /// ⭐⭐ **字段出口的值** —— 多个命中取**第一个非空**（Legado 语义）。
     ///
     /// ⚠️ 与**正文出口**不同：正文规则（`ruleContent.content`）命中多个时要**全部拼接**。
+    /// ⭐⭐⭐ **字段出口：第一个「非空白」的命中**（老引擎口径）
+    ///
+    /// ⚠️⚠️ **返回值要【原样】**（老引擎不 trim）⇒
+    ///   站方（大灰狼）的简介是模板串，首尾带换行 ⇒ 老引擎的简介**首尾有换行**，
+    ///   以前这里 trim 掉 ⇒ **同一份规则、两个引擎的字段不一样** ⭐⭐⭐
+    ///   ⇒ **trim 只用来判断「是不是空白」，不用来改内容** ⭐
     public static func firstNonEmpty(_ v: RuleValue) -> String {
         switch v {
         case .void:
             return ""
         case .string(let s):
-            return s.trimmingCharacters(in: .whitespacesAndNewlines)
+            // ⭐ 空白 ⇒ 当没命中；**非空白 ⇒ 原样返回**（不 trim）
+            return s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : s
         case .list(let items):
             for it in items {
-                let t = it.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !t.isEmpty { return t }
+                let t = it.text
+                if !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return t }
             }
             return ""
         case .json(let j):
             if case .array(let arr) = j {
                 for it in arr {
-                    let t = it.scalarString.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !t.isEmpty { return t }
+                    let t = it.scalarString
+                    if !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return t }
                 }
                 return ""
             }
-            return j.scalarString.trimmingCharacters(in: .whitespacesAndNewlines)
+            let t = j.scalarString
+            return t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : t
         case .node(let n):
-            return n.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let t = n.text
+            return t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : t
         }
     }
 
