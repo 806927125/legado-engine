@@ -35,7 +35,10 @@ final class JSExploreKindsTests: XCTestCase {
         //   ⇒ 以前返回的是**解码后的原文** ⇒ 嵌进 JSON 模板 ⇒ **不是合法 JSON** ⇒ 解码必炸
         //   ⇒ 而且 macOS/新 Foundation 上 `as! [String]` 还会先崩 ⇒ **这些用例从没通过过** ⭐
         // ⇒ 正确做法：把**单个字符串**序列化成 JSON 文本（自带引号 + 转义）⇒ 直接嵌进模板
-        let data = try! JSONSerialization.data(withJSONObject: code)
+        // ⚠️⚠️ **必须用 JSONEncoder**（不是 JSONSerialization.data(withJSONObject:)）
+        //   ⇒ **macOS 上 `data(withJSONObject:)` 不接受 Swift String**（要 NSString）
+        //   ⇒ Linux 能过、macOS 直接抛 ⇒ 又一个「沙盒过了真机炸」的坑 ⭐
+        let data = try! JSONEncoder().encode(code)
         return String(data: data, encoding: .utf8)!
     }
 

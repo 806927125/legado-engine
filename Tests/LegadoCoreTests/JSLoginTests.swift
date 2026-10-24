@@ -46,7 +46,10 @@ final class JSLoginTests: XCTestCase {
         // ⚠️⚠️⚠️ 2026-10-24：**必须返回【带引号的 JSON 文本】**
         //   ⇒ 以前返回的是**解码后的原文** ⇒ 嵌进 JSON 模板 ⇒ **不是合法 JSON** ⇒ 解码必炸
         //   ⇒ 而且 macOS/新 Foundation 上 `as! [String]` 还会先崩 ⇒ **这些用例从没通过过** ⭐
-        let data = try! JSONSerialization.data(withJSONObject: code)
+        // ⚠️⚠️ **必须用 JSONEncoder**（不是 JSONSerialization.data(withJSONObject:)）
+        //   ⇒ **macOS 上 `data(withJSONObject:)` 不接受 Swift String**（要 NSString）
+        //   ⇒ Linux 能过、macOS 直接抛 ⇒ 又一个「沙盒过了真机炸」的坑 ⭐
+        let data = try! JSONEncoder().encode(code)
         return String(data: data, encoding: .utf8)!
     }
 
