@@ -43,7 +43,6 @@ final class JSLoginTests: XCTestCase {
 
     /// 把 JS 源码安全地塞进 JSON 字符串
     private static func jsLiteral(_ code: String) -> String {
-        let data = try! JSONSerialization.data(withJSONObject: [code])
         // ⚠️⚠️⚠️ 2026-10-24：**必须返回【带引号的 JSON 文本】**
         //   ⇒ 以前返回的是**解码后的原文** ⇒ 嵌进 JSON 模板 ⇒ **不是合法 JSON** ⇒ 解码必炸
         //   ⇒ 而且 macOS/新 Foundation 上 `as! [String]` 还会先崩 ⇒ **这些用例从没通过过** ⭐
