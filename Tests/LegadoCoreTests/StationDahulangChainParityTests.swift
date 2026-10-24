@@ -65,8 +65,9 @@ final class StationDahulangChainParityTests: XCTestCase {
         let expectedData = try Data(contentsOf:
             Self.chainDir.appendingPathComponent("chain-expected.json"))
         let expected = try JSONDecoder().decode(ChainOutput.self, from: expectedData)
-        // ⭐ **老引擎的全文**（在 expected.json 里；没有就空）
-        let expectedFull = (try? JSONDecoder().decode(ChainFull.self, from: expectedData)) ?? nil
+        // ⭐ **老引擎的全文**（在 expected.json 的 `full` 里；没有就空）
+        struct WithFull: Decodable { let full: ChainFull }
+        let expectedFull = (try? JSONDecoder().decode(WithFull.self, from: expectedData))?.full
 
         // ② 源（真规则 + 真 jsLib）
         let srcData = try Data(contentsOf:
