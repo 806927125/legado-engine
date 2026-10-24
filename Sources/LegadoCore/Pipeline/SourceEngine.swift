@@ -267,6 +267,13 @@ public final class SourceEngine {
 
     /// ⭐ **纯文本分类**（`标题::URL`）⇒ 按 `&&` / 换行切
     public static func splitPlainKinds(_ text: String) -> [String] {
+        // ⭐⭐⭐ **先剥最外层的一对引号**（2026-10-24 真机栽的）
+        //   站方的 JS 常写 `JSON.stringify('玄幻::/type/xh&&仙侠::/type/xx')`
+        //   ⇒ 返回的是**带引号的 JSON 文本** ⇒ 不剥 ⇒ 标题变成「"玄幻"」（带引号）⭐
+        var text = text
+        if text.count >= 2, text.hasPrefix("\""), text.hasSuffix("\"") {
+            text = String(text.dropFirst().dropLast())
+        }
         var parts: [String] = []
         var buf = ""
         for ch in text {
@@ -922,7 +929,12 @@ public final class SourceEngine {
         }
         guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接，无法加载登录脚本") }
         let runCtx = JSRunContext(base: .page(""), baseUrl: source.bookSourceUrl, varBox: varBox)
-        _ = try js.run(code, context: runCtx)
+        // ⭐⭐⭐ **必须走 `runGlobal`（间接 eval）**（2026-10-24 真机栽的）
+        //   站方 loginUrl 定义的 `function login()` / `get_type()` **是全局函数**
+        //   ⇒ 用 `run`（函数内 eval）⇒ 它们变成**局部** ⇒ 后续调用 `login()`
+        //   ⇒ `ReferenceError: Can't find variable: login` ⇒ **登录按钮点了就炸** ⭐⭐
+        // ⇒ 间接 eval ⇒ 顶层 `function`/`var` 进全局 ⇒ 站方脚本调得到 ✔
+        _ = try js.runGlobal(code, context: runCtx)
         // ⭐⭐ **重设基线** ⇒ 站方 loginUrl 定义的全局被长期保留
         js.markGlobalsAsBaseline()
         return true

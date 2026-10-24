@@ -142,3 +142,20 @@ final class DataURLAbsoluteTests: XCTestCase {
                        "https://a.example/x", "⭐ 绝对 URL 不变")
     }
 }
+
+// MARK: - ⑥⭐⭐ 纯文本分类：JS 的 JSON.stringify 会带引号 ⇒ 要剥
+
+final class PlainKindsQuoteTests: XCTestCase {
+    func testQuotesAreStripped() {
+        let parts = SourceEngine.splitPlainKinds("\"玄幻::/type/xh&&仙侠::/type/xx\"")
+        XCTAssertEqual(parts.count, 2, "⭐ 两项")
+        XCTAssertEqual(parts[0], "玄幻::/type/xh", "⭐⭐ 引号要剥掉（否则标题带引号）")
+        XCTAssertEqual(parts[1], "仙侠::/type/xx")
+    }
+
+    func testWithoutQuotesStillWorks() {
+        let parts = SourceEngine.splitPlainKinds("玄幻::/type/xh&&仙侠::/type/xx")
+        XCTAssertEqual(parts.count, 2)
+        XCTAssertEqual(parts[0], "玄幻::/type/xh")
+    }
+}
