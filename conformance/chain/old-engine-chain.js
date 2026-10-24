@@ -89,6 +89,8 @@ const invoke = async (op, payload) => {
         name: book.name || '',
         author: book.author || '',
         introLen: normalizeStamp(book.intro || '').length,
+        // ⭐ **简介全文**（逐字比；**别比长度** ⇒ JS 的 .length 数 UTF-16 码元、Swift 的 count 数字素簇 ⇒ 口径不同）
+        intro: normalizeStamp(book.intro || ''),
         tocUrl: book.tocUrl || '',
         coverUrl: book.coverUrl || '',
       };
@@ -122,7 +124,7 @@ const invoke = async (op, payload) => {
     fullContent = text;
     out.steps.content = ct.error
       ? { error: ct.error }
-      : { len: text.length, head: text.slice(0, 60) };
+      : { len: text.length, head: text.slice(0, 60), text: text };
   }
 
   // ⭐ **期望值 = 老引擎的输出**（同样的形状给新引擎当门禁基准）

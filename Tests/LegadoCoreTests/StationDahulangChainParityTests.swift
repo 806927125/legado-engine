@@ -122,13 +122,14 @@ final class StationDahulangChainParityTests: XCTestCase {
         // ⑦ 逐项比对（**指名道姓**，不许只说「不一致」）
         let actual = ChainOutput(
             bookInfo: ChainBookInfo(name: info.name, author: info.author,
-                                    introLen: introNorm.count,
+                                    introLen: introNorm.count, intro: introNorm,
                                     tocUrl: info.tocUrl, coverUrl: info.coverUrl),
             toc: ChainToc(count: chapters.count,
                           chapters: chapters.map {
                               ChainChapter(title: $0.name, url: $0.url, isVolume: $0.isVolume)
                           }),
-            content: ChainContent(len: content.count, head: String(content.prefix(60)))
+            content: ChainContent(len: content.count, head: String(content.prefix(60)),
+                                  text: content)
         )
         var diff = Self.diff(expected: expected, actual: actual)
         if ch == nil {
@@ -155,7 +156,7 @@ final class StationDahulangChainParityTests: XCTestCase {
         }
         cmp("详情.书名", expected.bookInfo.name, actual.bookInfo.name)
         cmp("详情.作者", expected.bookInfo.author, actual.bookInfo.author)
-        cmp("详情.简介长度", String(expected.bookInfo.introLen), String(actual.bookInfo.introLen))
+        cmp("详情.简介（全文逐字）", expected.bookInfo.intro ?? "", actual.bookInfo.intro ?? "")
         cmp("详情.tocUrl", expected.bookInfo.tocUrl, actual.bookInfo.tocUrl)
         cmp("详情.封面", expected.bookInfo.coverUrl, actual.bookInfo.coverUrl)
         cmp("目录.章数", String(expected.toc.count), String(actual.toc.count))
@@ -167,8 +168,7 @@ final class StationDahulangChainParityTests: XCTestCase {
             cmp("目录[\(i)].URL", e?.url ?? "（无）", a?.url ?? "（无）")
             cmp("目录[\(i)].是否卷", String(e?.isVolume ?? false), String(a?.isVolume ?? false))
         }
-        cmp("正文.长度", String(expected.content.len), String(actual.content.len))
-        cmp("正文.开头", expected.content.head, actual.content.head)
+        cmp("正文（全文逐字）", expected.content.text ?? "", actual.content.text ?? "")
         return out
     }
 
@@ -208,6 +208,8 @@ final class StationDahulangChainParityTests: XCTestCase {
         var name: String
         var author: String
         var introLen: Int
+        /// ⭐ **简介全文**（逐字比；**不比长度** ⇒ JS 的 .length 数 UTF-16 码元、Swift 的 count 数字素簇 ⇒ 口径不同）
+        var intro: String?
         var tocUrl: String
         var coverUrl: String
     }
@@ -223,6 +225,8 @@ final class StationDahulangChainParityTests: XCTestCase {
     struct ChainContent: Codable {
         var len: Int
         var head: String
+        /// ⭐ **正文全文**（逐字比）
+        var text: String?
     }
 
     /// ⭐ **全文（转义后）** —— 差异时打出来，一眼看出差在哪

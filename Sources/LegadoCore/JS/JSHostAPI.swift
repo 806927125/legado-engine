@@ -84,6 +84,13 @@ public enum JSHostAPI {
         .init(object: "source", name: "putLoginInfo", kind: .method),
         .init(object: "source", name: "loginUi", kind: .method),
         .init(object: "source", name: "getKey", kind: .method),
+        // ⭐⭐⭐ **source.get / source.put**（读/写「书籍变量」的某一项）
+        //   —— 老引擎 `source-api.js` 有，自研引擎的 `makeSourceObject` **也实现了**，
+        //   但契约里**漏登记** ⇒ 包装函数不生成 ⇒ 站方 `source.get("k")` 直接
+        //   **TypeError: not a function** ⇒ 站方 try/catch 吞掉 ⇒ **静默失效** ⭐⭐⭐
+        //   （125 源实测：**71 处 get + 58 处 put** ⇒ 命中就是整源空白/假成功）
+        .init(object: "source", name: "get", kind: .method),
+        .init(object: "source", name: "put", kind: .method),
 
         // ── book.*
         .init(object: "book", name: "getVariable", kind: .method),
@@ -97,6 +104,8 @@ public enum JSHostAPI {
         .init(object: "cookie", name: "setCookie", kind: .method),
         .init(object: "cookie", name: "removeCookie", kind: .method),
         .init(object: "cookie", name: "getKey", kind: .method),
+        // ⭐ `cookie.replaceCookie`（引擎已实现，契约漏登记 ⇒ 站方调用 TypeError）
+        .init(object: "cookie", name: "replaceCookie", kind: .method),
 
         // ── cache.*
         .init(object: "cache", name: "put", kind: .method),
