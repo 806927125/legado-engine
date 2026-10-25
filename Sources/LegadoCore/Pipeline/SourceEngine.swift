@@ -778,6 +778,21 @@ public final class SourceEngine {
         // ⭐⭐ `java.timeFormat(t)` ⇒ **epoch 毫秒 → "yyyy-MM-dd HH:mm:ss"**（本地时区）
         //   `java.timeFormatUTC(t, pattern, tz)` ⇒ UTC + **时区偏移小时**（如 8 = UTC+8）
         //   依据：轻阅参考实现（reference/js/java-api.js）+ 125 源真实用法
+        // ⭐⭐⭐ **`java.t2s` = `java.timeFormat` 的别名**（老引擎 `java-api.js` 里代码逐字相同）
+        //   ⇒ 站方 125 源实测 **27 处**在用（分类名转换）⇒ 不实现 ⇒ 站方调用 TypeError
+        //   ⇒ ⚠️ 照老引擎语义（老引擎上它就是 timeFormat，站方拿分类名去调会得到空串 ⇒ 与老引擎一致）⭐
+        case "t2s":
+            return engineJava("timeFormat", args, base)
+        // ⭐ **`java.getAbsoluteURL(u, base)`**（老引擎：`new URL(u, base || java.getString('$.baseUrl') || '').href`）
+        //   ⇒ 站方 3 处在用（把相对地址补成绝对）⇒ base 为空且 u 相对 ⇒ 老引擎会抛 ⇒ 站方 catch
+        //   ⇒ 这里**返回原串**（不抛）⇒ 与老引擎「站方 catch 后继续」的效果一致 ⭐
+        case "getAbsoluteURL":
+            let relURL = first
+            let baseStr = args.count > 1 ? args[1].scalarString : ""
+            if let abs = URL(string: relURL, relativeTo: baseStr.isEmpty ? nil : URL(string: baseStr))?.absoluteURL {
+                return .string(abs.absoluteString)
+            }
+            return .string(relURL)
         case "timeFormat", "timeFormatUTC":
             guard let ms = TimeFormat.millis(from: first) else { return .string("") }
             let pattern = args.count > 1 ? args[1].scalarString : nil
