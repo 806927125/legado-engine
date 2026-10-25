@@ -241,9 +241,15 @@ public enum JSScopeBuilder {
         //     ⇒ ⇒ 站方 jsLib 的 `hjmDec` 不可见 ⇒ **0 本书** ⭐⭐⭐
         //
         // ⭐ **正解**：**优先用 `this`**（与 `currentGlobals` 逐字一致）⇒ `globalThis` 只做兜底
-        out += "\n;try{var __qrG=(this&&typeof this==='object')?this:(typeof globalThis!=='undefined'?globalThis:null);"
+        // ⭐⭐⭐⭐⭐ **写两个对象**（\`globalThis\` 和 \`this\`）⇒ 不赌哪个是真全局
+        //   ⇒ 与 \`currentGlobals\` 的「并集」口径**严格一致** ⭐⭐⭐
+        //   ⇒ ⇒ 导出的符号**一定进基线** ⇒ 不会被全局治理清掉 ⭐⭐⭐
+        out += "\n;try{var __qrGs=[];"
+        out += "try{if(typeof globalThis!=='undefined'&&globalThis)__qrGs.push(globalThis);}catch(e){}"
+        out += "try{if(this&&typeof this==='object')__qrGs.push(this);}catch(e){}"
         for n in names {
-            out += "if(__qrG&&typeof \(n)!=='undefined'&&__qrG.\(n)===undefined){__qrG.\(n)=\(n);}"
+            out += "for(var __qrI=0;__qrI<__qrGs.length;__qrI++){try{var __qrG=__qrGs[__qrI];"
+            out += "if(typeof \(n)!=='undefined'&&__qrG.\(n)===undefined){__qrG.\(n)=\(n);}}catch(e){}}"
         }
         out += "}catch(e){}"
         return out

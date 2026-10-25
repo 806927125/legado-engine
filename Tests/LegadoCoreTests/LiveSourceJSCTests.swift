@@ -120,6 +120,33 @@ final class LiveSourceJSCTests: XCTestCase {
                        "⭐⭐⭐ jsLib 的全局在规则求值时必须可见（否则 hjmDec is not a function ⇒ 0 本书）")
     }
 
+    /// ⭐⭐⭐⭐⭐ **诊断探针：JSC 上「全局」到底是什么**（2026-10-26）
+    ///
+    /// ⚠️ 这条**不判对错，只打印事实** ⇒ 让 CI 给出确切答案，而不是我猜 ⭐⭐⭐
+    func testProbeWhatGlobalIsOnJSC() throws {
+        let js = try JSCExecutor(api: LiveSourceJSCTests.NoopAPI())
+        let ctx = JSRunContext(base: .page(""), baseUrl: "https://x.example/")
+        let lib = try loadJsLib()
+        _ = try js.runGlobal(lib, context: ctx)
+        js.markGlobalsAsBaseline()
+
+        let probe = [
+            "(function(){",
+            "var out=[];",
+            "try{out.push('gt===this: '+(globalThis===this));}catch(e){out.push('gt===t: ERR');}",
+            "try{out.push('typeof this: '+(typeof this));}catch(e){out.push('typeof this: ERR');}",
+            "try{out.push('gtNames: '+Object.getOwnPropertyNames(globalThis).length);}catch(e){out.push('gtNames: ERR');}",
+            "try{out.push('tNames: '+Object.getOwnPropertyNames(this).length);}catch(e){out.push('tNames: ERR');}",
+            "try{out.push('gt.hjmDec: '+(typeof globalThis.hjmDec));}catch(e){out.push('gt.hjmDec: ERR');}",
+            "try{out.push('t.hjmDec: '+(typeof this.hjmDec));}catch(e){out.push('t.hjmDec: ERR');}",
+            "try{out.push('bare hjmDec: '+(typeof hjmDec));}catch(e){out.push('bare hjmDec: ERR');}",
+            "return out.join(' | ');",
+            "})()"
+        ].joined(separator: "\n")
+        let v = try js.run(probe, context: ctx)
+        print("⭐⭐⭐ [JSC 全局诊断] " + v.scalarString)
+    }
+
     /// ⭐⭐⭐ **空宿主**（这个测试不需要宿主能力）
     final class NoopAPI: JSHostAPIProvider, @unchecked Sendable {
         func hostObject(named name: String) -> HostObject? { nil }

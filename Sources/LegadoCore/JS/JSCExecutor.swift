@@ -513,8 +513,28 @@ public final class JSCExecutor: JSExecutor {
         // ⚠️⚠️ **必须用 `Object.getOwnPropertyNames`，不能用 `for...in`**
         //   ⇒ 全局代码里的 `var` 声明创建的属性是**【不可枚举】**的
         //   ⇒ `for...in` **枚举不到** ⇒ 全局清理形同虚设（门禁红出来的）⭐
+        // ⭐⭐⭐⭐⭐ **抓全局名：\`globalThis\` 和 \`this\` 两个对象的【并集】**
+        //
+        // ⚠️⚠️⚠️ **为什么不能只用一个**（2026-10-26 真机回归实证：JM小说 0 本书）：
+        //   · 原来只用 \`Object.getOwnPropertyNames(this)\`
+        //   · ⇒ **JSC 上 \`this\` 不一定是真全局**（严格模式下是 undefined ⇒ 抛错 ⇒ 返回空）
+        //   · ⇒ ⇒ **基线永远是空的** ⇒ ⇒ 每次求值前的「全局治理」
+        //     把**站方 jsLib 的全局全置成 undefined** ⭐⭐⭐
+        //   · ⇒ ⇒ 站方 \`hjmDec\` 不可见 ⇒ 站方 catch 吞掉 ⇒ **0 本书** ⭐⭐⭐
+        //   · ⇒ 顺带解释了「副作用计数 = 0」（第一次设的全局被清掉了）⭐⭐⭐
+        //
+        // ⭐ **正解**：**两个对象都抓、导出也写两个** ⇒ 不赌哪个是真全局 ⇒ 一定覆盖 ⭐⭐⭐
         let src = """
-        (function(){var o=Object.getOwnPropertyNames(this);return o.join(String.fromCharCode(1));})()
+        (function(){
+          var out=[], seen={}, gs=[];
+          try{ if(typeof globalThis!=='undefined'&&globalThis) gs.push(globalThis); }catch(e){}
+          try{ if(this&&typeof this==='object') gs.push(this); }catch(e){}
+          for(var i=0;i<gs.length;i++){
+            var names=Object.getOwnPropertyNames(gs[i]);
+            for(var j=0;j<names.length;j++){ if(!seen[names[j]]){seen[names[j]]=1;out.push(names[j]);} }
+          }
+          return out.join(String.fromCharCode(1));
+        })()
         """
         guard let v = js.evaluateScript(src) else { return [] }
         let text = v.toString() ?? ""

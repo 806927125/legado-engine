@@ -1035,10 +1035,15 @@ function exportSuffix(code) {
   if (!names.length) return '';
   // ⭐⭐⭐⭐⭐ **优先用 `this`**（与 `currentGlobals` 的 `Object.getOwnPropertyNames(this)` 一致）
   //   ⇒ 导出到「全局治理认的那个对象」⇒ 才会进基线 ⇒ 不会被置 undefined ⭐⭐⭐
-  var out = '\n;try{var __qrG=(this&&typeof this===\'object\')?this:(typeof globalThis!==\'undefined\'?globalThis:null);';
+  // ⭐⭐⭐⭐⭐ **写两个对象**（globalThis + this）⇒ 与「基线取并集」口径一致 ⭐⭐⭐
+  var out = '\n;try{var __qrGs=[];';
+  out += 'try{if(typeof globalThis!==\'undefined\'&&globalThis)__qrGs.push(globalThis);}catch(e){}';
+  out += 'try{if(this&&typeof this===\'object\')__qrGs.push(this);}catch(e){}';
   for (var j = 0; j < names.length; j++) {
     var n = names[j];
-    out += 'if(__qrG&&typeof ' + n + "!=='undefined'&&__qrG." + n + '===undefined){__qrG.' + n + '=' + n + ';}';
+    out += 'for(var __qrI=0;__qrI<__qrGs.length;__qrI++){try{var __qrG=__qrGs[__qrI];';
+    out += 'if(typeof ' + n + "!=='undefined'&&__qrG." + n + '===undefined){__qrG.' + n + '=' + n + ';}';
+    out += '}catch(e){}}';
   }
   out += '}catch(e){}';
   return out;
