@@ -1084,6 +1084,21 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
     public func setEngineAPI(_ handler: JSEngineAPIHandler?) {}
     public func markGlobalsAsBaseline() {}
     public func invalidate() {}
+
+    // ⭐⭐⭐⭐⭐ **下面这几个在非 Linux 上必须是【空实现】**（2026-10-26 macOS CI 编译失败实证）
+    //
+    // ⚠️⚠️ **为什么**：\`Conformance/main.swift\` 里有一堆 **Node 专属**的调用
+    //   （setRoutes / recordedRequests / setHostState / setBrowserPages / hostState）
+    //   ⇒ 它们只在 \`#if os(Linux)\` 的真身里有 ⇒ **macOS 上不存在** ⇒ 编译失败 ⭐⭐⭐
+    //   ⇒ 症状：\`value of type 'NodeJSExecutor' has no member 'setRoutes'\` ⭐⭐⭐
+    //
+    // ⭐ **正解**：stub 里补齐**同名同签名**的空实现 ⇒ Conformance 一行不用改
+    //   ⇒ macOS 上这些调用变成「无操作」⇒ 反正 macOS 有 JSC ⇒ 不用 Node ⭐⭐⭐
+    public func setRoutes(_ routes: [[String: Any]]) {}
+    public func recordedRequests() -> [String] { [] }
+    public func setHostState(_ state: [String: Any]) {}
+    public func setBrowserPages(_ pages: [[String: Any]]) {}
+    public func hostState() -> [String: Any] { [:] }
 }
 
 #endif
