@@ -1099,6 +1099,7 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
     public func setHostState(_ state: [String: Any]) {}
     public func setBrowserPages(_ pages: [[String: Any]]) {}
     public func hostState() -> [String: Any] { [:] }
+    public func recordedBrowsers() -> [String] { [] }
 }
 
 #endif
