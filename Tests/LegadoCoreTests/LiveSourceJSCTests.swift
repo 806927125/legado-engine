@@ -148,7 +148,8 @@ final class LiveSourceJSCTests: XCTestCase {
             "})()"
         ].joined(separator: "\n")
         let v = try js.run(probe, context: ctx)
-        print("⭐⭐⭐ [JSC 全局诊断] " + v.scalarString)
+        // ⭐⭐⭐⭐⭐ **用断言暴露事实**（CI 会吞掉 print ⇒ 只有断言能进日志）⭐⭐⭐
+        XCTFail("⭐⭐⭐ [JSC 全局诊断] " + v.scalarString)
     }
 
     /// ⭐⭐⭐⭐⭐ **诊断探针：JSC 上 JM 的 bookList 到底看到什么**（2026-10-26）
@@ -180,7 +181,7 @@ final class LiveSourceJSCTests: XCTestCase {
             "})()"
         ].joined(separator: "\n")
         let v = try js.run(probe, context: ctx)
-        print("⭐⭐⭐ [JM bookList 诊断] " + v.scalarString)
+        XCTFail("⭐⭐⭐ [JM bookList 诊断] " + v.scalarString)
     }
 
     /// ⭐⭐⭐⭐⭐ **诊断探针：走【完整 explore 流程】失败后，诊断里有什么**（2026-10-26）
@@ -197,15 +198,17 @@ final class LiveSourceJSCTests: XCTestCase {
         try engine.loadJsLib(try loadJsLib())
 
         let listURL = "https://cof03.bahfn.cn/jbapi/book/onetab/61/1/15/sort/hjm.ojbk"
+        var report = ""
         do {
             let books = try engine.explore(listURL)
-            print("⭐⭐⭐ [JSC explore 诊断] 出书了：\(books.count) 本 → " + books.prefix(3).map { $0.name }.joined(separator: " , "))
+            report = "出书了：\(books.count) 本 → " + books.prefix(3).map { $0.name }.joined(separator: " , ")
         } catch {
-            print("⭐⭐⭐ [JSC explore 诊断] 抛错：\(error)")
+            report = "抛错：\(error)"
         }
-        print("⭐⭐⭐ [JSC explore 诊断] failureDiagnosticLines：")
-        for l in engine.failureDiagnosticLines { print("    · " + l) }
-        print("⭐⭐⭐ [JSC explore 诊断] failureDiagnosticLines 数量：\(engine.failureDiagnosticLines.count)")
+        report += " || failureDiagnosticLines(\(engine.failureDiagnosticLines.count)): "
+            + engine.failureDiagnosticLines.joined(separator: " | ")
+        // ⭐⭐⭐⭐⭐ **用断言暴露事实**（CI 会吞掉 print ⇒ 只有断言能进日志）⭐⭐⭐
+        XCTFail("⭐⭐⭐ [JSC explore 诊断] " + report)
     }
 
     /// ⭐⭐⭐ **空宿主**（这个测试不需要宿主能力）
