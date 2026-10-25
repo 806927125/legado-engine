@@ -83,6 +83,21 @@ final class BookInfoInheritsFromListTests: XCTestCase {
         XCTAssertTrue(info.name.contains("详情书名"), "站方给了规则 ⇒ 该用规则的：\(info.name)")
     }
 
+    /// ⭐⭐⭐⭐⭐ **失败诊断能被宿主拿到**（⇒ 错误信息能说清「哪条规则失败」）
+    ///   2026-10-25 真机教训：App 只说「书名/书 URL 是空的」⇒ 用户**完全不知道该查哪** ⭐⭐⭐
+    func testFailureDiagnosticsAreExported() throws {
+        let src = try makeSource(ruleBookInfo: ["name": "不存在的选择器@text"])
+        let engine = SourceEngine(source: src,
+                                  fetcher: PageFetcher(transport: MemTransport(body: "<html><h1>x</h1></html>")))
+        var b = Book()
+        b.bookUrl = "https://example.test/book/1"
+        b.name = "列表页的书名"
+        _ = try engine.bookInfo(b)
+        let lines = engine.failureDiagnosticLines
+        XCTAssertFalse(lines.isEmpty, "失败的诊断行不该是空的")
+        XCTAssertTrue(lines.joined().contains("规则["), "诊断行要带规则原文：\(lines)")
+    }
+
     /// ⭐⭐⭐⭐⭐ **规则存在但【没命中】⇒ 如实为空**（不拿列表页的糊弄）
     ///   ⇒ 这是**站方的问题** ⇒ 不该被掩盖 ⭐⭐⭐
     func testRulePresentButNoMatchStaysEmpty() throws {

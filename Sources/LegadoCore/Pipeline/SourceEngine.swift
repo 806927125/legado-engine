@@ -55,6 +55,24 @@ public final class SourceEngine {
     /// ⭐ **诊断流水** —— 每次求值都记一条，UI 可以整段回放
     public private(set) var diagnostics: [EngineDiagnostic] = []
 
+    // MARK: - ⭐⭐⭐ 诊断导出（给宿主 ⇒ 错误信息能说清「哪条规则失败」）
+
+    /// ⭐⭐⭐⭐⭐ **失败的诊断行**（给宿主用）
+    ///
+    /// ⚠️⚠️ **为什么需要**（2026-10-25 真机教训）：
+    ///   App 侧只会说「书名/书 URL 是空的」⇒ **用户完全不知道该查哪** ⇒ 白等一轮 ⭐⭐⭐
+    ///   ⇒ 引擎明明知道「哪条规则走的哪个分支、为什么失败」⇒ **得把它带出来** ⭐⭐⭐
+    ///   ⇒ 宿主把它拼进错误信息 ⇒ 用户看日志就能自己定位 ⭐⭐⭐
+    public var failureDiagnosticLines: [String] {
+        diagnostics.compactMap { d -> String? in
+            guard d.failure != nil else { return nil }
+            let rule = d.rule.count > 60 ? String(d.rule.prefix(60)) + "…" : d.rule
+            let branch = d.branch ?? "-"
+            let why = d.failure.map { "\($0)" } ?? "-"
+            return "规则[\(rule)] 分支=\(branch) 失败=\(why)"
+        }
+    }
+
     // MARK: - 宿主服务（都是**可选**的 ⇒ 核心层不依赖任何具体实现）
 
     /// 键值存储（书源变量 / 登录态 / 用户选择）
