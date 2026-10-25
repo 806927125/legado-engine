@@ -227,18 +227,27 @@ public final class JSCExecutor: JSExecutor {
         // ⭐⭐⭐ **对象字面量判定**（首尾 `{ }`）⇒ 走「整段当表达式」
         //   ⚠️ 不能塞进 eval 块 ⇒ 块里 `{a:1}` 会被当**标签语句** ⇒ 值是 undefined ⭐⭐⭐
         let isObjectLiteral = trimmed.hasPrefix("{") && trimmed.hasSuffix("}")
-        let blockLiteral = JSScopeBuilder.jsonLiteral(.string("{ " + code + " }"))
         let hasTopLevelReturn = JSScopeBuilder.hasTopLevelReturn(code)
         let attempts: [String]
         if isObjectLiteral {
-            // ⭐⭐⭐ **对象字面量 ⇒ 整段当表达式**（不能塞进 eval 块 ⇒ 块里会被当标签语句）
+            // ⭐⭐⭐ **对象字面量 ⇒ 整段当表达式**（不能当脚本跑 ⇒ `{a:1}` 是语句块 ⇒ 无值）
             attempts = [scope + "\n(" + trimmed + "\n)"]
         } else if hasTopLevelReturn {
-            // 顶层有 return ⇒ 直接用函数体形态（只跑一次）
+            // 顶层有 return ⇒ 函数体形态（顶层 return 才合法）⇒ **只跑一次**
             attempts = [scope + "\n(function(){\n" + trimmed + "\n})()"]
         } else {
-            // 主力形态：eval 块 ⇒ 有值 + let 局部
-            attempts = [scope + "\n(function(){ return eval(" + blockLiteral + "); })()",
+            // ⭐⭐⭐⭐⭐ **主力形态：顶层脚本**（JSC 的 \`evaluateScript\` 返回**脚本完成值**）
+            //
+            // ⚠️⚠️⚠️ **为什么 JSC 用「顶层」而 Node 用「eval 块」**（2026-10-26 真机回归实证）：
+            //   · **JSC**：\`evaluateScript("{ expr }")` ⇒ 块语句的完成值是 **undefined** ⇒ 拿不到值
+            //     ⇒ 所以 **JSC 必须用顶层形态**（\`scope + "\n" + code\`）⇒ 完成值 = 末行表达式 ✅
+            //     ⇒ 而 JSC 顶层 \`var\`/\`let\` 都是**脚本局部** ⇒ **重复声明不会炸** ✅
+            //   · **Node**：\`vm.runInContext("{ expr }")` ⇒ **返回块内最后表达式的值** ✅
+            //     ⇒ 但 \`vm\` 的顶层 \`let\` 会**留在 ctx** ⇒ 重复声明会炸 ❌
+            //     ⇒ 所以 **Node 用 \`eval('{ code }')\`** ⇒ 有值 + let 局部 ✅
+            //   ⇒ ⇒ **两个后端的 eval/完成值语义本来就不同** ⇒ **各自用适合自己的形态**
+            //     ⇒ **不要拿 Node 的实测结果去推断 JSC**（今天就是这么栽的）⭐⭐⭐⭐⭐
+            attempts = [scope + "\n" + trimmed,
                         scope + "\n(function(){\n" + trimmed + "\n})()"]
         }
       // ⭐⭐⭐⭐⭐ **看门狗**:JS 跑太久 ⇒ **明确报出来**(是「站方 JS 卡住了」,不是「网络慢」)
