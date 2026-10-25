@@ -508,12 +508,51 @@ public final class SourceEngine {
 
         // ⭐ 站方 JS 里的 `book` / `source` 对象**上面已经建好了**（init 规则之前）⭐
 
-        info.name = value(rules?.name, in: nil, page: p, base: base)
-        info.author = value(rules?.author, in: nil, page: p, base: base)
-        info.intro = value(rules?.intro, in: nil, page: p, base: base)
-        info.kind = value(rules?.kind, in: nil, page: p, base: base)
-        info.coverUrl = Self.absolute(valueURL(rules?.coverUrl, in: nil, page: p, base: base), base: p.url)
-        info.lastChapter = value(rules?.lastChapter, in: nil, page: p, base: base)
+        // ⭐⭐⭐⭐⭐ **站方没给规则 ⇒ 保留【列表页】的值**（2026-10-25 真机实证）
+        //
+        // ⚠️⚠️⚠️ **这是通用回归，不是一个源的问题**：
+        //   **125 个真源里 25 个（20%）的 `ruleBookInfo` 压根没有 `name` 规则**
+        //   ⇒ 它们的书名**本来就该从列表项继承**（Legado 语义）⭐⭐⭐
+        //   ⇒ 以前这里**无条件赋值** ⇒ 站方没给规则时**把列表页带来的书名清空了** ⭐⭐⭐
+        //   ⇒ 症状：详情页「书名/书 URL 是空的」⇒ **整个详情链挂掉** ⭐⭐⭐
+        //
+        // ⭐ **权威口径 = 老引擎**（`engine.js` 的 bookInfo）：
+        //   `name: v[0] || (p.book && p.book.name) || ''`  ⇒ **有 fallback** ⭐⭐⭐
+        //   ⇒ 新引擎少了这个 fallback ⇒ **行为不一致 = 回归** ⭐⭐⭐
+        //
+        // ⇒ 修法：**站方给了规则才覆盖，没给就继承列表页的** ⭐⭐⭐
+        //   ⚠️ 判据是「**规则为空**」而不是「**求值结果为空**」
+        //      （规则存在但没命中 ⇒ 那是站方的问题 ⇒ 应当如实为空，不该拿列表页的糊弄）⭐⭐⭐
+        if let r = rules?.name, !r.isEmpty {
+            info.name = value(r, in: nil, page: p, base: base)
+        } else {
+            info.name = book.name
+        }
+        if let r = rules?.author, !r.isEmpty {
+            info.author = value(r, in: nil, page: p, base: base)
+        } else {
+            info.author = book.author
+        }
+        if let r = rules?.intro, !r.isEmpty {
+            info.intro = value(r, in: nil, page: p, base: base)
+        } else {
+            info.intro = book.intro
+        }
+        if let r = rules?.kind, !r.isEmpty {
+            info.kind = value(r, in: nil, page: p, base: base)
+        } else {
+            info.kind = book.kind
+        }
+        if let r = rules?.coverUrl, !r.isEmpty {
+            info.coverUrl = Self.absolute(valueURL(r, in: nil, page: p, base: base), base: p.url)
+        } else {
+            info.coverUrl = book.coverUrl
+        }
+        if let r = rules?.lastChapter, !r.isEmpty {
+            info.lastChapter = value(r, in: nil, page: p, base: base)
+        } else {
+            info.lastChapter = book.lastChapter
+        }
         // ⭐⭐⭐ **分组**（2026-10-25 真机：App 详情页那格「分组」一直显示「未分组」）
         //   ⇒ 站方给的是 `{{$.category}}`（**多占位符模板**）⇒ 现在模板能出值了 ⭐⭐⭐
         //   ⇒ 两个 key 都收（`group` / `category`）⇒ 不同版本的书源都能覆盖 ⭐
@@ -523,7 +562,11 @@ public final class SourceEngine {
             info.group = value(c, in: nil, page: p, base: base)
         }
         // ⭐ **字数**（44 个源在用）
-        info.wordCount = value(rules?.wordCount, in: nil, page: p, base: base)
+        if let r = rules?.wordCount, !r.isEmpty {
+            info.wordCount = value(r, in: nil, page: p, base: base)
+        } else {
+            info.wordCount = book.wordCount
+        }
         let toc = valueURL(rules?.tocUrl, in: nil, page: p, base: base)
         // ⚠️ 该源没给 tocUrl ⇒ **目录规则在详情页上跑**（Legado 语义：空 = 用 bookUrl）
         //
