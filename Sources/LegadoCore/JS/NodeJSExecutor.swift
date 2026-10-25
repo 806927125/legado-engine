@@ -186,7 +186,11 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
         let scope = JSScopeBuilder.build(context)
         // ⭐⭐⭐ **预计算纯计算方法**（站方包装函数是**同步**的 ⇒ JS 侧只能查表）⭐⭐⭐
         let cache = Self.pureMethodCache(engineAPI: engineAPI, base: currentBase, code: code)
-        let reply = try send(["cmd": "run", "code": code, "scope": scope,
+        // ⭐⭐⭐⭐⭐ **形态选择在 Swift 侧算好**（`JSEvalShape` ⇒ 单一真相 ⇒ JSC / Node 不漂移）
+        let plan = JSEvalShape.plan(for: code)
+        let planTag = plan == .objectLiteral ? "objectLiteral"
+            : (plan == .topLevelReturn ? "topLevelReturn" : "script")
+        let reply = try send(["cmd": "run", "code": code, "scope": scope, "plan": planTag,
                               "hostProps": props, "hostCache": cache])
         if let err = reply["error"] as? String {
             throw SourceError.unsupported("Node JS 报错：\(err)")
@@ -888,99 +892,19 @@ function setHostProps(props, cache) {
   }
 }
 
-// ⭐⭐⭐⭐⭐ **顶层 `return` 判定**（词法扫描：只看括号深度 0 的 return）
-// ⇒ 深度 > 0 的 return 属于**函数体内** ⇒ 不算顶层 return ⭐⭐⭐
-// ⇒ 用途：顶层 return ⇒ 用「函数体形态」；否则用「eval 块」⇒ **副作用只发生一次** ⭐⭐⭐
-function hasTopLevelReturn(code) {
-  var src = String(code === undefined ? '' : code);
-  var depth = 0, i = 0, n = src.length;
-  // 跳过字符串与注释
-  while (i < n) {
-    var c = src.charAt(i);
-    if (c === '"' || c === "'" || c === '`') {
-      var q = c; i++;
-      while (i < n) { if (src.charAt(i) === '\\') { i += 2; continue; } if (src.charAt(i) === q) break; i++; }
-      i++; continue;
-    }
-    if (c === '/' && src.charAt(i + 1) === '/') { while (i < n && src.charAt(i) !== '\n') i++; continue; }
-    if (c === '/' && src.charAt(i + 1) === '*') { i += 2; while (i < n && !(src.charAt(i) === '*' && src.charAt(i + 1) === '/')) i++; i += 2; continue; }
-    if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
-    if (c === ')' || c === ']' || c === '}') { depth--; i++; continue; }
-    if (depth === 0 && src.substr(i, 6) === 'return' && !/[A-Za-z0-9_$]/.test(src.charAt(i + 6) || ' ')) {
-      return true;
-    }
-    i++;
-  }
-  return false;
-}
-
-function runEval(code, scope) {
-  // ⭐⭐⭐⭐⭐ **三级兜底**（2026-10-25 真机实证）
-  // ① **函数体形态** ⇒ 顶层 `return` 合法（站方真的这么写）
-  // ② **Script 形态** ⇒ 末行表达式的完成值（Legado 的主语义）
-  // ③ **整段当表达式** `(<code>)` ⇒ 对象字面量当规则时能用（老引擎/栖阅同款）⭐⭐⭐
-  // ⇒ **谁先出值用谁**；①抛错 ⇒ 记下来，继续试 ②③ ⭐⭐⭐
-  // ⭐⭐⭐⭐⭐ **scope 后面必须补分号**（2026-10-25 真 bug，Node 后端）
-  //
-  // ⚠️ **原来的 bug**：scope 和 code 之间只隔了一个换行
-  //   ⇒ scope 是 `var book={},source={};` 这种**声明**（末尾**可能没有分号**）
-  //   ⇒ 声明后面直接跟 `(function(){…})()` ⇒ **ASI 不会插入分号**
-  //   ⇒ 语法错 ⇒ 第一级兜底直接炸 ⇒ **整条规则死** ⭐⭐⭐
-  //   ⇒ 症状：Node JS 报错 "Unexpected token '('" / "Unexpected token 'var'" ⭐⭐⭐
-  //
-  // ⭐ 修法：scope 后补 `;` ⇒ 声明与后续代码彻底断开 ⭐⭐⭐
-  const sc = (scope || '').replace(/\s*$/, '') + ';\n';
-
-  // ⭐⭐⭐⭐⭐ **只执行一次（或两次）的形态选择**（2026-10-25 真 bug）
-  //
-  // ⚠️⚠️⚠️ **原来的 bug**：三级兜底是「**跑到有值为止**」
-  //   ⇒ 第一级（函数体形态）执行完**没有值**（站方是末行表达式风格 ⇒ 函数体里没 return）
-  //   ⇒ **继续跑第二级、第三级** ⇒ **站方 JS 被执行 3 次**！⭐⭐⭐
-  //   ⇒ ⇒ 站方的 `java.ajax` 被调 **3 次** ⇒ **请求翻 3 倍** ⇒ 限流打爆（番茄 3 次/天）⭐⭐⭐
-  //   ⇒ **真机（JSC）没有这个问题**（JSC 只 eval 一次）⇒ **沙盒 ≠ 真机** ⭐⭐⭐
-  //   ⇒ ⇒ 门禁跑出来的是假象 ⇒ 也会掩盖真机的 bug ⭐⭐⭐
-  //
-  // ⭐⭐⭐ **正解**：**静态选形态** ⇒ 正常只跑一次
-  //   ① 代码**首尾是 `{ }`** ⇒ 对象字面量 ⇒ 直接用「整段当表达式」
-  //   ② 代码里有**顶层 return** ⇒ 用「函数体形态」（顶层 return 才合法）
-  //   ③ 否则 ⇒ 用「Script 形态」（末行表达式的完成值）⭐⭐⭐
-  //   ⇒ **只有真的抛语法错时**才追加一次「整段当表达式」⇒ 副作用最多 2 次（且只在语法错时）⭐⭐⭐
-  const trimmed = String(code || '').trim();
-  // ⭐⭐⭐ **对象字面量**（首尾 `{ }`）⇒ 直接用「整段当表达式」（**只跑一次**）
-  //   （Script 形态会把 `{a:1}` 当**语句块** ⇒ 不抛错但返回 undefined ⇒ 拿不到值）⭐⭐⭐
-  const isObjectLiteral = trimmed.charAt(0) === '{' && trimmed.charAt(trimmed.length - 1) === '}';
-
-  // ⭐⭐⭐⭐⭐ **形态顺序（2026-10-25 定稿）**
-  //
-  // ① **对象字面量** ⇒ 「整段当表达式」⇒ 只跑一次 ⭐⭐⭐
-  // ② **其它** ⇒ 先「Script 形态」（末行表达式的完成值 = Legado 主语义）⭐⭐⭐
-  //    ⇒ **只有抛语法错**（顶层 `return` 在 Script 里是非法 return ⇒ SyntaxError）
-  //      ⇒ 才改用「函数体形态」（顶层 return 才合法）⭐⭐⭐
-  //    ⇒ ⚠️ **不要静态判断「有没有顶层 return」** ⇒ `(function(){return [];})()`
-  //      这种**函数体内的 return** 会被误判 ⇒ 整条规则死 ⭐⭐⭐
-  // ③ 追加「整段当表达式」（对象字面量之外的怪写法）
-  //
-  // ⭐⭐⭐ **副作用只发生一次**（形态 ① 一次 / 形态 ② 正常一次、
-  //   **只有语法错**才再跑一次）⇒ 站方 `java.ajax` 不会被重复调 ⭐⭐⭐
-  // ⭐⭐⭐⭐⭐ **形态选择（2026-10-26 真机回归实证：JM小说 0 本书）**
-  //
-  // ⭐⭐⭐⭐⭐ **正解：`eval('{ code }')`**（与 JSC 侧逐字一致，ECMAScript 标准）
-  //   ① 完成值 = **块内最后表达式的值** ✓
-  //   ② 块有**自己的词法作用域** ⇒ 顶层 `let`/`const` **不污染 ctx**
-  //      ⇒ **同一段代码跑两次不炸** ⭐⭐⭐
-  // ⚠️ **原来用「块形态」`{ code }` 直接当脚本跑**
-  //   ⇒ **Node 的 `vm.runInContext` 会返回块内最后表达式的值** ✓（沙盒能出 15 本）
-  //   ⇒ **但 JSC 的 `evaluateScript("{ … }")` 返回 undefined** ⇒ **沙盒全绿、真机全错** ⭐⭐⭐
-  let attempts;
-  // ⭐⭐⭐ 复用上面已声明的 `trimmed` / `isObjectLiteral`（别重复声明 ⇒ Node 会 SyntaxError）
-  if (isObjectLiteral) {
-    // ⭐⭐⭐ 对象字面量 ⇒ 整段当表达式（不能塞进 eval 块 ⇒ 块里会被当标签语句）
+function runEval(code, scope, planTag) {
+  // ⭐⭐⭐⭐⭐ **形态由 Swift 侧算好**（`JSEvalShape` ⇒ 单一真相 ⇒ JSC / Node 不会漂移）⭐⭐⭐
+  // ⇒ 这里只负责「把形态拼成脚本」⭐⭐⭐
+  var sc = (scope || '').replace(/\s*$/, '') + ';\n';
+  var attempts;
+  if (planTag === 'objectLiteral') {
+    // ⭐⭐⭐ 对象字面量 ⇒ 整段当表达式（两个后端一致）
     attempts = [sc + '(' + code + '\n)'];
-  } else if (hasTopLevelReturn(code)) {
-    // 顶层有 return ⇒ 直接用函数体形态（只跑一次）
+  } else if (planTag === 'topLevelReturn') {
+    // ⭐⭐⭐ 顶层有 return ⇒ 函数体形态（只跑一次）
     attempts = [sc + '(function(){\n' + code + '\n})()'];
   } else {
-    // 主力形态：eval 块 ⇒ 有值 + let 局部
+    // ⭐⭐⭐ 主力形态：**Node 用 eval 块**（eval 完成值 = 块内最后表达式 + let 局部）
     attempts = [sc + '(function(){ return eval(' + JSON.stringify('{ ' + code + ' }') + '); })()',
                 sc + '(function(){\n' + code + '\n})()'];
   }
@@ -995,27 +919,9 @@ function runEval(code, scope) {
       if (!firstErr) firstErr = err;
       continue;
     }
-    // ⭐⭐⭐ **执行成功就返回**（哪怕是 undefined/null）⇒ **不重复执行** ⭐⭐⭐
+    // ⭐⭐⭐ **执行成功就返回**（哪怕 undefined/null）⇒ **不重复执行** ⇒ 副作用不重复 ⭐⭐⭐
     if (v === undefined || v === null) {
-      // ⭐⭐⭐⭐⭐ **这里【不许】再执行任何形态**（2026-10-26 真机回归实证）
-      //
-      // ⚠️⚠️ **原来的 bug**：undefined 时又跑了一次「整段当表达式」
-      //   ⇒ **站方 JS 被执行 3 次** ⇒ `java.ajax` 调 3 次 ⇒ **限流打爆**
-      //   ⇒ 日志写 3 倍 ⇒ **写盘翻倍** ⇒ 撞 iOS diskwrites 限额 ⇒ 被杀 ⭐⭐⭐
-      //   ⇒ 而且 JSC 侧已经改成「undefined 就结束」⇒ **两边不一致** ⇒ 沙盒 ≠ 真机 ⭐⭐⭐
-      //
-      // ⭐ **正解**：形态选择已经在上面**静态定好**（对象字面量 ⇒ 整段当表达式；
-      //   其它 ⇒ Script 优先、语法错才换函数体形态）⇒ **undefined 就是最终结果**
-      //   ⇒ **不再执行** ⇒ 与 JSC 侧**逐字一致** ⭐⭐⭐
-      //
-      // ⭐⭐⭐⭐⭐ **「形态 1 抛错 + 形态 2 没值」⇒ 要把【真错】抛出去**（2026-10-26 门禁迁移时补）
-      //
-      // ⚠️⚠️⚠️ **为什么必须**：形态 1（Script）抛错、形态 2（函数体）返回 undefined 时
-      //   ⇒ 以前这里 `return null` ⇒ **真错被吞掉** ⇒ Swift 侧只看到「规则求值为空」
-      //   ⇒ **诊断在说谎**（引擎自己的纪律：诊断必须说真话）⭐⭐⭐
-      //   ⇒ 症状：站方 JS 里的 `const { source } = this;`（顶层 `this` 在严格模式下是 undefined）
-      //     ⇒ 真错是「Cannot destructure property 'source' of 'this'」
-      //     ⇒ 但诊断只说「规则求值为空」⇒ **排查方向完全错** ⭐⭐⭐
+      // ⭐⭐⭐⭐⭐ 「形态 1 抛错 + 形态 2 没值」⇒ 把【真错】抛出去（诊断不许说谎）
       if (firstErr) {
         throw new Error(String(firstErr && firstErr.message || firstErr)
           + ' | 形态尝试: ' + errs.join(' || '));
@@ -1024,14 +930,9 @@ function runEval(code, scope) {
     }
     return v;
   }
-  // 全都抛错 ⇒ 把错误抛出去（让 Swift 侧知道「语法错」）
-  // ⭐⭐⭐ **带上各级错误**（否则只看到最后一个 ⇒ 定位不到真凶）⭐⭐⭐
-  if (firstErr) {
-    const e = new Error(String(firstErr && firstErr.message || firstErr)
-      + ' | 形态尝试: ' + errs.join(' || '));
-    throw e;
-  }
-  return null;
+  const e = new Error(String(firstErr && firstErr.message || firstErr)
+    + ' | 形态尝试: ' + errs.join(' || '));
+  throw e;
 }
 
 function runGlobal(code) {
@@ -1111,7 +1012,7 @@ rl.on('line', function(line) {
       process.stdout.write(JSON.stringify({ ok: true, value: v, globals: globals() }) + '\n');
     } else if (req.cmd === 'run') {
       setHostProps(req.hostProps, req.hostCache);
-      const v = runEval(req.code, req.scope);
+      const v = runEval(req.code, req.scope, req.plan || 'script');
       process.stdout.write(JSON.stringify({ ok: true, value: v, globals: globals() }) + '\n');
     } else if (req.cmd === 'routes') {
       ctx.__qrRoutes = req.routes || [];

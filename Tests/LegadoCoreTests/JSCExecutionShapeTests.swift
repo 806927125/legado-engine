@@ -30,6 +30,12 @@ import JavaScriptCore
 final class JSCExecutionShapeTests: XCTestCase {
 
     /// ⭐⭐⭐ **会记账的宿主**（统计 `java.ajax` 被调了几次）
+    /// ⭐ 空宿主 API（探针用）
+    final class NoopAPI: JSHostAPIProvider, @unchecked Sendable {
+        func hostObject(named name: String) -> HostObject? { nil }
+        func callJava(_ method: String, _ args: [JSONValue]) -> JSONValue? { nil }
+    }
+
     final class CountingAPI: JSHostAPIProvider, @unchecked Sendable {
         var javaCalls: [String] = []
         func hostObject(named name: String) -> HostObject? { nil }
