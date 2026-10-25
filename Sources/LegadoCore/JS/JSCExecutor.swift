@@ -186,11 +186,35 @@ public final class JSCExecutor: JSExecutor {
         // ② **Script 形态** ⇒ 末行表达式的完成值（Legado 的主语义）
         // ③ **整段当表达式** `( <code> )` ⇒ 对象字面量当规则时能用（老引擎/栖阅同款）⭐⭐⭐
         // ⇒ **谁先出值用谁**；①抛错 ⇒ 记下来，继续试 ②③ ⭐⭐⭐
-        let attempts: [String] = [
-            scope + "\n" + "(function(){ return eval(" + codeLiteral + "); })()",
-            scope + "\n" + code,
-            scope + "\n" + "( " + code + "\n)",
-        ]
+        // ⭐⭐⭐⭐⭐ **形态选择（2026-10-26 真机回归实证）**
+        //
+        // ⚠️⚠️⚠️ **原来的 bug**：三级兜底是「**跑到有值为止**」
+        //   ⇒ 第一级是 \`(function(){ return eval(code); })()\`
+        //   ⇒ **eval 的完成值对「末行表达式」风格返回 undefined**
+        //     （\`eval("var a=1; a")\` ⇒ undefined ⇒ 只有纯表达式 \`eval("1+2")\` 才有值）
+        //   ⇒ ⇒ **必然要跑第二级、第三级** ⇒ **站方 JS 在真机上被执行 2~3 次**！⭐⭐⭐
+        //   ⇒ ⇒ ① \`java.ajax\` 被调 2~3 次 ⇒ **限流打爆**（番茄 3 次/天）
+        //   ⇒ ⇒ ② 引擎日志写 2~3 倍 ⇒ **写盘翻倍** ⇒ 撞 iOS 的 diskwrites 限额 ⇒ 被杀 ⭐⭐⭐
+        //   ⇒ ⇒ ③ 站方 JS 的**副作用**（\`source.putVariable\` / \`cache.put\` / \`cookie.set\`）
+        //        重复执行 ⇒ **变量乱 / 结果错** ⇒ 表现为「以前能加载、换引擎后不行了」⭐⭐⭐
+        //
+        // ⭐⭐⭐ **正解（与 Node 后端同款）**：**静态选形态** ⇒ 正常只跑一次
+        //   ① **对象字面量**（首尾 \`{ }\`）⇒ 「整段当表达式」⇒ 只跑一次 ⭐⭐⭐
+        //   ② **其它** ⇒ **Script 形态**优先（末行表达式的完成值 = Legado 主语义）
+        //      ⇒ **只有抛语法错**（顶层 \`return\` 在 Script 里非法）才改用「函数体形态」
+        //   ⇒ **副作用只发生一次** ⭐⭐⭐
+        //
+        // ⚠️ **不要静态判断「有没有顶层 return」** ⇒ \`(function(){return [];})()\`
+        //   这种**函数体内的 return** 会被误判 ⇒ 整条规则死 ⇒ 用「抛语法错才换形态」
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let isObjectLiteral = trimmed.hasPrefix("{") && trimmed.hasSuffix("}")
+        let attempts: [String]
+        if isObjectLiteral {
+            attempts = [scope + "\n" + "( " + trimmed + "\n)"]
+        } else {
+            attempts = [scope + "\n" + trimmed,
+                        scope + "\n" + "(function(){ return eval(" + codeLiteral + "); })()"]
+        }
         // ⭐⭐⭐⭐⭐ **看门狗**:JS 跑太久 ⇒ **明确报出来**(是「站方 JS 卡住了」,不是「网络慢」)
         let t0 = Date()
         var value: JavaScriptCore.JSValue?
@@ -209,12 +233,11 @@ public final class JSCExecutor: JSExecutor {
                 if firstError == nil { firstError = msg }
                 continue
             }
-            // ⭐⭐⭐ **出值了**（不是 undefined）⇒ 用它
-            if let vv = v, !vv.isUndefined, !vv.isNull {
-                value = vv
-                break
-            }
-            // ⭐ undefined ⇒ 试下一种形态（①可能是顶层 return 不合法 ⇒ ②③能救）
+            // ⭐⭐⭐⭐⭐ **执行成功 ⇒ 就用它**（哪怕是 undefined/null）
+            //   ⇒ **绝不因为「没值」就再跑一遍** ⇒ **站方 JS 只执行一次** ⇒ 副作用不重复 ⭐⭐⭐
+            //   ⇒ ⚠️ 以前这里「undefined ⇒ 试下一种形态」⇒ **重复执行 2~3 次** ⇒ 真机回归的根因 ⭐⭐⭐
+            value = v
+            break
         }
         if value == nil, let e = firstError {
             throw JSCError.scriptException(e)
