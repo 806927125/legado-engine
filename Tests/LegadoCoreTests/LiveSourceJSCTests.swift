@@ -148,8 +148,10 @@ final class LiveSourceJSCTests: XCTestCase {
             "})()"
         ].joined(separator: "\n")
         let v = try js.run(probe, context: ctx)
-        // ⭐⭐⭐⭐⭐ **用断言暴露事实**（CI 会吞掉 print ⇒ 只有断言能进日志）⭐⭐⭐
-        XCTFail("⭐⭐⭐ [JSC 全局诊断] " + v.scalarString)
+        // ⭐⭐⭐⭐⭐ **断言期望事实，诊断挂在失败消息上**（CI 吞 print ⇒ 只有断言能进日志）⭐⭐⭐
+        // ⇒ 绿 = JSC 的全局语义正确；红 = 消息里就是**完整诊断** ⭐⭐⭐
+        XCTAssertTrue(v.scalarString.contains("gt.hjmDec: function"),
+                      "⭐⭐⭐ [JSC 全局诊断] " + v.scalarString)
     }
 
     /// ⭐⭐⭐⭐⭐ **诊断探针：JSC 上 JM 的 bookList 到底看到什么**（2026-10-26）
@@ -181,7 +183,8 @@ final class LiveSourceJSCTests: XCTestCase {
             "})()"
         ].joined(separator: "\n")
         let v = try js.run(probe, context: ctx)
-        XCTFail("⭐⭐⭐ [JM bookList 诊断] " + v.scalarString)
+        XCTAssertTrue(v.scalarString.contains("decoded type: object, isArray: true"),
+                      "⭐⭐⭐ [JM bookList 诊断] " + v.scalarString)
     }
 
     /// ⭐⭐⭐⭐⭐ **诊断探针：走【完整 explore 流程】失败后，诊断里有什么**（2026-10-26）
@@ -207,8 +210,9 @@ final class LiveSourceJSCTests: XCTestCase {
         }
         report += " || failureDiagnosticLines(\(engine.failureDiagnosticLines.count)): "
             + engine.failureDiagnosticLines.joined(separator: " | ")
-        // ⭐⭐⭐⭐⭐ **用断言暴露事实**（CI 会吞掉 print ⇒ 只有断言能进日志）⭐⭐⭐
-        XCTFail("⭐⭐⭐ [JSC explore 诊断] " + report)
+        // ⭐⭐⭐⭐⭐ **断言「出书 15 本」** ⇒ 失败时消息里就是**完整诊断** ⭐⭐⭐
+        XCTAssertTrue(report.hasPrefix("出书了：15 本"),
+                      "⭐⭐⭐ [JSC explore 诊断] " + report)
     }
 
     /// ⭐⭐⭐ **空宿主**（这个测试不需要宿主能力）

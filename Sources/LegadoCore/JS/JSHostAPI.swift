@@ -228,6 +228,63 @@ public enum JSScopeBuilder {
     ///
     /// ⭐⭐⭐ **做法**：扫出顶层符号 ⇒ 在**同一段脚本末尾**追加 `globalThis.X = X`
     ///   ⇒ 同一段代码 = 同一作用域 ⇒ **一定可见** ⇒ 不依赖 eval 语义 ⭐⭐⭐
+    /// ⭐⭐⭐⭐⭐ **顶层 `return` 判定**（词法扫描：只看括号深度 0 的 `return`）
+    ///
+    /// ⚠️⚠️ **为什么需要**（2026-10-26 真机回归实证：JM小说 0 本书）：
+    ///   · 主力形态是 `eval('{ code }')` ⇒ 有值 + `let` 局部
+    ///   · 但 `eval('{ return 7; }')` ⇒ **Illegal return statement** ⇒ 顶层 return 的站方代码要换形态
+    ///   ⇒ **顶层有 return ⇒ 用函数体形态；否则 ⇒ eval 块** ⇒ **副作用只发生一次** ⭐⭐⭐
+    ///
+    /// ⭐ **深度 > 0 的 `return` 属于函数体内** ⇒ **不算顶层 return**
+    ///   （否则 `(function(){ return []; })()` 会被误判 ⇒ 整条规则死）⭐⭐⭐
+    public static func hasTopLevelReturn(_ code: String) -> Bool {
+        let src = Array(code.utf8)
+        var depth = 0
+        var i = 0
+        let n = src.count
+        let isWordChar: (UInt8) -> Bool = { c in
+            (c >= 0x61 && c <= 0x7A) || (c >= 0x41 && c <= 0x5A)
+                || (c >= 0x30 && c <= 0x39) || c == 0x5F || c == 0x24
+        }
+        func at(_ k: Int) -> UInt8 { k < n ? src[k] : 0x20 }
+        while i < n {
+            let c = at(i)
+            // 跳过字符串
+            if c == 0x22 || c == 0x27 || c == 0x60 {
+                let q = c
+                i += 1
+                while i < n {
+                    if at(i) == 0x5C { i += 2; continue }
+                    if at(i) == q { break }
+                    i += 1
+                }
+                i += 1
+                continue
+            }
+            // 跳过行注释
+            if c == 0x2F && at(i + 1) == 0x2F {
+                while i < n && at(i) != 0x0A { i += 1 }
+                continue
+            }
+            // 跳过块注释
+            if c == 0x2F && at(i + 1) == 0x2A {
+                i += 2
+                while i + 1 < n && !(at(i) == 0x2A && at(i + 1) == 0x2F) { i += 1 }
+                i += 2
+                continue
+            }
+            if c == 0x28 || c == 0x5B || c == 0x7B { depth += 1; i += 1; continue }
+            if c == 0x29 || c == 0x5D || c == 0x7D { depth -= 1; i += 1; continue }
+            if depth == 0, i + 6 <= n,
+               String(decoding: src[i..<(i + 6)], as: UTF8.self) == "return",
+               !(i + 6 < n && isWordChar(at(i + 6))) {
+                return true
+            }
+            i += 1
+        }
+        return false
+    }
+
     public static func withExplicitGlobalExport(_ code: String) -> String {
         let names = topLevelDeclaredNames(code)
         guard !names.isEmpty else { return code }

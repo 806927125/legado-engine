@@ -888,6 +888,32 @@ function setHostProps(props, cache) {
   }
 }
 
+// ⭐⭐⭐⭐⭐ **顶层 `return` 判定**（词法扫描：只看括号深度 0 的 return）
+// ⇒ 深度 > 0 的 return 属于**函数体内** ⇒ 不算顶层 return ⭐⭐⭐
+// ⇒ 用途：顶层 return ⇒ 用「函数体形态」；否则用「eval 块」⇒ **副作用只发生一次** ⭐⭐⭐
+function hasTopLevelReturn(code) {
+  var src = String(code === undefined ? '' : code);
+  var depth = 0, i = 0, n = src.length;
+  // 跳过字符串与注释
+  while (i < n) {
+    var c = src.charAt(i);
+    if (c === '"' || c === "'" || c === '`') {
+      var q = c; i++;
+      while (i < n) { if (src.charAt(i) === '\\') { i += 2; continue; } if (src.charAt(i) === q) break; i++; }
+      i++; continue;
+    }
+    if (c === '/' && src.charAt(i + 1) === '/') { while (i < n && src.charAt(i) !== '\n') i++; continue; }
+    if (c === '/' && src.charAt(i + 1) === '*') { i += 2; while (i < n && !(src.charAt(i) === '*' && src.charAt(i + 1) === '/')) i++; i += 2; continue; }
+    if (c === '(' || c === '[' || c === '{') { depth++; i++; continue; }
+    if (c === ')' || c === ']' || c === '}') { depth--; i++; continue; }
+    if (depth === 0 && src.substr(i, 6) === 'return' && !/[A-Za-z0-9_$]/.test(src.charAt(i + 6) || ' ')) {
+      return true;
+    }
+    i++;
+  }
+  return false;
+}
+
 function runEval(code, scope) {
   // ⭐⭐⭐⭐⭐ **三级兜底**（2026-10-25 真机实证）
   // ① **函数体形态** ⇒ 顶层 `return` 合法（站方真的这么写）
@@ -936,20 +962,27 @@ function runEval(code, scope) {
   //
   // ⭐⭐⭐ **副作用只发生一次**（形态 ① 一次 / 形态 ② 正常一次、
   //   **只有语法错**才再跑一次）⇒ 站方 `java.ajax` 不会被重复调 ⭐⭐⭐
+  // ⭐⭐⭐⭐⭐ **形态选择（2026-10-26 真机回归实证：JM小说 0 本书）**
+  //
+  // ⭐⭐⭐⭐⭐ **正解：`eval('{ code }')`**（与 JSC 侧逐字一致，ECMAScript 标准）
+  //   ① 完成值 = **块内最后表达式的值** ✓
+  //   ② 块有**自己的词法作用域** ⇒ 顶层 `let`/`const` **不污染 ctx**
+  //      ⇒ **同一段代码跑两次不炸** ⭐⭐⭐
+  // ⚠️ **原来用「块形态」`{ code }` 直接当脚本跑**
+  //   ⇒ **Node 的 `vm.runInContext` 会返回块内最后表达式的值** ✓（沙盒能出 15 本）
+  //   ⇒ **但 JSC 的 `evaluateScript("{ … }")` 返回 undefined** ⇒ **沙盒全绿、真机全错** ⭐⭐⭐
   let attempts;
+  // ⭐⭐⭐ 复用上面已声明的 `trimmed` / `isObjectLiteral`（别重复声明 ⇒ Node 会 SyntaxError）
   if (isObjectLiteral) {
-    attempts = [sc + '( ' + trimmed + '\n)'];
+    // ⭐⭐⭐ 对象字面量 ⇒ 整段当表达式（不能塞进 eval 块 ⇒ 块里会被当标签语句）
+    attempts = [sc + '(' + code + '\n)'];
+  } else if (hasTopLevelReturn(code)) {
+    // 顶层有 return ⇒ 直接用函数体形态（只跑一次）
+    attempts = [sc + '(function(){\n' + code + '\n})()'];
   } else {
-    // ⭐⭐⭐⭐⭐ **Script 形态要包一层【块】**（2026-10-26 门禁迁移时补）
-    //
-    // ⚠️⚠️⚠️ **为什么必须**：Node 的 `vm.runInContext` 在**同一个 context** 里跑
-    //   ⇒ 顶层的 `let` / `const` 会**留在 context 的词法作用域**里 ⇒
-    //   ⇒ **第二次跑同样的代码 ⇒ 「Identifier 'x' has already been declared」** ⭐⭐⭐
-    //   ⇒ 真书源（🍅大灰狼）的规则**每条都用了 `let`** ⇒
-    //   ⇒ 第一条规则跑完 ⇒ **后面的规则全炸** ⇒ 详情页的 tocUrl / 目录 / 正文全废 ⭐⭐⭐
-    //   ⇒ JSC 那边是「函数作用域里 eval」⇒ 每次都是新的词法作用域 ⇒ **没有这个问题** ⭐⭐⭐
-    //   ⇒ ⇒ **这里包块**（块的完成值 = 块内最后一条语句的完成值 ⇒ Script 语义不变）⭐⭐⭐
-    attempts = [sc + '{\n' + trimmed + '\n}', sc + '(function(){\n' + trimmed + '\n})()'];
+    // 主力形态：eval 块 ⇒ 有值 + let 局部
+    attempts = [sc + '(function(){ return eval(' + JSON.stringify('{ ' + code + ' }') + '); })()',
+                sc + '(function(){\n' + code + '\n})()'];
   }
 
   let firstErr = null;

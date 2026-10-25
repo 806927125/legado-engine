@@ -207,33 +207,39 @@ public final class JSCExecutor: JSExecutor {
         // ⚠️ **不要静态判断「有没有顶层 return」** ⇒ \`(function(){return [];})()\`
         //   这种**函数体内的 return** 会被误判 ⇒ 整条规则死 ⇒ 用「抛语法错才换形态」
         let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        let isObjectLiteral = trimmed.hasPrefix("{") && trimmed.hasSuffix("}")
+        // ⭐⭐⭐⭐⭐ **形态选择（2026-10-26 真机回归实证：JM小说 0 本书）**
+        //
+        // ⚠️⚠️⚠️ **原来的 bug**：用「块形态」`{ code }` 取值
+        //   ⇒ **Node 的 \`vm.runInContext\` 会返回块内最后表达式的值** ⇒ 沙盒能出 15 本 ✓
+        //   ⇒ **但 JSC 的 \`evaluateScript("{ … }")` 返回【脚本完成值】⇒ 块语句的完成值是 undefined**！⭐⭐⭐
+        //   ⇒ ⇒ **JSC 上两种形态都拿不到值** ⇒ **0 本书**（真机症状）⭐⭐⭐
+        //   ⇒ ⇒ **沙盒全绿、真机全错** ⇒ 又一次「平台差异」⭐⭐⭐
+        //
+        // ⭐⭐⭐⭐⭐ **正解：\`eval('{ code }')`**（两个后端语义完全一致，ECMAScript 标准）
+        //   ① 完成值 = **块内最后表达式的值** ✓（末行表达式 / 对象字面量都行）
+        //   ② 块有**自己的词法作用域** ⇒ 顶层 \`let\`/\`const\` **不污染 context**
+        //      ⇒ **同一段代码跑两次不炸**（「重复声明」的老坑也一并解决）⭐⭐⭐
+        //   ⇒ **不依赖任何 eval 作用域行为** ⇒ JSC / Node / WebKit 一致 ⭐⭐⭐
+        //
+        // ⭐⭐⭐ **形态 ②：顶层 \`return\` 合法**（站方真的这么写）
+        //   ⚠️ \`eval('{ return 7; }')\` ⇒ Illegal return statement ⇒ 需要形态 ② 兜底 ⭐⭐⭐
+        //   ⇒ **只有「顶层有 return」时才用 ②** ⇒ 副作用**只发生一次** ⭐⭐⭐
+        let codeLiteral2 = JSScopeBuilder.jsonLiteral(.string(code))
+        let blockLiteral = JSScopeBuilder.jsonLiteral(.string("{ " + code + " }"))
+        let hasTopLevelReturn = JSScopeBuilder.hasTopLevelReturn(code)
         let attempts: [String]
         if isObjectLiteral {
-            attempts = [scope + "\n" + "( " + trimmed + "\n)"]
+            // ⭐⭐⭐ **对象字面量 ⇒ 整段当表达式**（不能塞进 eval 块 ⇒ 块里会被当标签语句）
+            attempts = [scope + "\n(" + trimmed + "\n)"]
+        } else if hasTopLevelReturn {
+            // 顶层有 return ⇒ 直接用函数体形态（只跑一次）
+            attempts = [scope + "\n(function(){\n" + trimmed + "\n})()"]
         } else {
-            // ⭐⭐⭐⭐⭐ **函数体形态：直接包住代码，不要再套 eval**
-            //
-            // ⚠️⚠️ **为什么**：\`eval("return 1;")\` ⇒ eval 作用域里 **顶层 return 仍是非法**
-            //   ⇒ 抛 "Return statements are only valid inside functions." ⭐⭐⭐
-            //   ⇒ ⇒ 站方「顶层 return」的写法在 JSC 下**永远失败** ⭐⭐⭐
-            //   ⇒ ⇒ 改成 **代码本身**放进函数体 ⇒ 顶层 return 就合法了 ⭐⭐⭐
-            // ⭐⭐⭐⭐⭐ **形态 ①：块形态**（`{ … }`）—— **与 Node 后端逐字一致**
-            //
-            // ⚠️⚠️⚠️ **为什么必须包块**（2026-10-26 真机回归实证）：
-            //   `evaluateScript` 的**顶层 `let` / `const` 会进 context 的词法作用域**
-            //   ⇒ **同一段代码跑第二次 ⇒ 「Identifier 'x' has already been declared」** ⭐⭐⭐
-            //   ⇒ 真书源（🍅大灰狼）的规则**每条都用了 `let`**
-            //   ⇒ 第一条规则跑完 ⇒ **后面的规则全炸** ⇒ 详情 / 目录 / 正文全废 ⭐⭐⭐
-            //   ⇒ 包块 ⇒ 块有**自己的词法作用域** ⇒ 每次跑都是新的 ⇒ **不重复声明** ✓
-            //   ⇒ 块的完成值 = 块内最后一条语句的完成值 ⇒ **Script 语义不变** ✓
-            //
-            // ⭐⭐⭐ **形态 ②：函数体形态** ⇒ **顶层 `return` 合法**（站方真的这么写）
-            //   ⇒ 不要再套 `eval` ⇒ `eval("return 1;")` 里的 return **仍是非法** ⭐⭐⭐
-            attempts = [scope + "\n{\n" + trimmed + "\n}",
-                        scope + "\n" + "(function(){\n" + trimmed + "\n})()"]
+            // 主力形态：eval 块 ⇒ 有值 + let 局部
+            attempts = [scope + "\n(function(){ return eval(" + blockLiteral + "); })()",
+                        scope + "\n(function(){\n" + trimmed + "\n})()"]
         }
-        // ⭐⭐⭐⭐⭐ **看门狗**:JS 跑太久 ⇒ **明确报出来**(是「站方 JS 卡住了」,不是「网络慢」)
+      // ⭐⭐⭐⭐⭐ **看门狗**:JS 跑太久 ⇒ **明确报出来**(是「站方 JS 卡住了」,不是「网络慢」)
         let t0 = Date()
         var value: JavaScriptCore.JSValue?
         var firstError: String?
