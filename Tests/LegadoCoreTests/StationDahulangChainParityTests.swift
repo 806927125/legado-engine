@@ -239,45 +239,5 @@ final class StationDahulangChainParityTests: XCTestCase {
 
     /// ⭐ 宿主 API：**只提供这条链用到的**（source / cookie / java 几个）
     /// ⇒ 两边拿到的能力一致 ⇒ 差异才只来自规则语义 ⭐
-    private final class LegacyHost: JSHostAPIProvider, @unchecked Sendable {
-        private let lock = NSLock()
-        private var vars = ""
-        func hostObject(named name: String) -> HostObject? {
-            switch name {
-            case "source":
-                return HostObject(name: "source", methods: [
-                    "getVariable": { [self] _ in .string(readVars()) },
-                    "setVariable": { [self] args in
-                        writeVars(args.first?.scalarString ?? ""); return .string("")
-                    },
-                    "getLoginInfoMap": { _ in .object([:]) },
-                    "header": { _ in .string("") },
-                ])
-            case "cookie":
-                return HostObject(name: "cookie", methods: [
-                    "getCookie": { _ in .string("") },
-                    "setCookie": { _ in .string("") },
-                    "removeCookie": { _ in .string("") },
-                ])
-            case "book":
-                return HostObject(name: "book", methods: [
-                    "getVariable": { _ in .string("") },
-                ])
-            default: return nil
-            }
-        }
-
-        func callJava(_ method: String, _ args: [JSONValue]) -> JSONValue? {
-            switch method {
-            case "deviceID": return .string("GT-DEVICE")
-            case "androidId": return .string("GT-ANDROID")
-            case "getWebViewUA": return .string("UA/1.0")
-            default: return .string("")
-            }
-        }
-
-        private func readVars() -> String { lock.lock(); defer { lock.unlock() }; return vars }
-        private func writeVars(_ v: String) { lock.lock(); vars = v; lock.unlock() }
-    }
 }
 #endif
