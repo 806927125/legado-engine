@@ -377,11 +377,32 @@ public final class SourceEngine {
                 }
                 let title = o["title"]?.scalarString ?? ""
                 let url = o["url"]?.scalarString ?? ""
-                guard !title.isEmpty, !url.isEmpty else { continue }
+                // ⭐⭐⭐⭐⭐ **对象项的「url 为空」= 组标题行**（2026-10-26 门禁迁移时补）
+                //
+                // ⚠️⚠️ **老引擎就是这么做的**（`reference/js/engine.js` 的对象分支）：
+                //   站方（🍅大灰狼 / QQ阅读 / 七猫）的 `style_list` 是**对象数组**：
+                //     { title:"°・*.☆ 排行榜 ☆.*・°", style:{…} }   ← **没有 url** ⇒ 组标题行
+                //     { title:"推荐榜", url:"https://…", style:{…} }   ← 真分类
+                //   ⇒ 「**url 为空的项 = 组标题行**，它自己成为一个组的标题，
+                //     后面有 url 的项都归到最近的那个组标题下」⭐⭐⭐
+                //   ⇒ 以前这里把它**直接丢掉** ⇒ **分组全没了** ⇒ 界面上「糊成一块」
+                //     （App 详情页/发现页显示「未分组」）⭐⭐⭐
+                //
+                // ⚠️ **判据只能是「url 空不空」**（不能看 style！站方组标题行的 style.pct 也是 1）⭐⭐⭐
+                let objTitle = title.isEmpty ? (o["name"]?.scalarString ?? (o["text"]?.scalarString ?? "")) : title
+                let objURL = url.isEmpty ? (o["link"]?.scalarString ?? "") : url
+                guard !objTitle.isEmpty else { continue }
+                if objURL.isEmpty {
+                    // 「--」这种垃圾行不当组标题（它后面没内容 ⇒ 空组 ⇒ UI 也不显示）
+                    if objTitle != "--" && objTitle.range(of: #"^[\s\-–—_]+$"#, options: .regularExpression) == nil {
+                        group = objTitle
+                    }
+                    continue   // ⭐ 组标题行**不作为分类项输出**
+                }
                 // ⭐⭐ **`@js:` 前缀必须原样保留**（否则被当相对路径绝对化 ⇒ 前缀丢了 ⇒ JS 分支认不出）
-                let isJSURL = url.hasPrefix("@js:") || url.hasPrefix("@JS:")
-                kinds.append(SourceCategory(title: title,
-                                            url: isJSURL ? url : absolute(url, base: base),
+                let isJSURL = objURL.hasPrefix("@js:") || objURL.hasPrefix("@JS:")
+                kinds.append(SourceCategory(title: objTitle,
+                                            url: isJSURL ? objURL : absolute(objURL, base: base),
                                             style: o["style"]?.scalarString,
                                             group: group.isEmpty ? nil : group))
             default:
@@ -1702,6 +1723,19 @@ public final class SourceEngine {
     /// ⭐⭐⭐ **诊断用的抓页**（暴露 `fetch` 给诊断 op 用）
     public func fetchForExplain(_ url: String, page: Int = 1) throws -> Page {
         try fetch(url, page: page)
+    }
+
+    /// ⭐⭐⭐⭐⭐ **把 URL 规则渲染成【真正要请求的地址】**（2026-10-26 门禁迁移时补）
+    ///
+    /// ⚠️ **为什么诊断 op 需要它**：老引擎（`reference/js/engine.js` 的 explain）报的是
+    ///   **`buildUrl(kindUrl, ctx)` 之后**的地址 ⇒ **`{{page}}` 已经插好了** ⭐⭐⭐
+    ///   ⇒ 新引擎原来报的是**原始规则**（`{{page}}` 还在里面）⇒ **跟老引擎不一致** ⭐⭐⭐
+    ///   ⇒ 用户在诊断面板看到「请求URL = …curpage={{page}}」⇒ 会以为规则坏了 ⭐⭐⭐
+    public func preparedURL(_ urlRule: String, page: Int = 1, key: String = "") -> String {
+        var ctx = EvalContext(base: .page(""), baseUrl: source.bookSourceUrl, varBox: javaVars)
+        ctx.page = page
+        ctx.key = key
+        return TemplateEngine.render(urlRule, ctx: ctx, js: evaluator.js)
     }
 
     /// ⭐⭐⭐ **诊断用的列表求值**（暴露 `listItems` 给诊断 op 用）

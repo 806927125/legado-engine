@@ -20,7 +20,8 @@ public enum ExplainOps {
                                 page: Int = 1) -> [String: Any] {
         var out: [String: Any] = [:]
         let rules = engine.listRuleForExplore()
-        out["请求URL"] = kindUrl
+        // ⭐⭐⭐ **报【真正要请求的地址】**（`{{page}}` 已插好）⇒ 跟老引擎逐字一致
+        out["请求URL"] = engine.preparedURL(kindUrl, page: page)
         out["方式"] = "GET"
         out["用的规则"] = (rules?.bookList ?? "") == (engine.source.ruleSearch?.bookList ?? "")
             ? "ruleSearch（ruleExplore.bookList 为空，已回退）" : "ruleExplore"
@@ -57,7 +58,7 @@ public enum ExplainOps {
                                   bookUrl: String) -> [String: Any] {
         var out: [String: Any] = [:]
         let rules = engine.source.ruleToc
-        out["请求URL"] = tocUrl.isEmpty ? bookUrl : tocUrl
+        out["请求URL"] = engine.preparedURL(tocUrl.isEmpty ? bookUrl : tocUrl)
         out["chapterList规则"] = rules?.chapterList ?? ""
         out["chapterName规则"] = rules?.chapterName ?? ""
         out["chapterUrl规则"] = rules?.chapterUrl ?? ""

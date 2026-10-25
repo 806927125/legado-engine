@@ -759,6 +759,9 @@ if let oi = CommandLine.arguments.firstIndex(of: "--op") {
         for u in node.recordedRequests() where !reqURLs.contains(u) { reqURLs.append(u) }
     }
     if !reqURLs.isEmpty { out["requests"] = reqURLs }
+    // ⭐⭐⭐ **引擎的诊断行**（门禁排查用：「规则没命中」到底是哪一步坏了）⭐⭐⭐
+    let diagLines = engine.failureDiagnosticLines
+    if !diagLines.isEmpty { out["__diagnostics"] = diagLines }
     // ⭐⭐⭐ **开过的浏览器**（门禁要断言「引擎让宿主弹了浏览器」）⭐⭐⭐
     if let node = jsBackend as? NodeJSExecutor {
         let bs = node.recordedBrowsers()

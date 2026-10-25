@@ -927,7 +927,16 @@ function runEval(code, scope) {
   if (isObjectLiteral) {
     attempts = [sc + '( ' + trimmed + '\n)'];
   } else {
-    attempts = [sc + trimmed, sc + '(function(){\n' + trimmed + '\n})()'];
+    // ⭐⭐⭐⭐⭐ **Script 形态要包一层【块】**（2026-10-26 门禁迁移时补）
+    //
+    // ⚠️⚠️⚠️ **为什么必须**：Node 的 `vm.runInContext` 在**同一个 context** 里跑
+    //   ⇒ 顶层的 `let` / `const` 会**留在 context 的词法作用域**里 ⇒
+    //   ⇒ **第二次跑同样的代码 ⇒ 「Identifier 'x' has already been declared」** ⭐⭐⭐
+    //   ⇒ 真书源（🍅大灰狼）的规则**每条都用了 `let`** ⇒
+    //   ⇒ 第一条规则跑完 ⇒ **后面的规则全炸** ⇒ 详情页的 tocUrl / 目录 / 正文全废 ⭐⭐⭐
+    //   ⇒ JSC 那边是「函数作用域里 eval」⇒ 每次都是新的词法作用域 ⇒ **没有这个问题** ⭐⭐⭐
+    //   ⇒ ⇒ **这里包块**（块的完成值 = 块内最后一条语句的完成值 ⇒ Script 语义不变）⭐⭐⭐
+    attempts = [sc + '{\n' + trimmed + '\n}', sc + '(function(){\n' + trimmed + '\n})()'];
   }
 
   let firstErr = null;
@@ -948,6 +957,18 @@ function runEval(code, scope) {
           const v2 = vm.runInContext(sc + '( ' + trimmed + '\n)', ctx);
           if (v2 !== undefined && v2 !== null) return v2;
         } catch (e2) { /* 忽略 ⇒ 报第一个错 */ }
+      }
+      // ⭐⭐⭐⭐⭐ **「形态 1 抛错 + 形态 2 没值」⇒ 要把【真错】抛出去**（2026-10-26 门禁迁移时补）
+      //
+      // ⚠️⚠️⚠️ **为什么必须**：形态 1（Script）抛错、形态 2（函数体）返回 undefined 时
+      //   ⇒ 以前这里 `return null` ⇒ **真错被吞掉** ⇒ Swift 侧只看到「规则求值为空」
+      //   ⇒ **诊断在说谎**（引擎自己的纪律：诊断必须说真话）⭐⭐⭐
+      //   ⇒ 症状：站方 JS 里的 `const { source } = this;`（顶层 `this` 在严格模式下是 undefined）
+      //     ⇒ 真错是「Cannot destructure property 'source' of 'this'」
+      //     ⇒ 但诊断只说「规则求值为空」⇒ **排查方向完全错** ⭐⭐⭐
+      if (firstErr) {
+        throw new Error(String(firstErr && firstErr.message || firstErr)
+          + ' | 形态尝试: ' + errs.join(' || '));
       }
       return null;
     }
