@@ -1603,6 +1603,34 @@ public final class SourceEngine {
         return HostObject(name: "chapter", methods: [:], properties: properties)
     }
 
+    // MARK: - ⭐⭐⭐⭐⭐ 诊断用的公开入口（2026-10-25 真机：老引擎退役 ⇒ 诊断 op 迁到新引擎）
+
+    /// ⭐⭐⭐ **诊断用的抓页**（暴露 `fetch` 给诊断 op 用）
+    public func fetchForExplain(_ url: String, page: Int = 1) throws -> Page {
+        try fetch(url, page: page)
+    }
+
+    /// ⭐⭐⭐ **诊断用的列表求值**（暴露 `listItems` 给诊断 op 用）
+    public func listItemsForExplain(_ rules: RuleFields?, page: Page) throws -> [ListItem] {
+        guard let rules else { throw SourceError.ruleMissing("bookList") }
+        let rule = rules.bookList ?? ""
+        guard !rule.isEmpty else { throw SourceError.ruleMissing("bookList") }
+        return try listItems(rule, page: page, field: "bookList", strict: false)
+    }
+
+    /// ⭐⭐⭐ **诊断用的目录求值**
+    public func chaptersForExplain(_ rules: RuleFields?, page: Page) throws -> [Chapter] {
+        guard let rules else { throw SourceError.ruleMissing("ruleToc") }
+        let listRule = rules.chapterList ?? ""
+        guard !listRule.isEmpty else { throw SourceError.ruleMissing("chapterList") }
+        let items = try listItems(listRule, page: page, field: "chapterList", strict: false)
+        return items.map { item in
+            Chapter(name: value(rules.chapterName, in: item, page: page),
+                    url: valueURL(rules.chapterUrl, in: item, page: page),
+                    isVolume: false, index: 0)
+        }
+    }
+
     // MARK: - 内部
 
     /// ⭐⭐ **这个 URL 是不是「页面」**（能发 HTTP 请求的那种）
@@ -1651,7 +1679,7 @@ public final class SourceEngine {
             }
             let doc = try? SwiftSoupDocument(html: payload, baseURL: trimmedRule)
             return Page(url: trimmedRule, text: payload, document: doc?.document,
-                        isJSON: Self.looksLikeJSON(payload))
+                        isJSON: Self.looksLikeJSON(payload), statusCode: 200)
         }
         // ⚠️⚠️ **不是「页面」的 URL**（`javascript:;` / `mailto:` …）⇒ 别发请求
         //   ⇒ 报一个**说人话**的错（以前报「unsupported URL」⇒ 整个目录炸）⭐
@@ -1682,7 +1710,8 @@ public final class SourceEngine {
                 domCache.put(doc.document, for: finalURL)
             }
         }
-        return Page(url: finalURL, text: text, document: document, isJSON: isJSON)
+        return Page(url: finalURL, text: text, document: document, isJSON: isJSON,
+                    statusCode: resp.statusCode)
     }
 
     /// 列表项 → 书

@@ -136,9 +136,13 @@ public struct Page {
     public var document: DOMNode?
     /// 响应是不是 JSON
     public var isJSON: Bool
+    /// ⭐⭐⭐ **HTTP 状态码**（诊断面板用；老引擎的 explain 有这字段 ⇒ 保持一致）
+    public var statusCode: Int
 
-    public init(url: String, text: String, document: DOMNode?, isJSON: Bool) {
+    public init(url: String, text: String, document: DOMNode?, isJSON: Bool,
+                statusCode: Int = 0) {
         self.url = url; self.text = text; self.document = document; self.isJSON = isJSON
+        self.statusCode = statusCode
     }
 }
 
