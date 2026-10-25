@@ -1,0 +1,159 @@
+{
+ "source": "🍅大灰狼聚合5.9.30(vip完全版)",
+ "exploreKinds": {
+  "kindCount": 5,
+  "kinds": [
+   {
+    "title": "登录大灰狼书源",
+    "url": "{{java.startBrowser(\"https://v5.langge.uk/login\",\"登录书源\");}}"
+   },
+   {
+    "title": "登录番茄",
+    "url": "{{java.startBrowser(\"https://fanqienovel.com/\",\"番茄登录\");}}"
+   },
+   {
+    "title": "男频",
+    "url": "https://v5.langge.uk/get_discover?source=番茄&source_type=小说&type=1&bdtype=0"
+   },
+   {
+    "title": "女频",
+    "url": "https://v5.langge.uk/get_discover?source=番茄&source_type=小说&type=2&bdtype=0"
+   },
+   {
+    "title": "排行榜",
+    "url": "https://v5.langge.uk/get_discover?source=番茄&source_type=小说&type=0&bdtype=0&is_ranking=1"
+   }
+  ],
+  "filterCount": 7,
+  "filters": [
+   {
+    "title": "线路",
+    "type": "select",
+    "chars": [
+     "https://v5.langge.uk",
+     "http://219.154.201.122:5006",
+     "https://v4.langge.uk",
+     "https://v2.langge.uk",
+     "https://v7.langge.uk",
+     "https://v8.langge.uk",
+     "https://v9.langge.uk",
+     "https://v10.langge.uk"
+    ],
+    "paramKey": "server"
+   },
+   {
+    "title": "模式",
+    "type": "select",
+    "chars": [
+     "小说",
+     "听书",
+     "短剧",
+     "漫画"
+    ],
+    "paramKey": "find_tab"
+   },
+   {
+    "title": "频道",
+    "type": "select",
+    "chars": [
+     "男频",
+     "女频"
+    ],
+    "paramKey": "source_type"
+   },
+   {
+    "title": "平台",
+    "type": "select",
+    "chars": [
+     "番茄",
+     "七猫",
+     "书旗",
+     "塔读",
+     "江湖",
+     "小米",
+     "米读",
+     "QQ阅读",
+     "酷我小说",
+     "幻梦轻小说",
+     "猫眼",
+     "西瓜小说",
+     "69书吧",
+     "顶点",
+     "爱下电子书",
+     "伪69",
+     "超会专属小说",
+     "听小说",
+     "阅友小说",
+     "百度",
+     "得间",
+     "QQ",
+     "搜书神器",
+     "得奇",
+     "知乎",
+     "追更人",
+     "久久小说",
+     "52书库",
+     "腐小说",
+     "完本小说",
+     "盐选文库",
+     "有度中文",
+     "三零读书",
+     "鹿鹿",
+     "星空小说",
+     "365小说",
+     "冷冷文学",
+     "万相书城",
+     "独步小说",
+     "福书网",
+     "速读谷",
+     "全本同人"
+    ],
+    "paramKey": "find_source"
+   },
+   {
+    "title": "字数",
+    "type": "select",
+    "chars": [
+     "不限",
+     "10万字以内",
+     "30万字以内",
+     "50万字以内",
+     "30万字以上",
+     "50万字以上",
+     "100万字以上",
+     "200万字以上",
+     "300万字以上",
+     "500万字以上"
+    ],
+    "paramKey": "fq_word_filter"
+   },
+   {
+    "title": "状态",
+    "type": "select",
+    "chars": [
+     "不限",
+     "完结",
+     "连载",
+     "半年内完结",
+     "3日内更新",
+     "7日内更新",
+     "1月内更新"
+    ],
+    "paramKey": "fq_status_filter"
+   },
+   {
+    "title": "排序",
+    "type": "select",
+    "chars": [
+     "不限",
+     "热门",
+     "新书",
+     "评分",
+     "字数",
+     "有声"
+    ],
+    "paramKey": "fq_sort_filter"
+   }
+  ]
+ }
+}

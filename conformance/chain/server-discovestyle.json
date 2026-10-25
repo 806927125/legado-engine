@@ -1,0 +1,22 @@
+{
+ "code": 0,
+ "msg": "ok",
+ "data": [
+  {
+   "title": "男频",
+   "url": "https://v5.langge.uk/get_discover?source=番茄&source_type=小说&type=1&bdtype=0"
+  },
+  {
+   "title": "女频",
+   "url": "https://v5.langge.uk/get_discover?source=番茄&source_type=小说&type=2&bdtype=0"
+  },
+  {
+   "title": "排行榜",
+   "url": "https://v5.langge.uk/get_discover?source=番茄&source_type=小说&type=0&bdtype=0&is_ranking=1"
+  },
+  {
+   "title": "点击登录可切换来源",
+   "url": "https://v5.langge.uk/get_discover?source=七猫&source_type=小说&type=1"
+  }
+ ]
+}
