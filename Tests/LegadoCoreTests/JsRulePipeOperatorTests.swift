@@ -68,6 +68,43 @@ final class JsRulePipeOperatorTests: XCTestCase {
         }
     }
 
+    /// ⭐⭐⭐⭐⭐ **顶层 `return` 要支持**（2026-10-25 真机实证，通用缺口）
+    ///
+    /// ⚠️ **站方真的写顶层 `return`**（🍅大灰狼的 `ruleBookInfo.tocUrl` 就是）
+    ///   ⇒ 只按 Script 求值 ⇒ **语法错** ⇒ 规则失败 ⭐⭐⭐
+    func testTopLevelReturnIsSupported() throws {
+        try XCTSkipUnless(NodeJSExecutor.isAvailable, "没装 node ⇒ 跑不了")
+        let js = try NodeJSExecutor()
+        let ev = Evaluator(js: js)
+        let obj = JSONValue.object(["book_id": .string("MTgzNTEy"), "tab": .string("小说")])
+        let base = RuleBase.json(obj)
+        let ctx = EvalContext(base: base, baseUrl: "https://x", isJSON: true)
+        let e = ev.evalOne("@js:var b = result.book_id; return \"id=\" + b;",
+                          base: base, ctx: ctx)
+        XCTAssertNil(e.diagnostic.failure,
+                     "⭐⭐⭐ 顶层 `return` 不该失败：\(SourceEngine.diagnosticLine(e.diagnostic))")
+        XCTAssertTrue(e.value.text.contains("MTgzNTEy"),
+                      "⭐⭐⭐ 顶层 `return` 的值要拿到：\(e.value.text)")
+    }
+
+    /// ⭐⭐⭐⭐⭐ **对象字面量当规则**要能用（老引擎/栖阅同款兜底）
+    func testObjectLiteralRuleWorks() throws {
+        try XCTSkipUnless(NodeJSExecutor.isAvailable, "没装 node ⇒ 跑不了")
+        let js = try NodeJSExecutor()
+        let ev = Evaluator(js: js)
+        let base = RuleBase.page("")
+        let ctx = EvalContext(base: base, baseUrl: "https://x", isJSON: false)
+        let e = ev.evalOne("@js:{a:1, b:\"x\"}", base: base, ctx: ctx)
+        XCTAssertNil(e.diagnostic.failure,
+                     "⭐⭐⭐ 对象字面量规则不该失败：\(SourceEngine.diagnosticLine(e.diagnostic))")
+        // ⭐⭐ **对象要看 `value`，不是 `text`**（`text` 对对象是空串）⭐⭐
+        if case .json(let j) = e.value {
+            XCTAssertEqual(j["a"]?.scalarString, "1", "对象字面量的 a 要取得到")
+        } else {
+            XCTFail("对象字面量规则应返回对象，实际=\(e.value)")
+        }
+    }
+
     /// ⭐⭐⭐⭐⭐ **非 JS 规则的 `||` 仍要当兜底链**（别把现在能用的搞坏）
     func testNonJsRuleStillUsesFallback() {
         let parser = RuleParser()

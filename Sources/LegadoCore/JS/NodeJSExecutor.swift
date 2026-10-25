@@ -155,7 +155,10 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
         // ⭐⭐⭐ **宿主对象的属性要每次更新**（编排层随时会换 source/book/chapter）⭐⭐⭐
         let props = Self.hostPropertiesPayload(context)
         let scope = JSScopeBuilder.build(context)
-        let reply = try send(["cmd": "run", "code": code, "scope": scope, "hostProps": props])
+        // ⭐⭐⭐ **预计算纯计算方法**（站方包装函数是**同步**的 ⇒ JS 侧只能查表）⭐⭐⭐
+        let cache = Self.pureMethodCache(engineAPI: engineAPI, base: currentBase)
+        let reply = try send(["cmd": "run", "code": code, "scope": scope,
+                              "hostProps": props, "hostCache": cache])
         if let err = reply["error"] as? String {
             throw SourceError.unsupported("Node JS 报错：\(err)")
         }
@@ -243,6 +246,27 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
     ///   JSCExecutor 是 `scope + "\n" + "(function(){ return eval(<codeLiteral>); })()"`
     ///   ⇒ **代码是字符串字面量** ⇒ 完成值 = eval 的值 ⭐⭐⭐
     ///   ⇒ 直接 `eval(code)`（不是字符串）**语义不同** ⇒ 会造成假绿/假红 ⭐⭐⭐
+    /// ⭐⭐⭐⭐⭐ **纯计算方法的预计算**
+    ///
+    /// ⚠️ **哪些能预计算**：**纯计算**（不碰网络/cookie/全局）的 `java.*`
+    /// ⚠️ **哪些不能**：`ajax`（要发请求）⇒ 沙盒跑不了 ⇒ 那条路径 SKIP（真机走 JSC 后端）⭐⭐⭐
+    private static func pureMethodCache(engineAPI: JSEngineAPIHandler?,
+                                        base: RuleBase) -> [String: String] {
+        guard let engineAPI else { return [:] }
+        var out: [String: String] = [:]
+        // ⭐ 站方包装函数的调用形态：`__hostJSON('java','base64Encode', JSON.stringify([args…]))`
+        //   ⇒ 缓存 key 用**同样形态** ⇒ Node 侧查表能命中 ⭐⭐⭐
+        for method in ["base64Encode", "base64Decode", "md5Encode", "timeFormat",
+                       "hexDecodeToString", "hexEncodeToString", "base64DecodeSafe"] {
+            guard let r = engineAPI(method, [], base) else { continue }
+            let any = r.foundationValue
+            guard let data = try? JSONSerialization.data(withJSONObject: [any]),
+                  let text = String(data: data, encoding: .utf8) else { continue }
+            out["java|\(method)|[]"] = text
+        }
+        return out
+    }
+
     static let harnessSource = #"""
 'use strict';
 // ⭐⭐⭐⭐⭐ **忽略 SIGPIPE**（2026-10-25 踩过）
@@ -266,12 +290,59 @@ ctx.__hostCall = function(object, method, argsJSON) {
 // ⭐ 包装函数用的是**同步** `__hostJSON` ⇒ 这里给一个同步版本（Node 的 host 往返是异步的）
 //   ⇒ 引擎的包装函数是同步的 ⇒ Node 里没法同步等 ⇒ 这里用**同步阻塞**（Atomics 风格不适用）
 //   ⇒ 改用：把宿主调用**批处理**在每次 run 前预先算好（见 run 的 hostProps）⭐⭐⭐
+// ⭐⭐⭐⭐⭐ **纯计算方法在【JS 侧】直接实现**（2026-10-25 踩过）
+//
+// ⚠️ **为什么不能在 Swift 侧预计算**：
+// · 站方包装函数是**同步**调 `__hostJSON(...)` ⇒ JS 侧拿不到异步往返的结果
+// · 而这些方法**有参数**（`java.base64Encode(文本)`）⇒ 参数运行时才知道
+//   ⇒ Swift 侧**没法预计算**（只能预计算无参的）⇒ 命中不了 ⇒ `java.base64Encode` 返回 null ⭐⭐⭐
+//
+// ⇒ 正解：**在 JS 侧实现这几个纯方法**（Node 内置能力 ⇒ 零 Swift 往返）⭐⭐⭐
+// ⚠️ `java.ajax`（要发请求）**不能**这样 ⇒ 沙盒里那条路径仍不可用（真机走 JSC）⭐⭐⭐
+ctx.__qrPure = {
+  base64Encode: function(s) {
+    return Buffer.from(String(s === undefined ? '' : s), 'utf8').toString('base64');
+  },
+  base64Decode: function(s) {
+    try { return Buffer.from(String(s), 'base64').toString('utf8'); } catch (e) { return ''; }
+  },
+  md5Encode: function(s) {
+    return require('crypto').createHash('md5')
+      .update(String(s === undefined ? '' : s), 'utf8').digest('hex');
+  },
+  hexDecodeToString: function(s) {
+    const t = String(s === undefined ? '' : s);
+    if (!/^[0-9a-fA-F]*$/.test(t)) return '';
+    let out = '';
+    for (let i = 0; i + 1 < t.length; i += 2) {
+      out += String.fromCharCode(parseInt(t.slice(i, i + 2), 16));
+    }
+    return out;
+  },
+  hexEncodeToString: function(s) {
+    let out = '';
+    const t = String(s === undefined ? '' : s);
+    for (let i = 0; i < t.length; i++) {
+      out += t.charCodeAt(i).toString(16).padStart(2, '0');
+    }
+    return out;
+  },
+};
+
 ctx.__hostJSON = function(object, method, argsJSON) {
-  // ⭐ 同步实现：从预置的 hostCache 取（run 前由 Swift 填好）
+  // ① ⭐ 纯计算方法 ⇒ JS 侧直接算（**有参数也能算**）⭐⭐⭐
+  if (object === 'java' && ctx.__qrPure[method]) {
+    let args = [];
+    try { args = JSON.parse(argsJSON); } catch (e) { args = []; }
+    const v = ctx.__qrPure[method].apply(null, args);
+    return JSON.stringify([v === undefined ? null : v]);
+  }
+  // ② 预置缓存（Swift 侧算好的）
   const key = object + '|' + method + '|' + argsJSON;
   if (Object.prototype.hasOwnProperty.call(ctx.__hostCache, key)) {
     return ctx.__hostCache[key];
   }
+  // ⚠️ 缓存里没有 ⇒ **宿主没实现**（老引擎上也会是 undefined）⇒ 返回 null
   return 'null';
 };
 
@@ -300,8 +371,9 @@ function injectWrappers(sources) {
   }
 }
 
-function setHostProps(props) {
+function setHostProps(props, cache) {
   ctx.__hostCache = ctx.__hostCache || {};
+  if (cache) { for (const [k, v] of Object.entries(cache)) { ctx.__hostCache[k] = v; } }
   for (const [name, objProps] of Object.entries(props || {})) {
     if (!ctx[name]) { ctx[name] = {}; }
     for (const [k, v] of Object.entries(objProps)) {
@@ -311,13 +383,26 @@ function setHostProps(props) {
 }
 
 function runEval(code, scope) {
-  // ⭐⭐⭐ **必须复刻 JSCExecutor 的包装**：
-  //   scope + "\n" + "(function(){ return eval(<codeLiteral>); })()"
-  //   ⇒ 代码是**字符串字面量** ⇒ 完成值 = eval 的值 ⭐⭐⭐
-  const codeLiteral = JSON.stringify(code);
-  const src = (scope || '') + '\n' + '(function(){ return eval(' + codeLiteral + '); })()';
-  const v = vm.runInContext(src, ctx);
-  return v === undefined ? null : v;
+  // ⭐⭐⭐⭐⭐ **三级兜底**（2026-10-25 真机实证）
+  // ① **函数体形态** ⇒ 顶层 `return` 合法（站方真的这么写）
+  // ② **Script 形态** ⇒ 末行表达式的完成值（Legado 的主语义）
+  // ③ **整段当表达式** `(<code>)` ⇒ 对象字面量当规则时能用（老引擎/栖阅同款）⭐⭐⭐
+  // ⇒ **谁先出值用谁**；①抛错 ⇒ 记下来，继续试 ②③ ⭐⭐⭐
+  const attempts = [
+    (scope || '') + '\n' + '(function(){\n' + code + '\n})()',
+    (scope || '') + '\n' + code,
+    (scope || '') + '\n' + '( ' + code + '\n)',
+  ];
+  let firstErr = null;
+  for (let i = 0; i < attempts.length; i++) {
+    let v = null, err = null;
+    try { v = vm.runInContext(attempts[i], ctx); } catch (e) { err = e; }
+    if (err) { if (!firstErr) firstErr = err; continue; }
+    if (v !== undefined && v !== null) return v;
+  }
+  // 全都没值 ⇒ 若第一次是语法错 ⇒ **把它抛出去**（让 Swift 侧知道「语法错」）
+  if (firstErr) throw firstErr;
+  return null;
 }
 
 function runGlobal(code) {
@@ -342,7 +427,7 @@ rl.on('line', function(line) {
       const v = runGlobal(req.code);
       process.stdout.write(JSON.stringify({ ok: true, value: v, globals: globals() }) + '\n');
     } else if (req.cmd === 'run') {
-      setHostProps(req.hostProps);
+      setHostProps(req.hostProps, req.hostCache);
       const v = runEval(req.code, req.scope);
       process.stdout.write(JSON.stringify({ ok: true, value: v, globals: globals() }) + '\n');
     } else if (req.cmd === 'globals') {

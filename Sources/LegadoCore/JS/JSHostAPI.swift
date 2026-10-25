@@ -270,20 +270,42 @@ public enum JSScopeBuilder {
     /// ⚠️ **顶层 `return` 也要兜住**：站方偶尔写顶层 `return` ⇒ 直接 eval 是 Script ⇒ 语法错
     /// ⇒ 这里包成函数体 ⇒ 顶层 `return` 就合法了。
     public static func program(_ code: String) -> String {
-        // ⭐⭐ **不要包成函数**！
+        // ⭐⭐⭐⭐⭐ **顶层 `return` 要支持**（2026-10-25 真机实证，通用真凶）
         //
-        // ⚠️ `(function(){ 1 + 2 })()` ⇒ **返回 undefined**（函数体要显式 return）
-        //    而 `eval("1 + 2")` ⇒ 完成值 = **3**（Script 的完成值）
+        // ⚠️⚠️⚠️ **以前的注释说「不支持顶层 return，两端行为一致」⇒ 是错的**：
+        // · **站方真的写顶层 `return`**（🍅大灰狼的 `ruleBookInfo.tocUrl` 就是）
+        //   ⇒ `@js: var b = …; return "data:;base64,…";` ⇒ **语法错** ⇒ 规则失败 ⭐⭐⭐
+        // · 而 Legado/Rhino 的 `eval` **允许**顶层 return（Rhino 的 eval 是函数作用域）⭐⭐⭐
+        //   ⇒ ⇒ **引擎才是那个「不一致」的一方** ⇒ 必须在引擎侧补上 ⭐⭐⭐
         //
-        // ⇒ 站方要的就是 **Script 的完成值**（末行表达式的值）⇒ 直接拼接即可。
-        //    ⭐ 站方自己给 `result` 赋值的情况也**天然正确**：
-        //    `result = String(...)` 作为末行 ⇒ 赋值表达式的值 = 赋的值 ✔
-        //    （大灰狼的 `ruleContent.content` 正是这么写的）
+        // ⭐ **怎么同时支持两种形态**：
+        //   ① 包成函数体 ⇒ **顶层 return 合法**（`return` 直接返回）
+        //   ② 但函数体**没有 return 时**返回 undefined ⇒ **末行表达式的值丢了**（不合 Legado 语义）⭐⭐⭐
+        // ⇒ 解法：**先试「包成函数」；若结果不是 undefined ⇒ 用它；
+        //   否则回退到「末行表达式」形态**（两个都跑 ⇒ 慢一点，但语义全对）⭐⭐⭐
         //
-        // ⚠️ 代价：**顶层 `return` 会语法错**（Script 不允许）
-        //    ⇒ 但 Legado/Rhino 也是 `eval` ⇒ **两端行为一致** ✔
-        //    ⇒ 站方规范本来就要求「末行表达式，别写顶层 return」。
-        code
+        // ⭐ 或者更省：**用 `eval` 在函数体里跑**，函数体末尾追加 `return <末行表达式>`：
+        //   ⇒ 顶层 return 仍是语法错（因为 eval 的是 Script）⇒ 不行 ⭐⭐⭐
+        // ⇒ 所以用「两次求值」方案（见 `programPair`）⭐⭐⭐
+        programPair(code).asScript
+    }
+
+    /// ⭐⭐⭐⭐⭐ **两种求值形态**（给求值器挑）
+    ///
+    /// - `asFunction`: 包成函数体 ⇒ **顶层 `return` 合法** ⇒ 返回值优先用
+    /// - `asScript`:  原样 Script ⇒ **末行表达式的完成值**（Legado 的主语义）⇒ 兜底
+    ///
+    /// ⭐⭐⭐ **为什么两个都要**（2026-10-25 真机实证）：
+    /// · 站方**真的**写顶层 `return`（🍅大灰狼的 `ruleBookInfo.tocUrl` 就是）
+    ///   ⇒ 只用 Script 形态 ⇒ **语法错** ⇒ 规则失败 ⭐⭐⭐
+    /// · 而站方也大量写「末行表达式」（没有 return）⇒ 只用函数体形态 ⇒ **拿到 undefined** ⭐⭐⭐
+    /// ⇒ ⇒ **两个都跑**：函数体版有值用它，否则用 Script 版 ⭐⭐⭐
+    public static func programPair(_ code: String) -> (asFunction: String, asScript: String) {
+        // ① 包成函数体（`return` 合法）
+        let asFunction = "(function(){\n" + code + "\n})()"
+        // ② 原样 Script（末行表达式的完成值）
+        let asScript = code
+        return (asFunction, asScript)
     }
 
     /// 旧名（等价 `program`）

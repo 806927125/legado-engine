@@ -268,6 +268,142 @@ func JSCExecutorIfAvailable() -> JSExecutor? {
 }
 
 // ===============================================================
+// ⭐⭐⭐⭐⭐ `--analyzeUrl` 模式：**URL 规则解析**（老 JS 引擎物理删除后的门禁入口）
+//
+// ⚠️ **为什么需要**：轻阅的 `qiyue-parity` 门禁原本在 jsdom 里跑老引擎的
+//   `QR.analyzeUrl(...)` ⇒ 老引擎删了 ⇒ 门禁的对象没了 ⇒ 改成**直接调新引擎**⭐⭐⭐
+// 用法：`swift run conformance --analyzeUrl '<json>'`
+//   json = {"url":"https://x.com/a,{...}", "baseUrl":""}
+//   输出：一行 JSON（`{"ok":true,"url":…,"method":…,"body":…,"headers":{…}}`）
+// ===============================================================
+if let au = CommandLine.arguments.firstIndex(of: "--analyzeUrl") {
+    let payload = au + 1 < CommandLine.arguments.count ? CommandLine.arguments[au + 1] : "{}"
+    guard let d = payload.data(using: .utf8),
+          let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {
+        print("{\"ok\":false,\"error\":\"bad payload\"}")
+        exit(2)
+    }
+    let url = obj["url"] as? String ?? ""
+    let baseUrl = obj["baseUrl"] as? String ?? ""
+    let t = URLBuilder.parse(url, baseUrl: baseUrl)
+    var headers: [String: Any] = [:]
+    for (k, v) in t.headers { headers[k] = v }
+    let out: [String: Any] = [
+        "ok": true, "url": t.url, "method": t.method,
+        "body": t.body, "headers": headers,
+    ]
+    let d2 = try! JSONSerialization.data(withJSONObject: out)
+    print(String(data: d2, encoding: .utf8)!)
+    exit(0)
+}
+
+// ===============================================================
+// ⭐⭐⭐⭐⭐ `--op` 模式：**跑完整 op 链**（假服务器 + 真引擎）
+//
+// ⚠️ **为什么需要**（2026-10-25 老 JS 引擎物理删除）：
+//   轻阅有一批门禁原本**在 jsdom 里跑老引擎的完整链**（explore / bookInfo / toc）
+//   ⇒ 老引擎删了 ⇒ 门禁的对象没了 ⇒ **覆盖就丢了** ⭐⭐⭐
+//   ⇒ 现在：**直接跑新引擎**（本模式）⇒ 门禁继续有效，而且验的是**真正在跑的那份**⭐⭐⭐
+//
+// 用法：`swift run conformance --op '<json>'`
+//   json = {"op":"explore", "source":{…}, "routes":[["匹配串","响应文件路径"]],
+//           "dir":"假服务器目录", "kindUrl":"…"}
+//   输出：一行 JSON（`{"ok":true, "books":[…], …}` 或 `{"ok":false,"error":"…"}`）
+// ===============================================================
+if let oi = CommandLine.arguments.firstIndex(of: "--op") {
+    // ⭐⭐⭐ **支持从文件读 payload**（payload 可能很大 ⇒ 命令行放不下 ⇒ "Argument list too long"）
+    var payload = oi + 1 < CommandLine.arguments.count ? CommandLine.arguments[oi + 1] : "{}"
+    if payload.hasSuffix(".json"), let pd = try? Data(contentsOf: URL(fileURLWithPath: payload)) {
+        payload = String(data: pd, encoding: .utf8) ?? payload
+    }
+    guard let d = payload.data(using: .utf8),
+          let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {
+        print("{\"ok\":false,\"error\":\"bad payload\"}")
+        exit(2)
+    }
+
+    /// ⭐⭐⭐ **假服务器**（照抄 `--bench-e2e` 的 `FileTransport`）⇒ 全程离线 ⭐⭐⭐
+    final class FileTransport: HTTPTransport, @unchecked Sendable {
+        let dir: URL
+        let routes: [(String, String)]
+        var requested: [String] = []
+        init(dir: URL, routes: [(String, String)]) { self.dir = dir; self.routes = routes }
+        func send(_ request: HTTPRequest) throws -> HTTPResponse {
+            requested.append(request.url)
+            for (pat, file) in routes where request.url.contains(pat) {
+                let data = try Data(contentsOf: dir.appendingPathComponent(file))
+                return HTTPResponse(statusCode: 200, headers: [:], body: data, finalURL: request.url)
+            }
+            throw SourceError.requestFailed(request.url, "没有这个 fixture")
+        }
+    }
+
+    let op = obj["op"] as? String ?? "explore"
+    let dir = URL(fileURLWithPath: (obj["dir"] as? String) ?? ".")
+    let routes = (obj["routes"] as? [[String]] ?? []).map { ($0[0], $0[1]) }
+    guard let srcDict = obj["source"] as? [String: Any],
+          let srcData = try? JSONSerialization.data(withJSONObject: srcDict),
+          let source = try? JSONDecoder().decode(BookSource.self, from: srcData) else {
+        print("{\"ok\":false,\"error\":\"source 解不开\"}")
+        exit(2)
+    }
+    // ⭐ JS 后端：有 JSC 用 JSC，没有就用 Node（Linux 沙盒）⭐⭐⭐
+    var jsBackend: JSExecutor?
+    if let jsc = JSCExecutorIfAvailable() {
+        jsBackend = jsc
+    } else if NodeJSExecutor.isAvailable {
+        jsBackend = try? NodeJSExecutor()
+    }
+    let transport = FileTransport(dir: dir, routes: routes)
+    let engine = SourceEngine(source: source, fetcher: PageFetcher(transport: transport), js: jsBackend)
+    if let lib = obj["jsLib"] as? String, !lib.isEmpty {
+        try? engine.loadJsLib(lib)
+    }
+
+    var out: [String: Any] = [:]
+    do {
+        switch op {
+        case "exploreKinds":
+            let (kinds, filters) = try engine.exploreKinds()
+            out["kinds"] = kinds.map { ["title": $0.title, "url": $0.url] }
+            out["filters"] = filters.map { ["title": $0.title] }
+        case "explore":
+            let kindUrl = obj["kindUrl"] as? String ?? ""
+            let page = obj["page"] as? Int ?? 1
+            let books = try engine.explore(kindUrl, page: page)
+            out["books"] = books.map { ["name": $0.name, "author": $0.author,
+                                        "bookUrl": $0.bookUrl, "intro": $0.intro,
+                                        "kind": $0.kind, "lastChapter": $0.lastChapter] }
+        case "bookInfo":
+            let bookUrl = obj["bookUrl"] as? String ?? ""
+            var b = Book()
+            b.bookUrl = bookUrl
+            b.name = obj["name"] as? String ?? ""
+            let info = try engine.bookInfo(b)
+            out["book"] = ["name": info.name, "author": info.author, "intro": info.intro,
+                           "kind": info.kind, "bookUrl": info.bookUrl, "tocUrl": info.tocUrl,
+                           "lastChapter": info.lastChapter]
+        case "toc":
+            let bookUrl = obj["bookUrl"] as? String ?? ""
+            var b = Book()
+            b.bookUrl = bookUrl
+            let info = try engine.bookInfo(b)
+            let chapters = try engine.toc(info, book: b)
+            out["chapters"] = chapters.map { ["name": $0.name, "url": $0.url] }
+        default:
+            out["error"] = "unknown op: \(op)"
+        }
+        out["ok"] = true
+    } catch {
+        out["ok"] = false
+        out["error"] = "\(error)"
+    }
+    let d2 = try! JSONSerialization.data(withJSONObject: out)
+    print(String(data: d2, encoding: .utf8)!)
+    exit(0)
+}
+
+// ===============================================================
 // ⭐⭐⭐⭐⭐ `--sourceVars` 模式：**问站方要默认变量表**
 //
 // ⚠️ **为什么需要**（2026-10-25 老 JS 引擎物理删除）：

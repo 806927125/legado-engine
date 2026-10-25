@@ -977,7 +977,28 @@ public struct Evaluator {
             diag.branch = "JS"
             return RuleValue.json(out)
         } catch {
-            diag.failure = .jsError(String(describing: error))
+            // ⭐⭐⭐⭐⭐ **语法错 ⇒ 再试「整段当表达式」**（2026-10-25 真机实证，通用缺口）
+            //
+            // ⚠️ **为什么必须**：站方会写**对象字面量**当规则（`@js:{a:1, b:"x"}`）
+            //   ⇒ 直接 eval 是 Script ⇒ `{a:1, b:"x"}` 被当**语句块** ⇒ **语法错** ⭐⭐⭐
+            //   ⇒ 老引擎/栖阅都有「整段当表达式再试一次」的兜底 ⇒ **引擎也得有** ⭐⭐⭐
+            //   ⇒ 兜底：把代码包成 `( <code> )` ⇒ 变成表达式 ⇒ 能取值 ⭐⭐⭐
+            let errText = String(describing: error)
+            let isSyntax = errText.contains("SyntaxError") || errText.contains("语法")
+            if isSyntax {
+                let asExpr = "( " + code + "\n)"
+                do {
+                    let out2 = try js.run(asExpr, context: jctx)
+                    diag.branch = "JS（整段当表达式）"
+                    diag.failure = nil
+                    return RuleValue.json(out2)
+                } catch {
+                    diag.failure = .jsError(String(describing: error))
+                    diag.branch = "JS"
+                    return .void
+                }
+            }
+            diag.failure = .jsError(errText)
             diag.branch = "JS"
             return .void
         }

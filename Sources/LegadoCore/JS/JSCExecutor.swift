@@ -172,19 +172,52 @@ public final class JSCExecutor: JSExecutor {
         //   ③ scope 变量（result / baseUrl / source / book）**照样可见**（eval 在闭包里）⭐
         let scope = JSScopeBuilder.build(context)
         let codeLiteral = JSScopeBuilder.jsonLiteral(.string(code))
-        let source = scope + "\n" + "(function(){ return eval(" + codeLiteral + "); })()"
+        // ⭐⭐⭐⭐⭐ **三级兜底**（2026-10-25 真机实证）
+        // ① 函数体形态 ⇒ 顶层 `return` 合法（站方真的这么写）
+        // ② Script 形态 ⇒ 末行表达式的完成值（Legado 的主语义）
+        // ③ 整段当表达式 `( <code> )` ⇒ 对象字面量当规则时能用（老引擎/栖阅同款）⭐⭐⭐
+        // ⭐⭐⭐⭐⭐ **三级兜底**（2026-10-25 真机实证）
+        // ① **函数体形态** ⇒ 顶层 `return` 合法（站方真的这么写 ⇒ 大灰狼的 tocUrl 就是）
+        // ② **Script 形态** ⇒ 末行表达式的完成值（Legado 的主语义）
+        // ③ **整段当表达式** `( <code> )` ⇒ 对象字面量当规则时能用（老引擎/栖阅同款）⭐⭐⭐
+        // ⇒ **谁先出值用谁**；①抛错 ⇒ 记下来，继续试 ②③ ⭐⭐⭐
+        // ⭐⭐⭐⭐⭐ **三级兜底**（2026-10-25 真机实证，通用缺口）
+        // ① **函数体形态** ⇒ 顶层 `return` 合法（站方真的这么写 ⇒ 大灰狼的 `ruleBookInfo.tocUrl` 就是）
+        // ② **Script 形态** ⇒ 末行表达式的完成值（Legado 的主语义）
+        // ③ **整段当表达式** `( <code> )` ⇒ 对象字面量当规则时能用（老引擎/栖阅同款）⭐⭐⭐
+        // ⇒ **谁先出值用谁**；①抛错 ⇒ 记下来，继续试 ②③ ⭐⭐⭐
+        let attempts: [String] = [
+            scope + "\n" + "(function(){ return eval(" + codeLiteral + "); })()",
+            scope + "\n" + code,
+            scope + "\n" + "( " + code + "\n)",
+        ]
         // ⭐⭐⭐⭐⭐ **看门狗**:JS 跑太久 ⇒ **明确报出来**(是「站方 JS 卡住了」,不是「网络慢」)
         let t0 = Date()
-        let value = js.evaluateScript(source)
-        let elapsed = Date().timeIntervalSince(t0)
-        if elapsed > Self.slowScriptThreshold {
-            throw JSCError.scriptException(
-                "站方 JS 执行 \(Int(elapsed)) 秒(超过 \(Int(Self.slowScriptThreshold)) 秒)"
-                + "⇒ 疑似死循环/极慢(宿主应回退老引擎:老引擎的 JS 在独立进程里 ⇒ 不会拖死 App)")
+        var value: JavaScriptCore.JSValue?
+        var firstError: String?
+        for src in attempts {
+            caught.value = nil
+            let v = js.evaluateScript(src)
+            let elapsed = Date().timeIntervalSince(t0)
+            if elapsed > Self.slowScriptThreshold {
+                throw JSCError.scriptException(
+                    "站方 JS 执行 \(Int(elapsed)) 秒(超过 \(Int(Self.slowScriptThreshold)) 秒)"
+                    + "⇒ 疑似死循环/极慢(宿主应回退老引擎:老引擎的 JS 在独立进程里 ⇒ 不会拖死 App)")
+            }
+            // ⭐ 站方 JS 抛异常 ⇒ **记下来**（继续试下一种形态）
+            if let msg = caught.value {
+                if firstError == nil { firstError = msg }
+                continue
+            }
+            // ⭐⭐⭐ **出值了**（不是 undefined）⇒ 用它
+            if let vv = v, !vv.isUndefined, !vv.isNull {
+                value = vv
+                break
+            }
+            // ⭐ undefined ⇒ 试下一种形态（①可能是顶层 return 不合法 ⇒ ②③能救）
         }
-        // ⭐ 站方 JS 抛异常 ⇒ 必须**报出来**（不能静默空）
-        if let msg = caught.value {
-            throw JSCError.scriptException(msg)
+        if value == nil, let e = firstError {
+            throw JSCError.scriptException(e)
         }
         guard let value else { return .null }
         return Self.toJSON(value)
