@@ -9,18 +9,17 @@
 /// ⇒ 修法：revision 由**构建时注入**（CI 传 `-Xswiftc -DLEGADO_REVISION=...`）
 ///   ⇒ 拿不到注入值时**明说「未知」**，**绝不含糊其辞** ⇒ 宁可不知道，不能报错 ⭐⭐⭐
 public enum LegadoEngineInfo {
-    /// ⭐⭐⭐ **构建时注入的 revision**（CI 传 `-DLEGADO_REVISION=<sha>`）
-    /// ⚠️ 没有注入 ⇒ `"unknown"` ⇒ **明说不知道**（不许手写一个假的）⭐⭐⭐
-    public static let revision: String = {
-        #if LEGADO_REVISION
-        return String(UTF8String: LEGADO_REVISION) ?? "unknown"
-        #else
-        return "unknown"
-        #endif
-    }()
-
-    /// ⭐ **引擎版本串**（给 UI 显示）
-    public static var version: String {
+    /// ⭐⭐⭐⭐⭐ **revision 由【宿主 App】提供**（不是这里读）⭐⭐⭐
+    ///
+    /// ⚠️⚠️ **为什么不能在这里读 `-D` 宏**：
+    ///   `LegadoCore` 是 **SPM 依赖 target** ⇒ 它的编译参数**不受 App target 的
+    ///   `OTHER_SWIFT_FLAGS` 影响** ⇒ 宏传不进来 ⇒ 永远 `unknown` ⭐⭐⭐
+    ///   ⇒（实测：`-DLEGADO_REVISION=` 出现在 App target 的 SwiftCompile 命令行里，
+    ///     但 **LegadoCore 的 SwiftCompile 命令行里没有** ⇒ 宏没生效）⭐⭐⭐
+    ///
+    /// ⇒ 所以：**App target 读宏**（它拿得到）⇒ 传给这里拼版本串 ⭐⭐⭐
+    /// ⇒ 拿不到 ⇒ `"unknown"` ⇒ **明说不知道**（绝不含糊其辞）⭐⭐⭐
+    public static func version(revision: String) -> String {
         "legado-engine \(revision) · 老 JS 引擎已退役，只剩新引擎"
     }
 }
