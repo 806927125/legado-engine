@@ -79,6 +79,13 @@ public struct BookInfo: Sendable, Equatable {
     public var kind: String
     public var coverUrl: String
     public var lastChapter: String
+    /// ⭐⭐⭐ **分组**（`ruleBookInfo.group` 或 `ruleBookInfo.category`）
+    ///
+    /// ⚠️⚠️ **2026-10-25 真机实证**：App 详情页有一格「分组」
+    ///   ⇒ 之前**一直硬编码「未分组」** ⇒ 因为引擎**根本不认**站方的分组字段 ⭐⭐⭐
+    ///   ⇒ 站方（🍅大灰狼 5.9.30）给的是 `{{$.category}}`（**多占位符模板**）
+    ///   ⇒ 加上「多占位符模板」那个修复（2026-10-25）⇒ 这里才有值 ⭐⭐⭐
+    public var group: String
     /// ⭐ **字数**（`ruleBookInfo.wordCount`）—— 44 个源在用
     public var wordCount: String
     public var bookUrl: String
@@ -89,11 +96,12 @@ public struct BookInfo: Sendable, Equatable {
     public var raw: [String: String]
 
     public init(name: String = "", author: String = "", intro: String = "", kind: String = "",
-                coverUrl: String = "", lastChapter: String = "", wordCount: String = "",
+                coverUrl: String = "", lastChapter: String = "", group: String = "",
+                wordCount: String = "",
                 bookUrl: String = "", tocUrl: String = "", sourceName: String = "",
                 raw: [String: String] = [:]) {
         self.name = name; self.author = author; self.intro = intro; self.kind = kind
-        self.coverUrl = coverUrl; self.lastChapter = lastChapter
+        self.coverUrl = coverUrl; self.lastChapter = lastChapter; self.group = group
         self.wordCount = wordCount; self.bookUrl = bookUrl
         self.tocUrl = tocUrl; self.sourceName = sourceName; self.raw = raw
     }

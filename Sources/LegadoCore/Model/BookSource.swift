@@ -89,6 +89,11 @@ public struct RuleFields: Codable, Sendable {
     public var lastChapter: String?
     public var bookUrl: String?
     public var wordCount: String?
+    /// ⭐⭐⭐ **分组**（2026-10-25 真机：App 详情页那格「分组」一直显示「未分组」）
+    ///   ⇒ 站方给的是 `{{$.category}}`（**多占位符模板**）⇒ 引擎不认这个 key ⇒ 一直空 ⭐⭐⭐
+    ///   ⇒ 两个 key 都收（`group` / `category`）⇒ 不同版本的书源都能覆盖 ⭐
+    public var group: String?
+    public var category: String?
 
     public var searchUrl: String?
     /// ⭐⭐ **`ruleExplore.exploreUrl`** —— 站方会把发现页 URL 写在**规则块里**（不是顶层）
@@ -127,6 +132,9 @@ public struct RuleFields: Codable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case name, author, kind, intro, coverUrl, lastChapter, bookUrl, wordCount
+        // ⭐⭐⭐ **分组**（2026-10-25 真机：App 详情页那格「分组」一直显示「未分组」）
+        //   ⇒ 站方给 `category`（也有给 `group` 的）⇒ 两个 key 都收 ⭐
+        case group, category
         case searchUrl, exploreUrl, bookList, tocUrl
         case chapterList, chapterName, chapterUrl, isVolume, isVip, nextTocUrl, nextUrl
         case content, nextContentUrl, replaceRegex, sourceRegex
@@ -160,6 +168,8 @@ public struct RuleFields: Codable, Sendable {
         lastChapter = r(.lastChapter)
         bookUrl = r(.bookUrl)
         wordCount = r(.wordCount)
+        group = r(.group)
+        category = r(.category)
         searchUrl = r(.searchUrl)
         exploreUrl = r(.exploreUrl)
         bookList = r(.bookList)

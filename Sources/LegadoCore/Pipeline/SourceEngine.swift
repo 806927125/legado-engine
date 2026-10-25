@@ -514,6 +514,14 @@ public final class SourceEngine {
         info.kind = value(rules?.kind, in: nil, page: p, base: base)
         info.coverUrl = Self.absolute(valueURL(rules?.coverUrl, in: nil, page: p, base: base), base: p.url)
         info.lastChapter = value(rules?.lastChapter, in: nil, page: p, base: base)
+        // ⭐⭐⭐ **分组**（2026-10-25 真机：App 详情页那格「分组」一直显示「未分组」）
+        //   ⇒ 站方给的是 `{{$.category}}`（**多占位符模板**）⇒ 现在模板能出值了 ⭐⭐⭐
+        //   ⇒ 两个 key 都收（`group` / `category`）⇒ 不同版本的书源都能覆盖 ⭐
+        if let g = rules?.group, !g.isEmpty {
+            info.group = value(g, in: nil, page: p, base: base)
+        } else if let c = rules?.category, !c.isEmpty {
+            info.group = value(c, in: nil, page: p, base: base)
+        }
         // ⭐ **字数**（44 个源在用）
         info.wordCount = value(rules?.wordCount, in: nil, page: p, base: base)
         let toc = valueURL(rules?.tocUrl, in: nil, page: p, base: base)

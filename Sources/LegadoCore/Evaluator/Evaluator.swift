@@ -245,16 +245,25 @@ public struct Evaluator {
             r = TemplateEngine.render(r, ctx: ctx)
         }
 
-        // ②' ⭐ **原规则就是一个 {{占位符}} ⇒ 结果就是这个值**（不再往下走选择器）
-        //     规格 §S-TPL-02。轻阅口径：判「原规则」而不是插值后的规则。
-        if r != rawRule, RuleParser.isWholeTemplate(rawRule) {
+        // ②' ⭐⭐⭐⭐⭐ **原规则含 {{占位符}} ⇒ 渲染结果就是这个值**（不再往下走选择器）
+        //
+        // ⚠️⚠️⚠️ **2026-10-25 真机事故（build253）**：这里原来只认「**整条一个** `{{…}}`」
+        //   （`RuleParser.isWholeTemplate`）⇒ **多占位符**规则（`{{a}} {{b}}` / `{{a}} • {{b}}`）
+        //   **渲染完之后继续当选择器去查** ⇒ 走「默认规则链」⇒
+        //   ⇒ `baseTypeMismatch(expected: "DOM", actual: "JSON")` ⇒ **规则失败** ⭐⭐⭐
+        //   ⇒ 症状：详情页的「分组 / 类型 / 更新」三格全取不到值（App 显示「未分组/文本/未加载」）⭐⭐⭐
+        //
+        // ⭐ **Legado 语义**：`{{…}}` 是**模板** ⇒ 渲染后**就是值** ⇒ 不该再走选择器 ⭐⭐⭐
+        //   ⇒ 所以判据是「**原规则含 `{{`**」而不是「整条一个 `{{…}}`」⭐⭐⭐
+        //   ⇒ 三种形态都覆盖：① 整条一个 ② 多个（空格/`•`/换行隔开）③ 前缀+模板 ⭐⭐⭐
+        if r != rawRule, rawRule.contains("{{") {
             let whole = r.trimmingCharacters(in: .whitespaces)
             if whole.isEmpty {
                 diag.failure = .noMatch(reason: "模板插值后为空")
-                diag.scope = "整条 {{}} 模板"
+                diag.scope = "{{}} 模板"
                 return Evaluation(value: .void, diagnostic: diag)
             }
-            diag.branch = "整条 {{}} 模板"
+            diag.branch = "{{}} 模板"
             return Evaluation(value: .string(whole), diagnostic: diag)
         }
 
