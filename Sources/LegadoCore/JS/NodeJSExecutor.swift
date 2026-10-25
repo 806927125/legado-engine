@@ -1,5 +1,18 @@
 import Foundation
 
+// ⭐⭐⭐⭐⭐ **Node 后端 = 【只给 Linux 沙盒用】**（2026-10-26 iOS CI 失败实证）
+//
+// ⚠️⚠️ **真凶**：`Foundation.Process` 是 **macOS-only** 的 API ⇒ **iOS 上压根不存在**
+//   ⇒ `cannot find 'Process' in scope` ⇒ **BUILD FAILED** ⇒ 真机编不出包 ⭐⭐⭐
+//   ⇒ 而 **Linux 沙盒编得过** ⇒ **沙盒绿 ≠ 真机编得过**（又抓到一个）⭐⭐⭐
+//
+// ⭐ **正解**：整个实现**只在 Linux 编译**；其它平台给一个 `isAvailable = false` 的 stub
+//   ⇒ 引用方（Conformance）**不用改** ⇒ macOS 上自动走 JSC 分支 ⭐⭐⭐
+//
+// ⚠️ **通用教训**：往引擎里加**平台专属**代码 ⇒ 必须问「iOS/macOS 编得过吗」
+//   ⇒ 沙盒只有 Linux ⇒ **平台专属的洞沙盒看不见** ⇒ 只能靠 CI 或显式闸门 ⭐⭐⭐
+#if os(Linux)
+
 /// ⭐⭐⭐⭐⭐ **Node 后端**（Linux / macOS 都能跑）—— 让**沙盒**能真跑站方 JS
 ///
 /// ⚠️ **为什么需要**（2026-10-25 真机实证）：
@@ -1046,3 +1059,27 @@ rl.on('line', function(line) {
 });
 """#
 }
+
+#else   // ⭐⭐⭐ 非 Linux（iOS / macOS）：只留 stub ⇒ 引用方不用改
+
+/// ⭐⭐⭐ **非 Linux 上的 stub**（Node 后端不可用 ⇒ 沙盒那条路在 iOS/macOS 上不存在）
+public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
+    /// ⭐ **永远 false**（iOS/macOS 走 JavaScriptCore）
+    public static var isAvailable: Bool { false }
+
+    public init() throws {
+        throw SourceError.unsupported("Node 后端只在 Linux 沙盒可用（iOS/macOS 走 JavaScriptCore）")
+    }
+
+    public func run(_ code: String, context: JSRunContext) throws -> JSONValue {
+        throw SourceError.unsupported("Node 后端只在 Linux 沙盒可用")
+    }
+    public func runGlobal(_ code: String, context: JSRunContext) throws -> JSONValue {
+        throw SourceError.unsupported("Node 后端只在 Linux 沙盒可用")
+    }
+    public func setEngineAPI(_ handler: JSEngineAPIHandler?) {}
+    public func markGlobalsAsBaseline() {}
+    public func invalidate() {}
+}
+
+#endif
