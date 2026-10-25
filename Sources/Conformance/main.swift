@@ -291,7 +291,11 @@ if CommandLine.arguments.contains("--crypto") {
 //   输出：一行 JSON（`{"ok":true,"value":…,"text":…,"branch":…}`）
 // ===============================================================
 if let ji = CommandLine.arguments.firstIndex(of: "--js") {
-    let payload = ji + 1 < CommandLine.arguments.count ? CommandLine.arguments[ji + 1] : "{}"
+    var payload = ji + 1 < CommandLine.arguments.count ? CommandLine.arguments[ji + 1] : "{}"
+    // ⭐⭐⭐ **payload 也可以从【文件】读**（`.json` 后缀 ⇒ 当路径）⇒ 大 payload 不用塞命令行
+    if payload.hasSuffix(".json"), let pd = try? Data(contentsOf: URL(fileURLWithPath: payload)) {
+        payload = String(data: pd, encoding: .utf8) ?? payload
+    }
     guard let d = payload.data(using: .utf8),
           let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {
         print("{\"ok\":false,\"error\":\"bad payload\"}")
@@ -489,30 +493,114 @@ if let oi = CommandLine.arguments.firstIndex(of: "--op") {
         routeTransport = RouteTransport(rules: rules)
     }
     let transport: HTTPTransport = routeTransport ?? FileTransport(dir: dir, routes: routes)
-    let engine = SourceEngine(source: source, fetcher: PageFetcher(transport: transport), js: jsBackend)
+    // ⭐⭐⭐⭐⭐ **宿主的存储 / cookie 罐**（登录链路要用）⭐⭐⭐⭐⭐
+    //
+    // ⚠️ **为什么要有**（2026-10-25 迁移门禁时实证）：
+    //   · 站方的登录脚本要读 **登录信息**（`source.getLoginInfoMap()` ⇒ 表单值）
+    //     和 **cookie**（`cookie.getCookie(url)` / `cookie.getKey(host, name)`）
+    //   · 而它们分别住在**宿主的存储**和**宿主的 cookie 罐**里（真机 = UserDefaults / HTTPCookieStorage）
+    //   · ⇒ 沙盒里也要有 ⇒ 这里给内存实现（与 App 侧的 `SourceStorage` / `AppCookieService` 同款）⭐⭐⭐
+    let storage = MemoryStorage()
+    if let srcDict = obj["source"] as? [String: Any] {
+        if let li = srcDict["__loginInfo"] as? String, !li.isEmpty {
+            storage.setString(li, forKey: SourceEngine.loginInfoKey)
+        }
+        if let lh = srcDict["__loginHeader"] as? String, !lh.isEmpty {
+            storage.setString(lh, forKey: SourceEngine.loginHeaderKey)
+        }
+    }
+    let cookieService = MemoryCookieService()
+    // ⭐ cookie 快照（App 的 cookie 罐 ⇒ 引擎的罐）
+    if let snap = obj["cookieSnapshot"] as? [String: String] {
+        for (host, value) in snap { cookieService.setCookie(value, for: host) }
+    }
+    let engine = SourceEngine(source: source, fetcher: PageFetcher(transport: transport), js: jsBackend,
+                              storage: storage, cookies: cookieService)
+    // ⭐⭐⭐⭐⭐ **站方变量 ⇒ 灌进引擎的变量盒**（App 侧 `seedVars` 同款）⭐⭐⭐⭐⭐
+    if let srcDict = obj["source"] as? [String: Any],
+       let text = srcDict["__variables"] as? String, !text.isEmpty,
+       let data = text.data(using: .utf8),
+       let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        for (k, v) in parsed {
+            if let s = v as? String { engine.varBox.set(k, s) }
+            else if let n = v as? NSNumber { engine.varBox.set(k, n.stringValue) }
+        }
+    }
     // ⭐⭐⭐⭐⭐ **静态路由给 Node 后端** ⇒ `java.ajax` 能**同步**查表
     //   （Node 的宿主往返是异步 ⇒ 同步包装函数拿不到结果 ⇒ 路由必须下沉到 JS 侧）⭐⭐⭐
     if let node = jsBackend as? NodeJSExecutor, !inlineRoutes.isEmpty {
         node.setRoutes(inlineRoutes)
     }
+    // ⭐⭐⭐⭐⭐ **宿主对象的状态 ⇒ 灌进 Node 后端**（`source.*` / `cookie.*` 的数据）⭐⭐⭐⭐⭐
+    //
+    // ⚠️ Node 后端**没法同步回调 Swift** ⇒ 宿主对象只能「Swift 灌数据 + JS 记写回」⭐
+    //   ⇒ 这里灌的是：**站方变量 / 登录信息 / 登录头 / cookie 罐** ⭐
+    func hostStatePayload() -> [String: Any] {
+        var vars: [String: String] = [:]
+        for (k, v) in engine.varBox.all { vars[k] = v }
+        var loginInfo: [String: String] = [:]
+        if let text = storage.string(forKey: SourceEngine.loginInfoKey),
+           let data = text.data(using: .utf8),
+           let o = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+            loginInfo = o
+        }
+        var jar: [String: String] = [:]
+        if let snap = obj["cookieSnapshot"] as? [String: String] { jar = snap }
+        return [
+            "source": [
+                "url": source.bookSourceUrl,
+                "name": source.bookSourceName,
+                "group": source.bookSourceGroup ?? "",
+                "vars": vars,
+                "loginInfo": loginInfo,
+                "loginHeader": storage.string(forKey: SourceEngine.loginHeaderKey) ?? "",
+            ],
+            "cookie": ["jar": jar],
+        ]
+    }
+    if let node = jsBackend as? NodeJSExecutor {
+        node.setHostState(hostStatePayload())
+    }
+    // ⭐⭐⭐⭐⭐ **假浏览器**（站方 🍅番茄登录靠它拿 sessionid）⭐⭐⭐⭐⭐
+    if let node = jsBackend as? NodeJSExecutor {
+        let pages = (obj["browserPages"] as? [[String: Any]]) ?? []
+        if !pages.isEmpty { node.setBrowserPages(pages) }
+    }
     if let lib = obj["jsLib"] as? String, !lib.isEmpty {
         try? engine.loadJsLib(lib)
     }
+
+    // ⭐⭐⭐ **登录信息快照**（跑 op 之前）⇒ 失败的登录不许破坏已有登录态 ⭐⭐⭐
+    let loginInfoBefore = engine.loadLoginInfo()
+    let loginAction = obj["action"] as? String ?? ""
 
     var out: [String: Any] = [:]
     do {
         switch op {
         case "exploreKinds":
             let (kinds, filters) = try engine.exploreKinds()
-            out["kinds"] = kinds.map { ["title": $0.title, "url": $0.url] }
+            // ⭐⭐⭐ **组名/样式也带出去**（App 的发现页要显示分组 ⇒ 门禁要能断言）
+            out["kinds"] = kinds.map { ["title": $0.title, "url": $0.url,
+                                       "group": $0.group ?? "", "style": $0.style ?? ""] }
             out["filters"] = filters.map { ["title": $0.title] }
         case "explore":
             let kindUrl = obj["kindUrl"] as? String ?? ""
             let page = obj["page"] as? Int ?? 1
             let books = try engine.explore(kindUrl, page: page)
+            // ⭐⭐⭐ **coverUrl 也要带出去**（老引擎的 explore op 给过 ⇒ 门禁在验它）
             out["books"] = books.map { ["name": $0.name, "author": $0.author,
                                         "bookUrl": $0.bookUrl, "intro": $0.intro,
-                                        "kind": $0.kind, "lastChapter": $0.lastChapter] }
+                                        "kind": $0.kind, "lastChapter": $0.lastChapter,
+                                        "coverUrl": $0.coverUrl, "wordCount": $0.wordCount] }
+        case "search":
+            // ⭐⭐⭐ **搜索 op**（老引擎有 ⇒ 门禁在验它 ⇒ 新引擎也要能跑）
+            let keyword = obj["keyword"] as? String ?? ""
+            let page = obj["page"] as? Int ?? 1
+            let books = try engine.search(keyword, page: page)
+            out["books"] = books.map { ["name": $0.name, "author": $0.author,
+                                        "bookUrl": $0.bookUrl, "intro": $0.intro,
+                                        "kind": $0.kind, "lastChapter": $0.lastChapter,
+                                        "coverUrl": $0.coverUrl, "wordCount": $0.wordCount] }
         case "bookInfo":
             let bookUrl = obj["bookUrl"] as? String ?? ""
             var b = Book()
@@ -521,14 +609,65 @@ if let oi = CommandLine.arguments.firstIndex(of: "--op") {
             let info = try engine.bookInfo(b)
             out["book"] = ["name": info.name, "author": info.author, "intro": info.intro,
                            "kind": info.kind, "bookUrl": info.bookUrl, "tocUrl": info.tocUrl,
-                           "lastChapter": info.lastChapter]
+                           "lastChapter": info.lastChapter, "coverUrl": info.coverUrl,
+                           "group": info.group, "wordCount": info.wordCount]
         case "toc":
             let bookUrl = obj["bookUrl"] as? String ?? ""
             var b = Book()
             b.bookUrl = bookUrl
-            let info = try engine.bookInfo(b)
+            // ⚠️⚠️ **tocUrl 可以在 payload 里直接给**（老门禁就是这么做的）
+            //   ⇒ 不给 ⇒ 才去跑一遍 bookInfo 拿 tocUrl（老引擎的语义）
+            var info = BookInfo()
+            info.bookUrl = bookUrl
+            let payloadTocUrl = obj["tocUrl"] as? String ?? ""
+            if !payloadTocUrl.isEmpty {
+                info.tocUrl = payloadTocUrl
+            } else {
+                info = try engine.bookInfo(b)
+            }
             let chapters = try engine.toc(info, book: b)
-            out["chapters"] = chapters.map { ["name": $0.name, "url": $0.url] }
+            // ⭐⭐⭐ **章节字段名对齐老引擎**：老门禁断言的是 `title` / `index`
+            out["chapters"] = chapters.map { ["name": $0.name, "title": $0.name, "url": $0.url,
+                                             "index": $0.index, "isVolume": $0.isVolume] }
+        case "content":
+            let chapterUrl = obj["chapterUrl"] as? String ?? ""
+            let raw = (obj["book"] as? [String: Any]) ?? [:]
+            var b = Book()
+            b.bookUrl = (raw["bookUrl"] as? String) ?? (obj["bookUrl"] as? String) ?? ""
+            b.name = (raw["name"] as? String) ?? ""
+            var ch = Chapter()
+            ch.url = chapterUrl
+            ch.name = (obj["title"] as? String) ?? ""
+            let text = try engine.content(ch, book: b)
+            out["content"] = text
+            out["title"] = ch.name
+        case "explain":
+            let kindUrl = obj["kindUrl"] as? String ?? ""
+            let page = obj["page"] as? Int ?? 1
+            let d = ExplainOps.explain(engine: engine, kindUrl: kindUrl, page: page)
+            for (k, v) in d { out[k] = v }
+        case "explainToc":
+            let tocUrl = obj["tocUrl"] as? String ?? ""
+            let bookUrl = obj["bookUrl"] as? String ?? ""
+            let d = ExplainOps.explainToc(engine: engine, tocUrl: tocUrl, bookUrl: bookUrl)
+            for (k, v) in d { out[k] = v }
+        case "login":
+            // ⭐⭐⭐⭐⭐ **登录 op**（老引擎 `engine.js` 的 `login` 同款）⭐⭐⭐⭐⭐
+            //   ⚠️ 老引擎不是调 `login()`，而是跑【宿主传来的 action 表达式】
+            //   ⇒ 这里照抄 App 侧 `LegadoEngineBackend.runLogin` 的口径 ⭐⭐⭐
+            let action = obj["action"] as? String ?? ""
+            let formValues = obj["formValues"] as? [String: String] ?? [:]
+            let r = try engine.runLoginAction(action, formValues: formValues)
+            out["ok"] = r.ok
+            // ⭐⭐⭐ **站方原文**（toast / log）—— 判断「登录成没成功」的唯一依据 ⭐⭐⭐
+            out["messages"] = r.messages
+            if r.ok { out["result"] = r.result } else { out["error"] = r.result }
+        case "loginProbe":
+            // ⭐⭐⭐⭐⭐ **登录态检测 op**（老引擎 `loginProbe` 同款）⭐⭐⭐⭐⭐
+            let r = try engine.probeLoginStatus()
+            out["baseUrl"] = r.baseUrl
+            out["messages"] = r.messages
+            out["stationCheck"] = r.stationCheck
         default:
             out["error"] = "unknown op: \(op)"
         }
@@ -537,11 +676,93 @@ if let oi = CommandLine.arguments.firstIndex(of: "--op") {
         out["ok"] = false
         out["error"] = "\(error)"
     }
+    // ⭐⭐⭐⭐⭐ **宿主对象的状态收回来**（站方改过的变量 / 登录信息 / cookie）⭐⭐⭐⭐⭐
+    //
+    // ⚠️ Node 后端的宿主对象是「JS 侧记着 ⇒ Swift 收走」⇒ 收回来才能落盘（App 侧同款）⭐
+    if let node = jsBackend as? NodeJSExecutor {
+        let st = node.hostState()
+        if let srcState = st["source"] as? [String: Any] {
+            // ⚠️ **值不一定都是字符串**（站方变量可能有数字/布尔）⇒ 用 `[String: Any]` 再逐项转字符串
+            //   ⇒ 否则整个字典转换失败 ⇒ **一个变量都收不回来**（静默丢）⭐⭐⭐
+            if let vars = srcState["vars"] as? [String: Any] {
+                for (k, v) in vars {
+                    let s: String
+                    if let str = v as? String { s = str }
+                    else if let n = v as? NSNumber { s = n.stringValue }
+                    else { s = String(describing: v) }
+                    engine.varBox.set(k, s)
+                }
+            }
+            if let info = srcState["loginInfo"] as? [String: Any] {
+                var flat: [String: String] = [:]
+                for (k, v) in info {
+                    if let str = v as? String { flat[k] = str }
+                    else if let n = v as? NSNumber { flat[k] = n.stringValue }
+                    else { flat[k] = String(describing: v) }
+                }
+                // ⭐⭐⭐⭐⭐ **合并**（不是整份替换）⭐⭐⭐⭐⭐
+                //   ⇒ 引擎那边**已经把表单值合并进登录信息**了（站方 action 里读 `getLoginInfoMap()` 要读得到）
+                //   ⇒ 整份替换会把那份**抹掉** ⇒ 站方读不到输入框的值 ⇒ 用户点了「解锁整个源」还是提示「没填密码」⭐⭐⭐
+                //   ⇒ 站方 `putLoginInfo` 写的键**盖在上面**（它写的就是要生效的）⭐
+                var merged: [String: String] = [:]
+                if let text = storage.string(forKey: SourceEngine.loginInfoKey),
+                   let data = text.data(using: .utf8),
+                   let old = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+                    merged = old
+                }
+                for (k, v) in flat { merged[k] = v }
+                if let data = try? JSONSerialization.data(withJSONObject: merged),
+                   let text = String(data: data, encoding: .utf8) {
+                    storage.setString(text, forKey: SourceEngine.loginInfoKey)
+                }
+            }
+            if let header = srcState["loginHeader"] as? String, !header.isEmpty {
+                storage.setString(header, forKey: SourceEngine.loginHeaderKey)
+            }
+        }
+        if let cookieState = st["cookie"] as? [String: Any],
+           let jar = cookieState["jar"] as? [String: String] {
+            for (host, value) in jar { cookieService.setCookie(value, for: host) }
+        }
+    }
+    // ⭐⭐⭐⭐⭐ **失败的登录不许破坏已有登录态**（老引擎 `restoreLoginIfLost` 同款）⭐⭐⭐⭐⭐
+    //
+    // ⚠️ **为什么在这儿再恢复一次**：站方 `login(true)` 第一步无条件 `putLoginInfo(表单值)`
+    //   ⇒ **把「密钥」抹掉**；而密钥是「登录成功」的标志（只有成功那步才写回去）
+    //   ⇒ 登录_api 失败（服务器 502）⇒ 密钥**永远回不来**（用户真机就是这样丢的）⭐⭐⭐
+    // ⚠️ **必须放在「写回站方改过的登录信息」之后** ⇒ 否则写回会把恢复好的密钥又抹掉 ⭐⭐⭐
+    engine.restoreLoginIfLost(before: loginInfoBefore, action: loginAction)
+    // ⭐⭐⭐ **登录信息 / 登录头 / 站方变量回传**（App 侧 `invoke` 的口径 ⇒ 门禁要能断言）⭐⭐⭐
+    let info = engine.loadLoginInfo()
+    if !info.isEmpty, let data = try? JSONSerialization.data(withJSONObject: info),
+       let text = String(data: data, encoding: .utf8) {
+        out["__loginInfo"] = text
+    }
+    let header = engine.currentLoginHeaderString()
+    if !header.isEmpty { out["__loginHeader"] = header }
+    let varsJSON = SourceEngine.varsJSON(engine.varBox)
+    if !varsJSON.isEmpty { out["__sourceVars"] = varsJSON }
+    // ⭐⭐⭐ **cookie 罐的回传**（门禁要断言「站方写了 cookie」）⭐⭐⭐
+    var cookieOut: [String: String] = [:]
+    for (host, value) in cookieService.cookieJarSnapshot() { cookieOut[host] = value }
+    if !cookieOut.isEmpty { out["__cookies"] = cookieOut }
     // ⭐⭐⭐ **请求记录**（门禁要断言「发了哪几条」）⭐⭐⭐
+    //
+    // ⚠️⚠️ **两处都要记**（2026-10-26 门禁迁移时补的）：
+    // · `rt.recorder.urls` ⇒ **引擎自己发的**请求（搜索页 / 详情页 / 目录页 / 正文页）
+    // · `node.recordedRequests()` ⇒ **站方 JS 里 `java.ajax` 发的**请求
+    //   （Node 后端的 `java.ajax` 走 JS 侧的静态路由表 ⇒ 不经过引擎的 transport ⇒ 记不到）
+    // ⇒ 以前只记后者 ⇒ 门禁**看不到引擎发的请求**（「请求 URL 有没有编码」这类断言根本没法验）⭐⭐⭐
+    var reqURLs: [String] = []
+    if let rt = routeTransport { reqURLs.append(contentsOf: rt.recorder.urls) }
     if let node = jsBackend as? NodeJSExecutor, !inlineRoutes.isEmpty {
-        out["requests"] = node.recordedRequests()
-    } else if let rt = routeTransport {
-        out["requests"] = rt.recorder.urls
+        for u in node.recordedRequests() where !reqURLs.contains(u) { reqURLs.append(u) }
+    }
+    if !reqURLs.isEmpty { out["requests"] = reqURLs }
+    // ⭐⭐⭐ **开过的浏览器**（门禁要断言「引擎让宿主弹了浏览器」）⭐⭐⭐
+    if let node = jsBackend as? NodeJSExecutor {
+        let bs = node.recordedBrowsers()
+        if !bs.isEmpty { out["browsers"] = bs }
     }
     let d2 = try! JSONSerialization.data(withJSONObject: out)
     print(String(data: d2, encoding: .utf8)!)
@@ -608,8 +829,13 @@ if let si = CommandLine.arguments.firstIndex(of: "--sourceVars") {
 //   输出：一行 JSON `{"ok":true,"value":…,"text":"…","branch":"…","failure":"…"}`
 // ===============================================================
 if let ei = CommandLine.arguments.firstIndex(of: "--eval") {
-    let payload = ei + 1 < CommandLine.arguments.count
+    var payload = ei + 1 < CommandLine.arguments.count
         ? CommandLine.arguments[ei + 1] : "{}"
+    // ⭐⭐⭐ **payload 也可以从【文件】读**（`.json` 后缀 ⇒ 当路径）⇒ 大 payload 不用塞命令行
+    //   （argv 单参数上限 128KB ⇒ 真书源（158KB）+ 真页面快照 ⇒ 直接炸 `E2BIG`）⭐⭐⭐
+    if payload.hasSuffix(".json"), let pd = try? Data(contentsOf: URL(fileURLWithPath: payload)) {
+        payload = String(data: pd, encoding: .utf8) ?? payload
+    }
     guard let d = payload.data(using: .utf8),
           let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {
         print("{\"ok\":false,\"error\":\"bad payload\"}")
@@ -624,16 +850,40 @@ if let ei = CommandLine.arguments.firstIndex(of: "--eval") {
     let vars = obj["vars"] as? [String: String] ?? [:]
 
     let base: RuleBase
+    var document: DOMNode? = nil
     switch baseType {
     case "json":
         // ⭐⭐⭐ **baseJSON 是个对象** ⇒ 不能 `JSONValue.from(字典)`（那会走「当普通字符串」分支）
         //   ⇒ 必须直接 `JSONValue.from(Any)`（字典 ⇒ `.object`）⭐⭐⭐
         base = .json(JSONValue.from(obj["baseJSON"] ?? [:]))
+    case "node":
+        // ⭐⭐⭐⭐⭐ **条目级基准**（2026-10-26 门禁迁移补的）
+        //   老门禁（`rules.test.js` 等）有一批断言是「**相对某个 DOM 节点**求值」
+        //   （如「在 li 内查 li 自身」「`a@text` 取当前节点的链接」）
+        //   ⇒ 基准必须是**那个节点** ⇒ 页面级基准做不到 ⇒ 这里按 CSS 选择器取节点 ⭐⭐⭐
+        //   用法：`{"baseType":"node","base":"<html…>","selector":"li.item"}`
+        let sel = obj["selector"] as? String ?? ""
+        let doc = try? SwiftSoupDocument(html: baseText, baseURL: baseUrl)
+        let node = doc.flatMap { d -> DOMNode? in
+            sel.isEmpty ? d.document : (d.document.queryAll(sel).first)
+        }
+        if let node {
+            base = .element(DOMNodeRef(node))
+        } else {
+            base = .page(baseText)
+            document = doc?.document
+        }
     default:
         base = .page(baseText)
+        // ⭐⭐⭐⭐⭐ **页面级基准 ⇒ 必须解析出 DOM**（2026-10-26 门禁迁移补的）
+        //   ⚠️⚠️ **不解析 ⇒ CSS / XPath 规则全都报 `baseTypeMismatch`**
+        //   ⇒ 选择器类门禁（在 jsdom 里跑老引擎的那些）**一条都跑不了** ⭐⭐⭐
+        if let doc = try? SwiftSoupDocument(html: baseText, baseURL: baseUrl) {
+            document = doc.document
+        }
     }
-    let ctx = EvalContext(base: base, baseUrl: baseUrl, raw: raw,
-                          vars: vars, isJSON: isJSON)
+    var ctx = EvalContext(base: base, baseUrl: baseUrl, raw: raw,
+                          vars: vars, isJSON: isJSON, document: document)
     // ⭐⭐⭐⭐⭐ **选 JS 后端**：有 JSC 用 JSC（macOS）；没有就**用 Node 顶替**（Linux 沙盒）
     //   ⇒ 沙盒里也能真跑站方 JS ⇒ **JS 类门禁不用 SKIP** ⭐⭐⭐
     let ev: Evaluator
@@ -645,6 +895,15 @@ if let ei = CommandLine.arguments.firstIndex(of: "--eval") {
         print("{\"ok\":false,\"error\":\"本平台既没有 JSC 也没有 node ⇒ JS 用例没法验\"}")
         exit(0)
     }
+    // ⭐⭐⭐⭐⭐ **把【引擎的宿主 API】挂到 JS 后端**（2026-10-26 门禁迁移时补）
+    //   ⇒ `java.getString('$.x')` 这类**要靠引擎**的宿主 API 才能算 ⭐⭐⭐
+    //   ⇒ 而 `{{java.getString('$.status')=='50'?'完结':'连载'}}` 这种模板
+    //     **379 个真源里 90 个（24%）在用** ⇒ 不挂 ⇒ 这些源的分类/简介/更新时间全是空 ⭐⭐⭐
+    //   ⇒ 这里挂一个**空源**的引擎（不联网 ⇒ 只借它的宿主 API）⭐⭐⭐
+    let apiEngine = SourceEngine(source: BookSource(bookSourceName: "eval", bookSourceUrl: ""),
+                                 fetcher: PageFetcher(transport: HTTPTransportShim.failing()),
+                                 js: ev.js)
+    ev.js?.setEngineAPI({ method, args, base in apiEngine.engineJava(method, args, base) })
     // ⭐⭐⭐ **可选：先加载站方 jsLib**（2026-10-25 老引擎退役 ⇒ 门禁改验新引擎）
     //   ⇒ 站方 jsLib 定义的 `getArguments` / `host` 等**全局**必须先在同一个 JS 上下文里跑 ⭐⭐⭐
     //   ⇒ Linux 上没有 JSC ⇒ **JS 后端不可用** ⇒ jsLib 相关的用例会跳过（显式 SKIP）⭐⭐⭐
@@ -656,13 +915,26 @@ if let ei = CommandLine.arguments.firstIndex(of: "--eval") {
         try? js.runGlobal(jsLib, context: JSRunContext(base: .page(""), baseUrl: baseUrl))
     }
     let e = ev.evalOne(rule, base: base, ctx: ctx)
-    let out: [String: Any] = [
+    var out: [String: Any] = [
         "ok": true,
         "value": e.value.jsonValue.foundationValue,
         "text": e.value.text,
+        // ⭐⭐⭐⭐⭐ **字段出口**（2026-10-26 门禁迁移补的）
+        //   老门禁的 `QR.rule.getValue(rule, base, ctx)` ⇒ **多个命中取第一个非空**（Legado 语义）
+        //   ⇒ `text` 是「全部命中拼起来」⇒ 不能拿它当 getValue ⇒ 这里单独给 `first` ⭐⭐⭐
+        "first": SourceEngine.firstNonEmpty(e.value),
         "branch": e.diagnostic.branch ?? "",
         "failure": e.diagnostic.failure.map { "\($0)" } ?? "",
     ]
+    // ⭐⭐⭐⭐⭐ **「要全部命中」模式**（2026-10-26 门禁迁移补的）
+    //   老门禁的 `QR.rule.getElements(rule, base, ctx).values` ⇒ **一次要全部**
+    //   ⇒ `evalOne` 只给第一个 ⇒ 必须走 `getElements`（列表出口）⭐⭐⭐
+    if (obj["all"] as? Bool) == true {
+        let all = ev.getElements(rule, base: base, ctx: ctx)
+        let values = all.value.items.map { $0.text }
+        out["values"] = values
+        out["count"] = values.count
+    }
     let d2 = try! JSONSerialization.data(withJSONObject: out)
     print(String(data: d2, encoding: .utf8)!)
     exit(0)

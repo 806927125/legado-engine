@@ -197,6 +197,42 @@ public struct Evaluator {
         return key
     }
 
+    /// ⭐⭐⭐ **把一段文本当【整条规则】求值**（模板内容带 `##正则##` 尾巴时用）
+    ///
+    /// ⚠️ **老引擎的 `interpolate` 语义**：`{{…}}` 的内容**可以是一条完整规则**
+    ///   （如 `$.tags..name##\s##，`）⇒ 那样求值 ⇒ 结果就是那个值 ⭐⭐⭐
+    private func evalAsRule(_ expr: String, base: RuleBase, ctx: EvalContext) -> String {
+        var d = EngineDiagnostic(rule: expr)
+        let ast = parser.parse(expr, isJSON: ctx.isJSON)
+        return evaluate(ast, base: base, ctx: ctx, diag: &d).text
+    }
+
+    /// ⭐⭐⭐ **切「尾部后处理」—— 但要跳过 `{{…}}` 里的 `##`**
+    ///
+    /// ⚠️ **为什么要单独一套**：`{{$.tags..name##\s##，}}` 里的 `##` 在**花括号里面**
+    ///   ⇒ 那是**模板内容**（一条完整规则）⇒ **不是**「尾部后处理」⭐⭐⭐
+    ///   ⇒ 用普通的 `splitPostProcess` 会把模板**切烂**（`{{$.tags..name` ⇒ 渲染不出来）⭐⭐⭐
+    static func splitPostProcessOutsideTemplate(_ s: String) -> (String, RuleNode.PostProcess)? {
+        guard let idx = firstOutsideTemplate(s, needle: "##") else { return nil }
+        let head = String(s[..<idx]).trimmingCharacters(in: .whitespaces)
+        let tail = String(s[idx...])
+        guard !head.isEmpty else { return nil }
+        return (head, .regex(tail))
+    }
+
+    /// ⭐⭐⭐ **找【模板外面】的第一个 `needle`**
+    private static func firstOutsideTemplate(_ s: String, needle: String) -> String.Index? {
+        var inTemplate = false
+        var i = s.startIndex
+        while i < s.endIndex {
+            if s[i...].hasPrefix("{{") { inTemplate = true; i = s.index(i, offsetBy: 2); continue }
+            if s[i...].hasPrefix("}}") { inTemplate = false; i = s.index(i, offsetBy: 2); continue }
+            if !inTemplate, s[i...].hasPrefix(needle) { return i }
+            i = s.index(after: i)
+        }
+        return nil
+    }
+
     /// **单条规则**求值（不按行拆）
     private func evalSingle(_ rule: String, base: RuleBase, ctx ctxIn: EvalContext) -> Evaluation {
         var ctx = ctxIn
@@ -242,10 +278,45 @@ public struct Evaluator {
         let mode = RuleClassifier.classify(r, isJSON: ctx.isJSON)
         diag.mode = mode.rawValue
         if mode != .js {
-            r = TemplateEngine.render(r, ctx: ctx)
+            r = TemplateEngine.render(r, ctx: ctx, js: js) { expr in
+                // ⭐⭐⭐ **模板内容本身是【整条规则】**（`{{$.x##正则##替换}}`）
+                //   ⇒ 老引擎的 `interpolate` 就是这么做的（内容当规则求值）⭐⭐⭐
+                //   ⇒ 真书源「免费追书」的 `ruleBookInfo.intro` 里就有 `{{$..tags..name##\s##，}}` ⭐⭐⭐
+                self.evalAsRule(expr, base: base, ctx: ctx)
+            }
         }
 
-        // ②' ⭐⭐⭐⭐⭐ **原规则含 {{占位符}} ⇒ 渲染结果就是这个值**（不再往下走选择器）
+        // ②' ⭐⭐⭐⭐⭐ **模板 + 尾部后处理**（`{{…}}##正则##替换` / `{{…}}<js>…</js>`）
+        //
+        // ⚠️⚠️⚠️ **语义 =「先渲染模板，再对【渲染后的值】做后处理」**（老引擎的语义）
+        //   · 老引擎：`interpolate` 先渲染 ⇒ 尾巴的 `##正则##` 再作用在**渲染结果**上 ⭐⭐⭐
+        //   · 现在的做法：② 把**整条**规则渲染了（尾巴的原文被留在里面）⇒ ②' 直接返回
+        //     ⇒ **尾巴根本没执行** ⇒ `{{$..introduction}}##(^|…)##$1<br>` 这种
+        //       **简介尾巴失效**（真书源「免费追书」的 `ruleBookInfo.intro` 就是这样）⭐⭐⭐
+        //   ⇒ 这里：**先切尾巴 ⇒ 渲染头 ⇒ 值再过尾巴** ⭐⭐⭐
+        //
+        // ⚠️⚠️ **切尾巴时要跳过 `{{…}}` 里的 `##`**（那不是「尾部」，是**模板内容**）
+        //   ⇒ `{{$.tags..name##\s##，}}` 的 `##` 在**花括号里面** ⇒ 不能当尾部切 ⭐⭐⭐
+        if mode != .js,
+           let (head, post) = Self.splitPostProcessOutsideTemplate(rawRule),
+           head.contains("{{") {
+            let renderedHead = TemplateEngine.render(head, ctx: ctx, js: js) { expr in
+                self.evalAsRule(expr, base: base, ctx: ctx)
+            }
+            if renderedHead.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                diag.failure = .noMatch(reason: "模板插值后为空")
+                diag.scope = "{{}} 模板"
+                return Evaluation(value: .void, diagnostic: diag)
+            }
+            let v = applyPost(.string(renderedHead), post, base: base, ctx: ctx, diag: &diag)
+            diag.branch = "{{}} 模板 + 尾部后处理"
+            if diag.failure == nil, v.isEmpty {
+                diag.failure = .noMatch(reason: "模板 + 尾部后处理结果为空")
+            }
+            return Evaluation(value: v, diagnostic: diag)
+        }
+
+        // ②'' ⭐⭐⭐⭐⭐ **原规则含 {{占位符}} ⇒ 渲染结果就是这个值**（不再往下走选择器）
         //
         // ⚠️⚠️⚠️ **2026-10-25 真机事故（build253）**：这里原来只认「**整条一个** `{{…}}`」
         //   （`RuleParser.isWholeTemplate`）⇒ **多占位符**规则（`{{a}} {{b}}` / `{{a}} • {{b}}`）
@@ -411,7 +482,7 @@ public struct Evaluator {
             return .string(s)
 
         case .template(let s):
-            return .string(TemplateEngine.render(s, ctx: ctx))
+            return .string(TemplateEngine.render(s, ctx: ctx, js: js))
 
         // ① `||` 择一 —— 第一个非空胜出（§S-FBK-01）
         case .fallback(let xs):

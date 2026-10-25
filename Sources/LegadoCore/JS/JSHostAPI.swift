@@ -251,8 +251,30 @@ public enum JSScopeBuilder {
         for (k, v) in ctx.extra {
             lines.append("var \(k) = \(jsonLiteral(v));")
         }
+        // ⭐⭐⭐⭐⭐ **内部变量（`__qr` 前缀）要同时挂到【全局】** ⭐⭐⭐⭐⭐
+        //
+        // ⚠️⚠️ **为什么**（2026-10-25 迁移门禁时实证）：
+        //   · 宿主对象的实现（`source.getLoginInfoMap()` 等）是**全局函数**
+        //     ⇒ 它们**看不到** eval 作用域里的局部 `var` ⇒ 读不到引擎刚合并好的登录信息⭐⭐⭐
+        //   · 登录链路的语义 = 「点 action 时先把输入框的值合并进登录信息，**再**执行 action」
+        //     ⇒ 站方在 action 里读 `getLoginInfoMap()` 必须读到**合并之后**那份⭐⭐⭐
+        //   ⇒ 所以：引擎把合并后的登录信息放进 `extra["__qrLoginInfo"]`
+        //     ⇒ 这里挂到全局 ⇒ 宿主对象的实现读得到 ⭐⭐⭐
+        //   ⇒ （跟 `__qrMsgSink` 同一个道理：**全局的才是宿主能摸到的**）⭐
+        for (k, _) in ctx.extra where k.hasPrefix("__qr") {
+            lines.append("try { globalThis.\(k) = \(k); } catch(e) {}")
+        }
         if ctx.collectMessages {
             lines.append("var __qrMsgs = []; var __qrMsgSink = function(m){ __qrMsgs.push(String(m == null ? '' : m)); };")
+            // ⭐⭐⭐ **收集器必须挂到全局**（`globalThis.__qrMsgSink`）⭐⭐⭐
+            //
+            // ⚠️⚠️ **为什么**（2026-10-25 迁移门禁时实证）：
+            //   宿主包装函数（`java.toast` / `java.log`）是**全局函数**（context 创建时注入）
+            //   ⇒ 它**看不到** eval 作用域里的局部 `var __qrMsgSink` ⇒ 站方原文永远收不到
+            //   ⇒ 后果：`runLoginAction` / `probeLoginStatus` 的 `messages` **恒为空**
+            //   ⇒ 登录面板拿不到站方原文（「登录成功 / 失败」无从判断）⭐⭐⭐
+            //   ⇒ 老引擎的 `QR.__qrMsgSink` 就是**全局属性** ⇒ 这里照抄（语义等价）⭐
+            lines.append("try { globalThis.__qrMsgSink = __qrMsgSink; } catch(e) {}")
         }
         return lines.joined(separator: "\n")
     }
@@ -352,8 +374,26 @@ public enum JSScopeBuilder {
                 // ⭐ 老引擎上不抛 ⇒ 新引擎也不抛（静默返回 undefined）
                 guardClause = "if (__r && __r.__qrNotImplemented) { return undefined; }"
             }
+            // ⭐⭐⭐⭐⭐ **站方原文的收集**（老引擎 `pushMsg` 同款）⭐⭐⭐⭐⭐
+            //
+            // ⚠️⚠️ **为什么必须有**（2026-10-25 迁移门禁时实证）：
+            //   站方书源**只**用 `java.toast` / `java.longToast` / `java.log` 报登录结果
+            //   （"✅️登录成功" / "💔登录失败" / 会员卡片）
+            //   ⇒ 这段原文是**判断「登录成没成功」的唯一依据**⭐⭐⭐
+            //   ⇒ 老引擎的 `java-api.js` 里 `toast/log` 都先 `pushMsg(s, kind)`
+            //   ⇒ `pushMsg` 把原文塞进**全局的** `QR.__qrMsgSink` ⇒ 这里照抄：塞进全局的
+            //     `globalThis.__qrMsgSink`（收集器由 `JSScopeBuilder.build` 挂在全局）⭐
+            //
+            // ⚠️ **顺序**：先收集**再**交给宿主 ⇒ 宿主弹 toast 的同时原文已经拿到了 ⭐
+            let sinkPush: String
+            if obj == "java" && ["toast", "longToast", "log"].contains(name) {
+                sinkPush = "try { if (typeof globalThis !== 'undefined' && typeof globalThis.__qrMsgSink === 'function') { globalThis.__qrMsgSink(a0); } } catch(e) {} "
+            } else {
+                sinkPush = ""
+            }
             out.append("""
             try { \(obj).\(name) = function(\(params)){ \
+              \(sinkPush)\
               var __r = JSON.parse(__hostJSON('\(obj)','\(name)',JSON.stringify([\(params)]))); \
               \(guardClause) \
               return (__r && __r.length !== undefined) ? __r[0] : undefined; \

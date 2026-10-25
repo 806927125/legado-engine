@@ -72,6 +72,15 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
         p.standardInput = stdin
         p.standardOutput = stdout
         p.standardError = Pipe()
+        // ⭐⭐⭐ **node 的 stderr 要看得见**（不然 node 崩了/报错 ⇒ **静默丢失** ⇒ 门禁只看到「引擎退出码 null」）⭐⭐⭐
+        //   ⇒ 转发到本进程的 stderr ⇒ 排查时能直接看到 node 的真实报错 ⭐
+        let errPipe = Pipe()
+        p.standardError = errPipe
+        errPipe.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            guard !chunk.isEmpty else { return }
+            FileHandle.standardError.write(chunk)
+        }
         try p.run()
         process = p
         // ⭐⭐⭐ **用 readabilityHandler 读**（不能用 `availableData` 循环）
@@ -163,7 +172,7 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
         let props = Self.hostPropertiesPayload(context)
         let scope = JSScopeBuilder.build(context)
         // ⭐⭐⭐ **预计算纯计算方法**（站方包装函数是**同步**的 ⇒ JS 侧只能查表）⭐⭐⭐
-        let cache = Self.pureMethodCache(engineAPI: engineAPI, base: currentBase)
+        let cache = Self.pureMethodCache(engineAPI: engineAPI, base: currentBase, code: code)
         let reply = try send(["cmd": "run", "code": code, "scope": scope,
                               "hostProps": props, "hostCache": cache])
         if let err = reply["error"] as? String {
@@ -203,6 +212,48 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
             return []
         }
         return r
+    }
+
+    // MARK: - ⭐⭐⭐ 宿主对象的状态（沙盒专用）
+
+    /// ⭐⭐⭐⭐⭐ **灌入宿主对象的状态**（`source.*` / `cookie.*` 的数据）⭐⭐⭐⭐⭐
+    ///
+    /// ⚠️ **为什么需要**（2026-10-25 迁移门禁时实证）：
+    ///   Node 后端**没法同步回调 Swift**（宿主往返是异步的 ⇒ 同步的站方 JS 拿不到结果）
+    ///   ⇒ 宿主对象（`source.getLoginInfoMap()` / `cookie.getCookie(url)` / …）在 Node 侧
+    ///   **全是 undefined** ⇒ 站方的登录脚本第一步就炸（TypeError）⇒ **登录链路没法在沙盒验**⭐⭐⭐
+    ///   ⇒ 正解：**读** = Swift 把数据灌进来（快照）；**写** = JS 侧记下来 ⇒ 跑完 Swift 收走 ⭐
+    ///   ⇒ 与 App 侧的做法同款（App 靠 `__sourceVars` / `__loginInfo` 回传）⭐
+    public func setHostState(_ state: [String: Any]) {
+        lock.lock(); defer { lock.unlock() }
+        _ = try? send(["cmd": "hostState", "state": state])
+    }
+
+    /// ⭐⭐⭐⭐⭐ **灌入假浏览器**（`java.startBrowserAwait` 在沙盒里能跑）⭐⭐⭐⭐⭐
+    ///
+    /// ⚠️ 站方 🍅番茄登录靠「浏览器里登出来的 sessionid 回到引擎的 cookie 罐」⇒
+    ///   没有它 ⇒ 登录第 ③ 步拿不到凭据 ⇒ **整条链没法验** ⭐⭐⭐
+    public func setBrowserPages(_ pages: [[String: Any]]) {
+        lock.lock(); defer { lock.unlock() }
+        _ = try? send(["cmd": "browserPages", "pages": pages])
+    }
+
+    /// ⭐⭐⭐ **取回「开过哪些浏览器」**（门禁要断言「引擎让宿主弹了浏览器」）⭐⭐⭐
+    public func recordedBrowsers() -> [String] {
+        lock.lock(); defer { lock.unlock() }
+        guard let reply = try? send(["cmd": "browsers"]), let b = reply["browsers"] as? [String] else {
+            return []
+        }
+        return b
+    }
+
+    /// ⭐⭐⭐ **取回宿主对象的状态**（站方改过的变量 / 登录信息 / cookie 都在里面）
+    public func hostState() -> [String: Any] {
+        lock.lock(); defer { lock.unlock() }
+        guard let reply = try? send(["cmd": "hostState"]), let st = reply["state"] as? [String: Any] else {
+            return [:]
+        }
+        return st
     }
 
     /// ⭐⭐⭐ **标记全局基线**（jsLib 跑完后调）
@@ -274,18 +325,59 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
     /// ⚠️ **哪些能预计算**：**纯计算**（不碰网络/cookie/全局）的 `java.*`
     /// ⚠️ **哪些不能**：`ajax`（要发请求）⇒ 沙盒跑不了 ⇒ 那条路径 SKIP（真机走 JSC 后端）⭐⭐⭐
     private static func pureMethodCache(engineAPI: JSEngineAPIHandler?,
-                                        base: RuleBase) -> [String: String] {
+                                        base: RuleBase,
+                                        code: String = "") -> [String: String] {
         guard let engineAPI else { return [:] }
         var out: [String: String] = [:]
         // ⭐ 站方包装函数的调用形态：`__hostJSON('java','base64Encode', JSON.stringify([args…]))`
         //   ⇒ 缓存 key 用**同样形态** ⇒ Node 侧查表能命中 ⭐⭐⭐
-        for method in ["base64Encode", "base64Decode", "md5Encode", "timeFormat",
+        for method in ["base64Encode", "base64Decode", "md5Encode", "sha1Encode", "timeFormat",
                        "hexDecodeToString", "hexEncodeToString", "base64DecodeSafe"] {
             guard let r = engineAPI(method, [], base) else { continue }
             let any = r.foundationValue
             guard let data = try? JSONSerialization.data(withJSONObject: [any]),
                   let text = String(data: data, encoding: .utf8) else { continue }
             out["java|\(method)|[]"] = text
+        }
+        // ⭐⭐⭐⭐⭐ **代码里出现的 `java.getString('字面量')` 等 ⇒ 提前算好**（2026-10-26 门禁迁移时补）
+        //
+        // ⚠️ **为什么必须提前算**：Node 的宿主往返是**异步** ⇒ 同步的包装函数拿不到结果 ⭐⭐⭐
+        //   ⇒ 而 `java.getString('$.x')` 这种**带字面量参数**的调用**每个基准都不一样**
+        //   ⇒ 没法像纯计算方法那样一次性算好 ⇒ **只能从【这次要跑的代码】里把字面量抠出来** ⭐⭐⭐
+        //
+        // ⭐ **为什么重要**：站方 379 个真源里 **90 个（24%）** 的规则里有
+        //   `{{java.getString('$.status')=='50'?'完结':'连载'}}` 这种写法 ⭐⭐⭐
+        //   ⇒ 不算 ⇒ 沙盒里这些源的**分类 / 简介 / 更新时间全是空** ⇒ 门禁验不到 ⭐⭐⭐
+        if !code.isEmpty {
+            for method in ["getString", "get"] {
+                for arg in Self.literalArgs(of: method, in: code) {
+                    guard let r = engineAPI(method, [.string(arg)], base) else { continue }
+                    let any = r.foundationValue
+                    // ⚠️⚠️ **缓存 key 的参数个数必须跟【包装函数】一样**（`hostWrappers` 固定 4 个参数）
+                    //   ⇒ 包装函数传的是 `JSON.stringify([a0,a1,a2,a3])` ⇒ 未传的位是 `null`
+                    //   ⇒ key 必须也带 3 个 null ⇒ 否则**永远查不到**（静默 undefined）⭐⭐⭐
+                    let keyArgs: [Any] = [arg, NSNull(), NSNull(), NSNull()]
+                    guard let data = try? JSONSerialization.data(withJSONObject: [any]),
+                          let text = String(data: data, encoding: .utf8),
+                          let keyData = try? JSONSerialization.data(withJSONObject: keyArgs),
+                          let key = String(data: keyData, encoding: .utf8) else { continue }
+                    out["java|\(method)|\(key)"] = text
+                }
+            }
+        }
+        return out
+    }
+
+    /// ⭐⭐⭐ **从代码里抠出 `java.<method>('字面量')` 的字面量参数**
+    private static func literalArgs(of method: String, in code: String) -> [String] {
+        guard let re = try? NSRegularExpression(
+            pattern: "java\\.\(method)\\(\\s*(['\"])([^'\"]*)\\1\\s*\\)") else { return [] }
+        let ns = code as NSString
+        var out: [String] = []
+        re.enumerateMatches(in: code, range: NSRange(location: 0, length: ns.length)) { m, _, _ in
+            guard let m, m.numberOfRanges >= 3 else { return }
+            let v = ns.substring(with: m.range(at: 2))
+            if !out.contains(v) { out.append(v) }
         }
         return out
     }
@@ -364,6 +456,12 @@ ctx.__qrPure = {
     return require('crypto').createHash('md5')
       .update(String(s === undefined ? '' : s), 'utf8').digest('hex');
   },
+  // ⭐⭐⭐ **sha1Encode**（2026-10-26 补 ⇒ 老引擎有、新引擎缺的能力）
+  //   ⚠️ 必须与 Swift 侧 `Crypto.sha1Hex` **同语义**（小写 hex、UTF-8 字节）⭐⭐⭐
+  sha1Encode: function(s) {
+    return require('crypto').createHash('sha1')
+      .update(String(s === undefined ? '' : s), 'utf8').digest('hex');
+  },
   // ⭐⭐⭐⭐⭐ **hexDecodeToString 必须与 Swift 的 `Crypto.hexDecodeToString` 同语义**
   //
   // ⚠️ **原来的 bug**：JS 版**只做 hex** ⇒ base64 载荷一律返回空
@@ -382,6 +480,67 @@ ctx.__qrPure = {
     }
     // ② 失败 ⇒ 按 base64 再试一次（与 Swift 一致）
     return ctx.__qrPure.base64Decode(t);
+  },
+  // ⭐⭐⭐⭐⭐ **`java.timeFormat` / `java.timeFormatUTC`** —— 站方 125 源实测 60+ 处在用 ⭐⭐⭐⭐⭐
+  //
+  // ⚠️⚠️ **为什么必须有**（2026-10-25 迁移门禁时实证）：
+  //   · 站方的**会员卡片**就是靠它：`java.timeFormat(res.register_time*1000).padEnd(20,"\t")`
+  //   · Node 后端原来**没有这个纯方法** ⇒ `java.timeFormat(...)` 返回 **undefined**
+  //   ⇒ 站方 `.padEnd` 直接抛 `Cannot read properties of undefined (reading 'padEnd')`
+  //   ⇒ 卡片拼不出来 ⇒ 站方报「检测登录失败」⇒ **用户以为没登录，其实登录是好的** ⭐⭐⭐
+  //   （这正是老引擎时代那个真机 bug 的同款 ⇒ 沙盒必须能验它）⭐
+  //
+  // ⭐ **语义必须与 Swift 的 `TimeFormat` 一致**（沙盒 ≠ 真机 ⇒ 门禁跑出来的是假象）⭐
+  //   · 入参：epoch **毫秒**（纯数字）或常见日期串
+  //   · 出参：**字符串**（默认 `yyyy-MM-dd HH:mm:ss`）⇒ 站方的 `.padEnd` 才不会炸 ⭐⭐⭐
+  timeFormat: function(s, pattern, tzOffset) {
+    return ctx.__qrPure.__qrFormatTime(String(s === undefined || s === null ? '' : s),
+                                       pattern, tzOffset, false);
+  },
+  timeFormatUTC: function(s, pattern, tzOffset) {
+    return ctx.__qrPure.__qrFormatTime(String(s === undefined || s === null ? '' : s),
+                                       pattern, tzOffset, true);
+  },
+  // ⭐ 入参 → epoch 毫秒（与 Swift 的 `TimeFormat.millis(from:)` 同口径）
+  __qrMillis: function(v) {
+    var t = String(v === undefined || v === null ? '' : v).trim();
+    if (!t) return null;
+    if (/^-?\d+$/.test(t)) return Number(t);
+    var m = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/.exec(t);
+    if (m) {
+      return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]),
+                      Number(m[4] || 0), Number(m[5] || 0), Number(m[6] || 0)).getTime();
+    }
+    var m2 = /^(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/.exec(t);
+    if (m2) {
+      return new Date(1970, 0, Number(m2[1]), Number(m2[3]), Number(m2[4]), Number(m2[5] || 0)).getTime();
+    }
+    return null;
+  },
+  // ⭐ 毫秒 → 格式化串（Java pattern 的常用子集：yyyy / MM / dd / HH / mm / ss）
+  __qrFormatTime: function(v, pattern, tzOffset, isUTC) {
+    var ms = ctx.__qrPure.__qrMillis(v);
+    if (ms === null) return '';
+    var off = (tzOffset === undefined || tzOffset === null || tzOffset === '') ? null : Number(tzOffset);
+    var useOff = (off !== null && !isNaN(off));
+    var dt = new Date(useOff ? ms + off * 3600 * 1000 : ms);
+    var Y = useOff ? dt.getUTCFullYear() : dt.getFullYear();
+    var Mo = (useOff ? dt.getUTCMonth() : dt.getMonth()) + 1;
+    var D = useOff ? dt.getUTCDate() : dt.getDate();
+    var H = useOff ? dt.getUTCHours() : dt.getHours();
+    var Mi = useOff ? dt.getUTCMinutes() : dt.getMinutes();
+    var S = useOff ? dt.getUTCSeconds() : dt.getSeconds();
+    function p2(n) { return (n < 10 ? '0' : '') + n; }
+    var p = pattern || 'yyyy-MM-dd HH:mm:ss';
+    return p.replace(/yyyy|MM|dd|HH|mm|ss/g, function(m) {
+      if (m === 'yyyy') return String(Y).padStart(4, '0');
+      if (m === 'MM') return p2(Mo);
+      if (m === 'dd') return p2(D);
+      if (m === 'HH') return p2(H);
+      if (m === 'mm') return p2(Mi);
+      if (m === 'ss') return p2(S);
+      return m;
+    });
   },
   hexEncodeToString: function(s) {
     let out = '';
@@ -409,6 +568,198 @@ ctx.__qrPure = {
 //   · 未命中 ⇒ 404（**明确失败** ⇒ 不静默 200 造成假绿）⭐⭐⭐
 ctx.__qrRoutes = ctx.__qrRoutes || [];
 ctx.__qrRequests = ctx.__qrRequests || [];
+
+// ⭐⭐⭐⭐⭐ **宿主对象的状态**（`source.*` / `cookie.*`）⭐⭐⭐⭐⭐
+//
+// ⚠️⚠️ **为什么要有**（2026-10-25 迁移门禁时实证）：
+// · 站方的**登录脚本**重度依赖宿主对象：
+//     source.getLoginInfoMap()   ← 表单值（轻阅的输入框）
+//     source.putLoginInfo(info)  ← 站方存登录信息
+//     source.getKey()            ← 缓存 key
+//     cookie.getCookie(url)      ← 站方读 cookie
+//     cookie.getKey(host, name)  ← 🍅番茄登录第 ③ 步
+// · 而 Node 后端**没法同步回调 Swift**（宿主往返是异步）⇒ 这些方法在 Node 侧**全是 undefined**
+// · ⇒ 站方脚本第一步就 TypeError ⇒ **登录链路在沙盒里没法验** ⭐⭐⭐
+//
+// ⭐ **正解**（与 App 侧同款）：
+//   **读** = Swift 把数据灌进来（快照）· **写** = JS 侧记下来 ⇒ 跑完 Swift 收走
+//   ⇒ 语义与 Swift 的 `makeSourceObject` / `makeCookieObject` **逐条对齐** ⭐⭐⭐
+//     （Swift 那套是 JSC/真机上的实现；这里是 **Node 沙盒**的等价实现 ⇒ 门禁验的是同一套语义）
+//
+// ⚠️⚠️ **必须注入到【vm 里面】**（不是在 node 的模块作用域里）：
+//   `source` / `cookie` 这两个壳是 `vm.runInContext('var source={},…')` 建的
+//   ⇒ **只存在于 vm 里** ⇒ 在 node 作用域写 `source.getVariable = …` ⇒ `source is not defined`
+//   ⇒ **整个安装函数挂掉**（⇒ `cookie.getCookie` 仍是「调宿主」版 ⇒ 返回 undefined）⭐⭐⭐
+// ⭐⭐⭐⭐⭐ **浏览器（假浏览器）** —— 让 `java.startBrowserAwait` 在沙盒里能跑 ⭐⭐⭐⭐⭐
+//
+// ⚠️⚠️ **为什么需要**（2026-10-25 迁移门禁时实证）：
+//   · 站方 🍅番茄登录（`fq_login()`）的流程是：
+//     ① cookie.removeCookie('fanqienovel.com')   ← **先把旧 cookie 删掉**
+//     ② java.startBrowserAwait('https://fanqienovel.com/', '登录')  ← 用户在浏览器里登录
+//     ③ cookie.getKey('fanqienovel.com', 'sessionid')  ← **浏览器里登出来的 cookie 必须回到引擎**
+//   · ① 之后 cookie 是空的 ⇒ ③ 拿不到凭据 ⇒ 除非**宿主把浏览器的 cookie 合并回来**⭐⭐⭐
+//   · 而 Node 后端的宿主调用**回不到 Swift** ⇒ 浏览器只能做在 **JS 侧**（跟 `java.ajax` 一样）⭐
+//   · 形态：`[{ match: 'fanqienovel.com', html: '…', cookies: { 'fanqienovel.com': 'sessionid=…' } }]`
+//     ⇒ `cookies` = 「用户在浏览器里登录后，宿主合并回来的 cookie」（真机上是 `HTTPCookieStorage`）⭐⭐⭐
+ctx.__qrBrowserPages = ctx.__qrBrowserPages || [];
+ctx.__qrBrowsers = ctx.__qrBrowsers || [];
+
+const HOST_OBJECT_SHIM = `
+(function(){
+  function H() {
+    if (!globalThis.__qrHostState) {
+      globalThis.__qrHostState = {
+        source: { url: '', name: '', group: '', vars: {}, loginInfo: {}, loginHeader: '' },
+        cookie: { jar: {} }
+      };
+    }
+    return globalThis.__qrHostState;
+  }
+  // ⭐ 字符串 → 变量表（站方可能传 JSON 串，也可能传对象）
+  function toVarMap(v) {
+    var out = {};
+    if (v === undefined || v === null) return out;
+    if (typeof v === 'string') {
+      var t = v.trim();
+      if (!t) return out;
+      try {
+        var o = JSON.parse(t);
+        if (o && typeof o === 'object') {
+          for (var k in o) { if (Object.prototype.hasOwnProperty.call(o, k)) out[k] = String(o[k]); }
+        }
+      } catch (e) { /* 不是 JSON ⇒ 空表 */ }
+      return out;
+    }
+    if (typeof v === 'object') {
+      for (var k2 in v) { if (Object.prototype.hasOwnProperty.call(v, k2)) out[k2] = String(v[k2]); }
+    }
+    return out;
+  }
+  // ⭐ cookie 的键（老引擎按 **host** 存；这里 URL / host 两种都试 ⇒ 与真机 CookieJar 的域匹配同思路）
+  function cookieKeyOf(url) {
+    var u = String(url === undefined ? '' : url);
+    var host = '';
+    try { host = new URL(u).host; } catch (e) {
+      // ⚠️ **不能用正则**（里面的双斜杠会把正则字面量截断 ⇒ 语法错 ⇒ 整个 shim 装不上）⭐⭐⭐
+      //   ⇒ 用 split 取第 3 段（'https:' / '' / 'host' / …）⭐
+      var seg = u.split('/');
+      if (seg.length > 2) host = seg[2];
+    }
+    return { url: u, host: host };
+  }
+  function cookieLookup(url) {
+    var jar = H().cookie.jar || {};
+    var k = cookieKeyOf(url);
+    if (Object.prototype.hasOwnProperty.call(jar, k.url)) return jar[k.url];
+    if (k.host && Object.prototype.hasOwnProperty.call(jar, k.host)) return jar[k.host];
+    return '';
+  }
+  globalThis.__qrInstallHostObjects = function() {
+    var st = H();
+    // ── source.* ────────────────────────────────────────────
+    source.getVariable = function () {
+      // ⚠️⚠️ **空变量 ⇒ 返回【空串】**（不是 "{}"）—— 与 Swift 的 varsJSON **逐字一致**⭐⭐⭐
+      //   ⇒ 站方（🍅大灰狼）的 getArguments('','server') 靠 **JSON.parse 失败** 才给默认表
+      //     （server: host[0] / tab / sources …）
+      //   ⇒ 返回 "{}" ⇒ parse 成功 ⇒ 默认表**整个丢掉** ⇒ server 变 undefined ⭐⭐⭐
+      //   ⇒ 老引擎的 wrapSource 也是这个语义（vars = src.__variables 原样返回）⭐
+      var vars = st.source.vars || {};
+      var keys = Object.keys(vars);
+      if (!keys.length) return '';
+      return JSON.stringify(vars);
+    };
+    source.setVariable = function (a, b) {
+      if (a && typeof a === 'object') { st.source.vars = toVarMap(a); return ''; }
+      if (b !== undefined) { st.source.vars[String(a)] = String(b); return ''; }
+      st.source.vars = toVarMap(a);
+      return '';
+    };
+    source.get = function (k) {
+      var v = (st.source.vars || {})[String(k)];
+      return (v === undefined || v === null) ? '' : String(v);
+    };
+    source.put = function (k, v) {
+      st.source.vars = st.source.vars || {};
+      st.source.vars[String(k)] = (v === undefined || v === null) ? '' : String(v);
+      return '';
+    };
+    source.getKey = function () { return String(st.source.url || ''); };
+    // ⭐⭐⭐⭐⭐ **登录信息：优先读引擎发布的那份**（引擎发布的 __qrLoginInfo）⭐⭐⭐⭐⭐
+    //   ⇒ 引擎在跑 action 之前把「表单值合并后的登录信息」发布到全局
+    //   ⇒ 站方 source.getLoginInfoMap() 必须读到**合并之后**那份
+    //     （否则用户填了密码，点了「解锁整个源」还是提示「没填密码」⇒ 老 bug 复发）⭐⭐⭐
+    function loginInfoNow() {
+      if (globalThis.__qrLoginInfo && typeof globalThis.__qrLoginInfo === 'object') {
+        return globalThis.__qrLoginInfo;
+      }
+      return st.source.loginInfo || {};
+    }
+    source.getLoginInfoMap = function () { return loginInfoNow(); };
+    source.getLoginInfo = function () { return JSON.stringify(loginInfoNow()); };
+    source.putLoginInfo = function (a, b) {
+      var info;
+      if (a && typeof a === 'object') { info = toVarMap(a); }
+      else if (b !== undefined) {
+        info = Object.assign({}, loginInfoNow());
+        info[String(a)] = String(b);
+      } else { info = toVarMap(a); }
+      st.source.loginInfo = info;
+      globalThis.__qrLoginInfo = info;
+      return '';
+    };
+    source.getLoginHeader = function () { return String(st.source.loginHeader || ''); };
+    source.putLoginHeader = function (v) {
+      st.source.loginHeader = (v === undefined || v === null) ? '' : String(v);
+      return '';
+    };
+    try { source.bookSourceUrl = st.source.url || ''; } catch (e) {}
+    try { source.bookSourceName = st.source.name || ''; } catch (e) {}
+    try { source.bookSourceGroup = st.source.group || ''; } catch (e) {}
+    // ── cookie.* ────────────────────────────────────────────
+    cookie.getCookie = function (url) { return cookieLookup(url); };
+    cookie.setCookie = function (url, value) {
+      var k = cookieKeyOf(url);
+      H().cookie.jar = H().cookie.jar || {};
+      // ⭐ 与真机 CookieJar 同思路：**域**为主键（同一个域的两次写要能互相看到）
+      var key = k.host || k.url;
+      H().cookie.jar[key] = (value === undefined || value === null) ? '' : String(value);
+      if (k.url) H().cookie.jar[k.url] = H().cookie.jar[key];
+      return '';
+    };
+    cookie.removeCookie = function (url) {
+      var k = cookieKeyOf(url);
+      H().cookie.jar = H().cookie.jar || {};
+      delete H().cookie.jar[k.url];
+      if (k.host) delete H().cookie.jar[k.host];
+      return '';
+    };
+    cookie.replaceCookie = function (url, value) {
+      cookie.removeCookie(url);
+      cookie.setCookie(url, value);
+      return '';
+    };
+    cookie.getKey = function (host, name) {
+      var c = cookieLookup(host);
+      if (!c) return '';
+      var parts = String(c).split(';');
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i].trim();
+        var idx = p.indexOf('=');
+        if (idx > 0 && p.slice(0, idx) === String(name)) return p.slice(idx + 1);
+      }
+      return '';
+    };
+  };
+})();
+`;
+
+function installHostObjectImpls() {
+  // ⚠️ **必须在 vm 里注入**（`source` / `cookie` 的壳只在 vm 里）⭐⭐⭐
+  try {
+    vm.runInContext(HOST_OBJECT_SHIM, ctx);
+    vm.runInContext('__qrInstallHostObjects();', ctx);
+  } catch (e) { /* 装不上 ⇒ 宿主对象仍是「调宿主」版（⇒ 返回 undefined） */ }
+}
 
 ctx.__qrAjax = function(url, optionsJSON) {
   var u = String(url === undefined ? '' : url);
@@ -442,6 +793,28 @@ ctx.__hostJSON = function(object, method, argsJSON) {
     try { a = JSON.parse(argsJSON); } catch (e) { a = []; }
     const v = ctx.__qrAjax(a[0], a[1]);
     return JSON.stringify([v === undefined ? null : v]);
+  }
+  // ⭐⭐⭐⭐⭐ **`java.startBrowserAwait` 等浏览器类** ⇒ 假浏览器（同步）⭐⭐⭐⭐⭐
+  if (object === 'java' && (method === 'startBrowserAwait' || method === 'startBrowser'
+      || method === 'showBrowser' || method === 'startBrowserDp' || method === 'showReadingBrowser')) {
+    var ba = [];
+    try { ba = JSON.parse(argsJSON); } catch (e) { ba = []; }
+    var bu = String(ba[0] === undefined ? '' : ba[0]);
+    ctx.__qrBrowsers.push(bu);
+    for (var bi = 0; bi < ctx.__qrBrowserPages.length; bi++) {
+      var bp = ctx.__qrBrowserPages[bi];
+      if (bu.indexOf(String(bp.match || '')) >= 0) {
+        // ⭐ **浏览器里登出来的 cookie ⇒ 合并回 cookie 罐**（宿主干的活 ⇒ 真机上是 HTTPCookieStorage）⭐
+        if (bp.cookies) {
+          var jar = ctx.__qrHostState.cookie.jar || (ctx.__qrHostState.cookie.jar = {});
+          for (var bk in bp.cookies) {
+            if (Object.prototype.hasOwnProperty.call(bp.cookies, bk)) jar[bk] = String(bp.cookies[bk]);
+          }
+        }
+        return JSON.stringify([bp.html === undefined || bp.html === null ? '' : String(bp.html)]);
+      }
+    }
+    return JSON.stringify(['']);
   }
   // ② 预置缓存（Swift 侧算好的）
   const key = object + '|' + method + '|' + argsJSON;
@@ -608,7 +981,17 @@ rl.on('line', function(line) {
       initHostShells();
       injectCompat(req.compat);
       injectWrappers(req.wrappers);
+      // ⭐⭐⭐ **宿主对象的实现**（覆盖包装函数 ⇒ Node 侧查快照，不回调 Swift）⭐⭐⭐
+      installHostObjectImpls();
       process.stdout.write(JSON.stringify({ ok: true }) + '\n');
+    } else if (req.cmd === 'hostState') {
+      // ⭐⭐⭐ **宿主对象的状态**：Swift 灌进来（读）/ 取回去（写）⭐⭐⭐
+      if (req.state) {
+        ctx.__qrHostState = req.state;
+        // ⚠️ 状态换了 ⇒ **实现要重新装一遍**（闭包捕获的是旧状态对象）⭐
+        installHostObjectImpls();
+      }
+      process.stdout.write(JSON.stringify({ ok: true, state: ctx.__qrHostState }) + '\n');
     } else if (req.cmd === 'runGlobal') {
       const v = runGlobal(req.code);
       process.stdout.write(JSON.stringify({ ok: true, value: v, globals: globals() }) + '\n');
@@ -619,6 +1002,11 @@ rl.on('line', function(line) {
     } else if (req.cmd === 'routes') {
       ctx.__qrRoutes = req.routes || [];
       process.stdout.write(JSON.stringify({ ok: true }) + '\n');
+    } else if (req.cmd === 'browserPages') {
+      ctx.__qrBrowserPages = req.pages || [];
+      process.stdout.write(JSON.stringify({ ok: true }) + '\n');
+    } else if (req.cmd === 'browsers') {
+      process.stdout.write(JSON.stringify({ ok: true, browsers: ctx.__qrBrowsers || [] }) + '\n');
     } else if (req.cmd === 'requests') {
       process.stdout.write(JSON.stringify({ ok: true, requests: ctx.__qrRequests || [] }) + '\n');
     } else if (req.cmd === 'globals') {

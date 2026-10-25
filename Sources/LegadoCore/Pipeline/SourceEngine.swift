@@ -138,7 +138,8 @@ public final class SourceEngine {
         // ⇒ 修：**init 里就把 `sourceObject` 建好** ⇒ 宿主通道从第一次调用就完整 ⭐
         //   （jsLib 里的 `source.getVariable()` / 发现页的 `source.setVariable()` 都活了）
         sourceObject = Self.makeSourceObject(source, varBox: varBox,
-                                              loginInfo: loadLoginInfo())
+                                              loginInfo: loadLoginInfo(),
+                                              storage: storage)
         // ⭐⭐ **让引擎接管 `java.ajax`**（站方 JS 抓页面用 —— 125 源里 22 处 / 12 个源）
         //
         // ⭐ 引擎**全同步** ⇒ 这里可以**同步发请求**并直接返回正文
@@ -458,7 +459,14 @@ public final class SourceEngine {
 
     /// **搜索**
     public func search(_ keyword: String, page: Int = 1) throws -> [Book] {
-        guard let searchUrl = source.searchUrl, !searchUrl.isEmpty else {
+        // ⭐⭐⭐ **searchUrl 要认【顶层】+【ruleSearch 里】两个地方**（2026-10-26 门禁迁移时补）
+        //   老引擎（`reference/js/engine.js`）：
+        //     `var spec = ruleText(src.searchUrl) || ruleText(src.ruleSearch && src.ruleSearch.searchUrl);`
+        //   ⇒ 只认顶层 ⇒ **把 searchUrl 写在 ruleSearch 里的源直接搜不了** ⇒ **回归** ⭐⭐⭐
+        let topURL = (source.searchUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let ruleURL = (source.ruleSearch?.searchUrl ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let searchUrl = !topURL.isEmpty ? topURL : ruleURL
+        guard !searchUrl.isEmpty else {
             throw SourceError.ruleMissing("searchUrl")
         }
         return try notifying {
@@ -829,6 +837,11 @@ public final class SourceEngine {
             return ajax(url: first, options: options).map { .string($0) }
         case "md5Encode":
             return .string(Crypto.md5Hex(first))
+        case "sha1Encode":
+            // ⭐⭐⭐ **SHA-1**（2026-10-26 补 ⇒ 老引擎有、新引擎缺的能力）
+            //   宿主 API 清单里写着 `java.sha1Encode`（`JSHostAPI.swift`）
+            //   但没人实现 ⇒ 站方一调就 undefined ⇒ 静默失效 ⭐⭐⭐
+            return .string(Crypto.sha1Hex(first))
         case "base64Encode":
             return .string(Crypto.base64Encode(first))
         case "base64Decode":
@@ -1231,10 +1244,40 @@ public final class SourceEngine {
         try? loadLoginScript()
         // ② 表单值 ⇒ `result`（老引擎：`result: formValues`）⭐
         let vars = formValues.mapValues { JSONValue.string($0) }
+        // ⭐⭐⭐⭐⭐ **表单值要先合并进登录信息**（老引擎 `engine.js` 的 `login` op 同款）⭐⭐⭐⭐⭐
+        //
+        // ⚠️⚠️ **为什么必须有**（2026-10-25 迁移门禁时实证）：
+        //   站方（🍒NovelHub 聚合源）是从 **`source.getLoginInfoMap()`** 读**当前输入框的值**的：
+        //     function nhAuthUiMap() { return source.getLoginInfoMap ? source.getLoginInfoMap() : {}; }
+        //     function unlockAll() { var _pw = String((_m && _m["整源解锁密码"]) || "").trim(); … }
+        //   ⇒ **只把 formValues 挂到 `result` 是不够的** ⇒ 站方读到的登录信息是**空的**
+        //   ⇒ 用户明明在输入框里填了密码，点了「解锁整个源」却一直提示「没填密码」⭐⭐⭐
+        //   ⇒ Legado / 栖阅的语义：**点 action 按钮时先把当前输入框的值写进 loginInfo，再执行 action** ⭐
+        if !formValues.isEmpty {
+            var info = loadLoginInfo()
+            for (k, v) in formValues { info[k] = v }
+            saveLoginInfo(info)
+        }
+        // ⭐⭐⭐ **登录信息快照**（老引擎 `beforeLogin` 同款）⭐⭐⭐
+        //
+        // ⚠️ 站方 `login(true)` 的**第一步**就是无条件 `putLoginInfo(表单值)`
+        //   ⇒ **把「密钥」抹掉**；而密钥是「登录成功」的标志（只有成功那步才写回去）
+        //   ⇒ 登录_api 失败（服务器 502 / 密码错）⇒ 密钥**永远回不来**（用户真机就是这样丢的）⭐⭐⭐
+        //   ⇒ 跑完看一眼：密钥没了但原来有 ⇒ **恢复回去**（失败的登录不许破坏已有登录态）⭐
+        let beforeLogin = loadLoginInfo()
+        // ⭐⭐⭐⭐⭐ **把「合并后的登录信息」交给 JS 侧** ⭐⭐⭐⭐⭐
+        //   ⇒ 站方的 action 里 `source.getLoginInfoMap()` 要读到**合并之后**那份
+        //     （= 输入框的值已经写进去了）⇒ 否则用户填了密码还是提示「没填密码」⭐⭐⭐
+        //   ⇒ `__qrLoginInfo` 是内部变量 ⇒ 作用域构造器会把它**挂到全局**（宿主对象够得到）⭐
+        var mergedInfo = loadLoginInfo()
+        for (k, v) in formValues { mergedInfo[k] = v }
+        var loginInfoExtra: [String: JSONValue] = [:]
+        for (k, v) in mergedInfo { loginInfoExtra[k] = .string(v) }
         let ctx = JSRunContext(base: .json(.object(vars)),
                                baseUrl: source.bookSourceUrl,
                                varBox: javaVars,
-                               collectMessages: true)
+                               collectMessages: true,
+                               extra: ["__qrLoginInfo": .object(loginInfoExtra)])
         // ③ ⭐⭐⭐ **同一次 eval 里**「跑 action + 取消息」
         //   ⚠️ `__qrMsgs` 是 eval 的**局部 var** ⇒ 分两次 eval 拿不到 ⇒ 必须包在一个 IIFE 里 ⭐
         let code = """
@@ -1249,12 +1292,42 @@ public final class SourceEngine {
         let text: String = out.scalarString
         guard let data = text.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            restoreLoginIfLost(before: beforeLogin, action: action)
             return (false, "", [])
         }
         let ok = obj["ok"] as? Bool ?? false
         let err = obj["error"] as? String ?? ""
         let msgs = (obj["messages"] as? [String]) ?? []
+        // ⭐⭐⭐ **失败的登录不许弄坏已有的登录态**（老引擎 `restoreLoginIfLost` 同款）⭐⭐⭐
+        restoreLoginIfLost(before: beforeLogin, action: action)
         return (ok, ok ? (obj["result"] as? String ?? "") : err, msgs)
+    }
+
+    /// ⭐⭐⭐ **登录态被失败的登录弄坏时 ⇒ 恢复回去**（老引擎 `restoreLoginIfLost` 同款）
+    ///
+    /// ⚠️ **只在「登录类」action 上生效**（`logout` 要能真的清掉登录态）⭐
+    /// ⚠️ **判据**：跑之前有「密钥」、跑之后没了 ⇒ 恢复**跑之前那一份**（老引擎语义）⭐
+    ///
+    /// ⭐⭐⭐ **为什么是 public**：宿主（沙盒的 CLI）要把「站方 JS 侧改过的登录信息」写回来
+    ///   ⇒ **写回来之后**才轮到这一步（否则站方那步 `putLoginInfo(表单值)` 会把恢复好的密钥又抹掉）⭐⭐⭐
+    public func restoreLoginIfLost(before: [String: String], action: String) {
+        guard let isLogin = Self.isLoginAction(action), isLogin else { return }
+        let oldKey = before["密钥"] ?? ""
+        guard !oldKey.isEmpty else { return }
+        let now = loadLoginInfo()
+        guard (now["密钥"] ?? "").isEmpty else { return }   // 密钥还在 ⇒ 登录成功了 ⇒ 不动
+        saveLoginInfo(before)
+    }
+
+    /// **这个 action 是不是「登录类」**（老引擎：`/login\s*\(/i` 且**不是** `logout`）⭐
+    static func isLoginAction(_ action: String) -> Bool? {
+        guard let loginRe = try? NSRegularExpression(pattern: "login\\s*\\(", options: [.caseInsensitive]),
+              let logoutRe = try? NSRegularExpression(pattern: "logout", options: [.caseInsensitive]) else {
+            return nil
+        }
+        let range = NSRange(action.startIndex..<action.endIndex, in: action)
+        guard loginRe.firstMatch(in: action, range: range) != nil else { return false }
+        return logoutRe.firstMatch(in: action, range: range) == nil
     }
 
     /// ⭐⭐⭐ **登录状态检测**（老引擎的 `loginProbe`）
@@ -1589,6 +1662,27 @@ public final class SourceEngine {
             if !url.isEmpty { service.replaceCookie(value, for: url) }
             return .string("")
         }
+        // ⭐⭐⭐⭐⭐ **`cookie.getKey(host, name)`**（老引擎 `source-api.js` 同款）⭐⭐⭐⭐⭐
+        //
+        // ⚠️⚠️ **为什么必须有**（2026-10-25 迁移门禁时实证）：
+        //   站方 🍅番茄登录（`fq_login()`）的第 ③ 步就是
+        //     cookie.getKey('fanqienovel.com', 'sessionid')
+        //   ⇒ **缺这个方法 ⇒ 站方 TypeError ⇒ 番茄登录整条链死定** ⭐⭐⭐
+        //   ⇒ 老引擎的语义 = 「取某个域下某个 cookie 的值」（把 cookie 串拆开找 `name=`）⭐
+        methods["getKey"] = { args in
+            let url = args.first?.scalarString ?? ""
+            let name = args.count > 1 ? args[1].scalarString : ""
+            guard !url.isEmpty, !name.isEmpty else { return .string("") }
+            let header = service.cookieHeader(for: url)
+            for part in header.split(separator: ";") {
+                let kv = part.trimmingCharacters(in: .whitespaces)
+                guard let idx = kv.firstIndex(of: "="), idx > kv.startIndex else { continue }
+                if String(kv[kv.startIndex..<idx]) == name {
+                    return .string(String(kv[kv.index(after: idx)...]))
+                }
+            }
+            return .string("")
+        }
         return HostObject(name: "cookie", methods: methods, properties: [:])
     }
 
@@ -1661,7 +1755,7 @@ public final class SourceEngine {
         var ctx = EvalContext(base: .page(""), baseUrl: baseURL, varBox: javaVars)
         ctx.page = page
         ctx.key = key
-        let rule = TemplateEngine.render(urlRule, ctx: ctx)
+        let rule = TemplateEngine.render(urlRule, ctx: ctx, js: evaluator.js)
 
         // ⭐⭐⭐ **`data:` 伪 URL 绝不能真去 fetch**（2026-10-24 真机「大灰狼详情空白」实证）
         //   站方聚合源（🍅大灰狼）的 bookUrl / tocUrl / chapterUrl 全是
@@ -1898,7 +1992,7 @@ public final class SourceEngine {
                               baseUrl: page.url, raw: page.text,
                               book: bookObject, source: sourceObject, chapter: chapterObject,
                               varBox: javaVars, isJSON: page.isJSON, document: page.document)
-        let rendered = TemplateEngine.render(t, ctx: ctx)
+        let rendered = TemplateEngine.render(t, ctx: ctx, js: evaluator.js)
         // ②b ⭐ 走 `URLBuilder.parse` ⇒ **剥掉 `,{json}` 选项后缀** + 绝对化
         //   （站方真实写法：`https://chuangshi.qq.com/chapter/26150754,{"headers":{…}}`
         //     ⇒ 不剥后缀 ⇒ 服务器收到一坨带逗号的 URL ⇒ 404 ⇒ **目录 0 章** ⭐）

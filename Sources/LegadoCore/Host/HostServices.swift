@@ -130,6 +130,12 @@ public final class MemoryCookieService: CookieService, @unchecked Sendable {
     public func replaceCookie(_ value: String, for url: String) {
         lock.lock(); store[url] = value; lock.unlock()
     }
+
+    /// ⭐⭐⭐ **整罐 cookie**（沙盒 / 门禁用 ⇒ 断言「站方到底写了什么 cookie」）⭐⭐⭐
+    public func cookieJarSnapshot() -> [String: String] {
+        lock.lock(); defer { lock.unlock() }
+        return store
+    }
 }
 
 // MARK: - ③ 浏览器（登录交接）

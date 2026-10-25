@@ -107,6 +107,80 @@ public enum Crypto {
 
     // MARK: - Base64
 
+    // MARK: - SHA-1（RFC 3174）
+
+    /// ⭐⭐⭐ **SHA-1** ⇒ **小写十六进制**（40 位）⇒ `java.sha1Encode`
+    ///
+    /// ⚠️ **为什么要有**（2026-10-26 门禁迁移时发现的**能力缺口**）：
+    /// · 老引擎（轻阅 `Resources/engine/sha1.js`）**有** `QR.sha1(bytes)` / `java.sha1Encode(str)`
+    /// · 新引擎的宿主 API 清单里**写着** `java.sha1Encode`（`JSHostAPI.swift`）
+    ///   ⇒ 但**没人实现** ⇒ 站方一调就拿到 undefined ⇒ **静默失效**（比报错更难查）⭐⭐⭐
+    /// · `Packages.java.security.MessageDigest` 的 `SHA-1` 分支也指着它
+    ///   （`JavaCompat.swift`：`if (name === 'SHA-1' || name === 'SHA1') return W.java.sha1Encode(s)`）⭐⭐⭐
+    ///
+    /// ⇒ 这里补上（纯 Foundation、跨平台 ⇒ Linux 沙盒也能跑）⭐⭐⭐
+    public static func sha1Hex(_ text: String) -> String {
+        sha1Bytes(Array(text.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// SHA-1 原始字节（20 字节）
+    public static func sha1Bytes(_ input: [UInt8]) -> [UInt8] {
+        // ① 填充：0x80 + 0x00… + 长度(大端 8 字节) ⇒ 总长 ≡ 56 (mod 64)
+        var msg = input
+        let bitLen = UInt64(input.count) &* 8
+        msg.append(0x80)
+        while msg.count % 64 != 56 { msg.append(0) }
+        for i in 0..<8 { msg.append(truncatingByte(bitLen >> (8 * UInt64(7 - i)))) }
+
+        // ② 初始向量（RFC 3174 §2）
+        var h0: UInt32 = 0x67452301
+        var h1: UInt32 = 0xEFCDAB89
+        var h2: UInt32 = 0x98BADCFE
+        var h3: UInt32 = 0x10325476
+        var h4: UInt32 = 0xC3D2E1F0
+
+        // ③ 每轮
+        var w = [UInt32](repeating: 0, count: 80)
+        for chunkStart in stride(from: 0, to: msg.count, by: 64) {
+            for i in 0..<16 {
+                let b = chunkStart + i * 4
+                w[i] = (UInt32(msg[b]) << 24) | (UInt32(msg[b + 1]) << 16)
+                     | (UInt32(msg[b + 2]) << 8) | UInt32(msg[b + 3])
+            }
+            for i in 16..<80 {
+                w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1)
+            }
+            var a = h0, bb = h1, c = h2, d = h3, e = h4
+            for i in 0..<80 {
+                let f: UInt32
+                let k: UInt32
+                switch i {
+                case 0..<20:  f = (bb & c) | (~bb & d);            k = 0x5A827999
+                case 20..<40: f = bb ^ c ^ d;                       k = 0x6ED9EBA1
+                case 40..<60: f = (bb & c) | (bb & d) | (c & d);   k = 0x8F1BBCDC
+                default:      f = bb ^ c ^ d;                       k = 0xCA62C1D6
+                }
+                let tmp = rotl(a, 5) &+ f &+ e &+ k &+ w[i]
+                e = d; d = c; c = rotl(bb, 30); bb = a; a = tmp
+            }
+            h0 = h0 &+ a; h1 = h1 &+ bb; h2 = h2 &+ c; h3 = h3 &+ d; h4 = h4 &+ e
+        }
+        var out: [UInt8] = []
+        for h in [h0, h1, h2, h3, h4] {
+            out.append(truncatingByte(UInt64(h >> 24)))
+            out.append(truncatingByte(UInt64(h >> 16)))
+            out.append(truncatingByte(UInt64(h >> 8)))
+            out.append(truncatingByte(UInt64(h)))
+        }
+        return out
+    }
+
+    private static func rotl(_ v: UInt32, _ n: UInt32) -> UInt32 {
+        (v << n) | (v >> (32 - n))
+    }
+
+    // MARK: - Base64
+
     /// ⭐ **Base64 编码**（标准字母表 + `=` 补齐）⇒ `java.base64Encode`
     public static func base64Encode(_ text: String) -> String {
         Data(text.utf8).base64EncodedString()

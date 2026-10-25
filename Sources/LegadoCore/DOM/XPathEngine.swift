@@ -262,12 +262,20 @@ public enum XPathEngine {
     }
 
     private static func allDescendants(_ node: DOMNode) -> [DOMNode] {
+        // ⭐⭐⭐⭐⭐ **文档顺序**（XPath 1.0 的语义：结果集按文档顺序）
+        //
+        // ⚠️⚠️⚠️ **原来的实现是【倒序】**（栈 + `popLast()` ⇒ 兄弟节点反着来）
+        //   ⇒ `//li` 拿到的是「三、二、一」⇒ **跟标准 XPath（`document.evaluate`）不一致** ⭐⭐⭐
+        //   ⇒ 老引擎（jsdom 的 `document.evaluate`）是**正序** ⇒ **这是新引擎的回归** ⭐⭐⭐
+        //   ⇒ 后果：站方规则里「取第一条 / 取全部」的顺序全反 ⇒ 目录章节倒序 ⭐⭐⭐
         var out: [DOMNode] = []
-        var stack = node.children()
-        while let n = stack.popLast() {
-            out.append(n)
-            stack.append(contentsOf: n.children())
+        func walk(_ n: DOMNode) {
+            for c in n.children() {
+                out.append(c)
+                walk(c)
+            }
         }
+        walk(node)
         return out
     }
 }

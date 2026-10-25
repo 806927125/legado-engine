@@ -18,7 +18,8 @@ import Foundation
 public enum TemplateEngine {
 
     /// 整串渲染
-    public static func render(_ text: String, ctx: EvalContext) -> String {
+    public static func render(_ text: String, ctx: EvalContext, js: JSExecutor? = nil,
+                              ruleEval: ((String) -> String)? = nil) -> String {
         guard text.contains("{{") else { return text }
         var out = ""
         var rest = Substring(text)
@@ -31,7 +32,7 @@ public enum TemplateEngine {
             }
             let expr = String(afterOpen[afterOpen.startIndex..<close.lowerBound])
                 .trimmingCharacters(in: .whitespaces)
-            out += evaluate(expr, ctx: ctx)
+            out += evaluate(expr, ctx: ctx, js: js, ruleEval: ruleEval)
             rest = afterOpen[close.upperBound...]
         }
         out += rest
@@ -39,18 +40,33 @@ public enum TemplateEngine {
     }
 
     /// 单个表达式的值
-    public static func evaluate(_ expr: String, ctx: EvalContext) -> String {
+    public static func evaluate(_ expr: String, ctx: EvalContext, js: JSExecutor? = nil,
+                                ruleEval: ((String) -> String)? = nil) -> String {
         if expr.isEmpty { return "" }
         // 已知变量
         switch expr {
         case "baseUrl": return ctx.baseUrl
-        case "key":     return ctx.key
+        // ⭐⭐⭐ **`{{keyword}}` 与 `{{key}}` 等价**（2026-10-26 门禁迁移时补）
+        //   老引擎（`reference/js/engine.js`）：`key: ctx.keyword || '', keyword: ctx.keyword || ''`
+        //   ⇒ 两个占位符都认 ⇒ 只认 `{{key}}` ⇒ 站方写 `{{keyword}}` 的 URL **插不上词** ⭐⭐⭐
+        case "key", "keyword": return ctx.key
         case "page":   return String(ctx.page)
         case "raw":    return ctx.raw
         default: break
         }
         // 源级变量
         if let v = ctx.vars[expr] { return v }
+        // ⭐⭐⭐⭐⭐ **模板内容本身是【一整条规则】**（`{{$.tags..name##\s##，}}`）
+        //
+        // ⚠️ **老引擎的 `interpolate` 语义**：`{{…}}` 里可以放**一条完整规则**
+        //   （路径 + 尾巴正则）⇒ 那样求值 ⇒ 结果就是那个值 ⭐⭐⭐
+        //   ⇒ 真书源「免费追书」的 `ruleBookInfo.intro` 里就有 `{{$..tags..name##\s##，}}` ⭐⭐⭐
+        //   ⇒ 不支持 ⇒ **简介里的标签数组拼不成顿号串**（真机症状）⭐⭐⭐
+        // ⇒ 注意：**要在 JSONPath 分支之前**判（`$.x##…` 也是以 `$` 开头）⭐⭐⭐
+        if expr.contains("##"), let ruleEval {
+            let v = ruleEval(expr)
+            if !v.isEmpty { return v }
+        }
         // JSONPath：`$.a.b` / `$..x`
         if expr.hasPrefix("$") {
             return jsonPathValue(expr, ctx: ctx)
@@ -63,8 +79,41 @@ public enum TemplateEngine {
         if let v = Arithmetic.evaluate(expr, vars: ["page": Double(ctx.page)]) {
             return v
         }
+        // ⭐⭐⭐⭐⭐ **`{{java.xxx(...)}}` 之类的【JS 表达式】**（2026-10-26 门禁迁移时补）
+        //
+        // ⚠️⚠️⚠️ **这是【大范围】能力缺口**（不是边角）：
+        //   · 老引擎（`reference/js/rule-analyzer.js` 的 `interpolate`）**会把 `{{…}}` 里的内容
+        //     当 JS 求值** ⇒ `{{java.getString('$.status')=='50'?'完结':'连载'}}` 这种写法能用 ⭐⭐⭐
+        //   · 规格 §S-TPL-01 也写着「支持 `{{java.md5Encode(k)}}` 等 JS 表达式」⇒ **本来就该支持** ⭐⭐⭐
+        //   · 实测：**379 个真源里 90 个（24%）的规则里有 `{{java.…}}`** ⭐⭐⭐
+        //     （`ruleBookInfo.kind` / `ruleBookInfo.intro` / `ruleToc.updateTime` …）
+        //   ⇒ 不实现 ⇒ 这 90 个源的**分类 / 简介 / 更新时间全是空** ⭐⭐⭐
+        if let js, let v = evaluateJS(expr, ctx: ctx, js: js) {
+            return v
+        }
         // 其余：求值失败 ⇒ 空串（轻阅口径）
         return ""
+    }
+
+    /// ⭐⭐⭐ **把 `{{…}}` 里的表达式当 JS 求值**（老引擎 `interpolate` 的语义）
+    ///
+    /// ⚠️ **为什么要包一层括号**：站方写的是**表达式**（`java.getString(...)=='03'?'完结':'连载'`）
+    ///   ⇒ 直接 eval 是 Script ⇒ 三元表达式是**语句** ⇒ 取不到值 ⇒ 必须当表达式 eval ⭐⭐⭐
+    /// ⇒ 失败 ⇒ 返回 nil（调用方按「求值失败 ⇒ 空串」处理 ⇒ 不会假成功）⭐⭐⭐
+    private static func evaluateJS(_ expr: String, ctx: EvalContext, js: JSExecutor) -> String? {
+        let jctx = JSRunContext(base: ctx.base, baseUrl: ctx.baseUrl, raw: ctx.raw,
+                                book: ctx.book, source: ctx.source, chapter: ctx.chapter,
+                                vars: ctx.vars, varBox: ctx.varBox,
+                                key: ctx.key, page: ctx.page, document: ctx.document)
+        // ① 表达式形态
+        if let v = try? js.run("( " + expr + "\n)", context: jctx) {
+            return v.scalarString
+        }
+        // ② 兜底：当成语句（`java.getString('$.x');` 这种带分号的写法）
+        if let v = try? js.run(expr, context: jctx) {
+            return v.scalarString
+        }
+        return nil
     }
 
     private static func jsonPathValue(_ path: String, ctx: EvalContext) -> String {
