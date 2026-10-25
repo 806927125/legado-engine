@@ -292,7 +292,7 @@ public final class JSCExecutor: JSExecutor {
         // ⭐⭐⭐ **正解**：**直接当脚本跑**（顶层 var = 脚本局部 ⇒ 同一段里能取到）
         //   + **同一段末尾追加 \`globalThis.X = X\`** ⇒ 挂到**真正的 globalThis** ⭐⭐⭐
         //   ⇒ 不依赖任何 eval 语义 ⇒ **JSC / Node / WebKit 行为一致** ⭐⭐⭐
-        let script = Self.withExplicitGlobalExport(code)
+        let script = JSScopeBuilder.withExplicitGlobalExport(code)
         let value = js.evaluateScript(script)
         if let msg = caught.value { throw JSCError.scriptException(msg) }
         guard let value else { return .null }
