@@ -232,9 +232,18 @@ public enum JSScopeBuilder {
         let names = topLevelDeclaredNames(code)
         guard !names.isEmpty else { return code }
         var out = code
-        out += "\n;try{"
+        // ⭐⭐⭐⭐⭐ **用 `this` 而不是 `globalThis`**（2026-10-26 真机回归实证）
+        //
+        // ⚠️⚠️ **为什么**：`currentGlobals(in:)` 抓全局用的是 **`Object.getOwnPropertyNames(this)`**
+        //   ⇒ 它认的是 **`this`** 指向的那个对象
+        //   ⇒ 而导出若写 `globalThis.X = X` ⇒ **两者可能不是同一个对象** ⇒
+        //     ⇒ 导出的符号**不在基线里** ⇒ 每次求值前的全局治理把它**置 undefined** ⭐⭐⭐
+        //     ⇒ ⇒ 站方 jsLib 的 `hjmDec` 不可见 ⇒ **0 本书** ⭐⭐⭐
+        //
+        // ⭐ **正解**：**优先用 `this`**（与 `currentGlobals` 逐字一致）⇒ `globalThis` 只做兜底
+        out += "\n;try{var __qrG=(this&&typeof this==='object')?this:(typeof globalThis!=='undefined'?globalThis:null);"
         for n in names {
-            out += "if(typeof \(n) !== 'undefined' && globalThis.\(n) === undefined){globalThis.\(n) = \(n);}"
+            out += "if(__qrG&&typeof \(n)!=='undefined'&&__qrG.\(n)===undefined){__qrG.\(n)=\(n);}"
         }
         out += "}catch(e){}"
         return out

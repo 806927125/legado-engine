@@ -1033,10 +1033,12 @@ function exportSuffix(code) {
     if (m && !seen[m[1]]) { seen[m[1]] = 1; names.push(m[1]); }
   }
   if (!names.length) return '';
-  var out = '\n;try{';
+  // ⭐⭐⭐⭐⭐ **优先用 `this`**（与 `currentGlobals` 的 `Object.getOwnPropertyNames(this)` 一致）
+  //   ⇒ 导出到「全局治理认的那个对象」⇒ 才会进基线 ⇒ 不会被置 undefined ⭐⭐⭐
+  var out = '\n;try{var __qrG=(this&&typeof this===\'object\')?this:(typeof globalThis!==\'undefined\'?globalThis:null);';
   for (var j = 0; j < names.length; j++) {
     var n = names[j];
-    out += 'if(typeof ' + n + " !== 'undefined' && globalThis." + n + ' === undefined){globalThis.' + n + ' = ' + n + ';}';
+    out += 'if(__qrG&&typeof ' + n + "!=='undefined'&&__qrG." + n + '===undefined){__qrG.' + n + '=' + n + ';}';
   }
   out += '}catch(e){}';
   return out;
