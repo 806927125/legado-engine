@@ -183,6 +183,31 @@ final class LiveSourceJSCTests: XCTestCase {
         print("⭐⭐⭐ [JM bookList 诊断] " + v.scalarString)
     }
 
+    /// ⭐⭐⭐⭐⭐ **诊断探针：走【完整 explore 流程】失败后，诊断里有什么**（2026-10-26）
+    ///
+    /// ⚠️ 前一个探针证明「bookList 单独跑【完全正常】」
+    ///   ⇒ ⇒ **真凶在 explore 的完整流程里**（不是 bookList 本身）⭐⭐⭐
+    /// ⇒ 这一条打印：**引擎的失败诊断行** ⇒ 看它到底看到了什么 ⭐⭐⭐
+    func testProbeExploreFailureDiagnosticsOnJSC() throws {
+        let src = try loadSource()
+        let response = try loadRealResponse()
+        let js = try JSCExecutor(api: LiveSourceJSCTests.NoopAPI())
+        let transport = MemTransport(body: response)
+        let engine = SourceEngine(source: src, fetcher: PageFetcher(transport: transport), js: js)
+        try engine.loadJsLib(try loadJsLib())
+
+        let listURL = "https://cof03.bahfn.cn/jbapi/book/onetab/61/1/15/sort/hjm.ojbk"
+        do {
+            let books = try engine.explore(listURL)
+            print("⭐⭐⭐ [JSC explore 诊断] 出书了：\(books.count) 本 → " + books.prefix(3).map { $0.name }.joined(separator: " , "))
+        } catch {
+            print("⭐⭐⭐ [JSC explore 诊断] 抛错：\(error)")
+        }
+        print("⭐⭐⭐ [JSC explore 诊断] failureDiagnosticLines：")
+        for l in engine.failureDiagnosticLines { print("    · " + l) }
+        print("⭐⭐⭐ [JSC explore 诊断] failureDiagnosticLines 数量：\(engine.failureDiagnosticLines.count)")
+    }
+
     /// ⭐⭐⭐ **空宿主**（这个测试不需要宿主能力）
     final class NoopAPI: JSHostAPIProvider, @unchecked Sendable {
         func hostObject(named name: String) -> HostObject? { nil }

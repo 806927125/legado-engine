@@ -218,7 +218,19 @@ public final class JSCExecutor: JSExecutor {
             //   ⇒ 抛 "Return statements are only valid inside functions." ⭐⭐⭐
             //   ⇒ ⇒ 站方「顶层 return」的写法在 JSC 下**永远失败** ⭐⭐⭐
             //   ⇒ ⇒ 改成 **代码本身**放进函数体 ⇒ 顶层 return 就合法了 ⭐⭐⭐
-            attempts = [scope + "\n" + trimmed,
+            // ⭐⭐⭐⭐⭐ **形态 ①：块形态**（`{ … }`）—— **与 Node 后端逐字一致**
+            //
+            // ⚠️⚠️⚠️ **为什么必须包块**（2026-10-26 真机回归实证）：
+            //   `evaluateScript` 的**顶层 `let` / `const` 会进 context 的词法作用域**
+            //   ⇒ **同一段代码跑第二次 ⇒ 「Identifier 'x' has already been declared」** ⭐⭐⭐
+            //   ⇒ 真书源（🍅大灰狼）的规则**每条都用了 `let`**
+            //   ⇒ 第一条规则跑完 ⇒ **后面的规则全炸** ⇒ 详情 / 目录 / 正文全废 ⭐⭐⭐
+            //   ⇒ 包块 ⇒ 块有**自己的词法作用域** ⇒ 每次跑都是新的 ⇒ **不重复声明** ✓
+            //   ⇒ 块的完成值 = 块内最后一条语句的完成值 ⇒ **Script 语义不变** ✓
+            //
+            // ⭐⭐⭐ **形态 ②：函数体形态** ⇒ **顶层 `return` 合法**（站方真的这么写）
+            //   ⇒ 不要再套 `eval` ⇒ `eval("return 1;")` 里的 return **仍是非法** ⭐⭐⭐
+            attempts = [scope + "\n{\n" + trimmed + "\n}",
                         scope + "\n" + "(function(){\n" + trimmed + "\n})()"]
         }
         // ⭐⭐⭐⭐⭐ **看门狗**:JS 跑太久 ⇒ **明确报出来**(是「站方 JS 卡住了」,不是「网络慢」)
