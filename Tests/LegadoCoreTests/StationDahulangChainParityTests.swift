@@ -69,11 +69,15 @@ final class StationDahulangChainParityTests: XCTestCase {
         struct WithFull: Decodable { let full: ChainFull }
         let expectedFull = (try? JSONDecoder().decode(WithFull.self, from: expectedData))?.full
 
-        // ② 源（真规则 + 真 jsLib）
+        // ② 源（真规则 + 真 jsLib）—— ⭐⭐⭐ **用【完整源】**（就是用户真机测的那个 `dahlang-v1`）
+        //   ⚠️ 之前用「精简源」（只有 jsLib + 详情/目录/正文规则）⇒ **测不到真机的场景**！
+        //   ⇒ 完整源才有 `exploreUrl` + 站方的 `data:` 伪 URL 入口 ⇒ 才是真机那条路 ⭐⭐⭐
         let srcData = try Data(contentsOf:
-            Self.chainDir.appendingPathComponent("chain-source.json"))
+            Self.chainDir.appendingPathComponent("chain-source-full.json"))
         let source = try JSONDecoder().decode(BookSource.self, from: srcData)
-        let bookUrl = try text("chain-bookurl.txt").trimmingCharacters(in: .whitespacesAndNewlines)
+        // ⭐ 真机的 bookUrl = **`data:` 伪 URL**（站方聚合源用它装载荷）⇒ 详情页的 init 规则
+        //   第一句就是 `if (String(baseUrl).startsWith("data:"))` ⇒ **这条路径必须被测到** ⭐⭐⭐
+        let bookUrl = try text("chain-bookurl-real.txt").trimmingCharacters(in: .whitespacesAndNewlines)
 
         // ③ 假传输 + 真 JSC
         let transport = FixtureTransport(detail: try text("server-detail.json"),
