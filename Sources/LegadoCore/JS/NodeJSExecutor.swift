@@ -964,13 +964,17 @@ function runEval(code, scope) {
     }
     // ⭐⭐⭐ **执行成功就返回**（哪怕是 undefined/null）⇒ **不重复执行** ⭐⭐⭐
     if (v === undefined || v === null) {
-      // ⚠️ 只有「对象字面量之外 + 明确是对象字面量形态」才追加表达式形态
-      if (i === attempts.length - 1 && !isObjectLiteral) {
-        try {
-          const v2 = vm.runInContext(sc + '( ' + trimmed + '\n)', ctx);
-          if (v2 !== undefined && v2 !== null) return v2;
-        } catch (e2) { /* 忽略 ⇒ 报第一个错 */ }
-      }
+      // ⭐⭐⭐⭐⭐ **这里【不许】再执行任何形态**（2026-10-26 真机回归实证）
+      //
+      // ⚠️⚠️ **原来的 bug**：undefined 时又跑了一次「整段当表达式」
+      //   ⇒ **站方 JS 被执行 3 次** ⇒ `java.ajax` 调 3 次 ⇒ **限流打爆**
+      //   ⇒ 日志写 3 倍 ⇒ **写盘翻倍** ⇒ 撞 iOS diskwrites 限额 ⇒ 被杀 ⭐⭐⭐
+      //   ⇒ 而且 JSC 侧已经改成「undefined 就结束」⇒ **两边不一致** ⇒ 沙盒 ≠ 真机 ⭐⭐⭐
+      //
+      // ⭐ **正解**：形态选择已经在上面**静态定好**（对象字面量 ⇒ 整段当表达式；
+      //   其它 ⇒ Script 优先、语法错才换函数体形态）⇒ **undefined 就是最终结果**
+      //   ⇒ **不再执行** ⇒ 与 JSC 侧**逐字一致** ⭐⭐⭐
+      //
       // ⭐⭐⭐⭐⭐ **「形态 1 抛错 + 形态 2 没值」⇒ 要把【真错】抛出去**（2026-10-26 门禁迁移时补）
       //
       // ⚠️⚠️⚠️ **为什么必须**：形态 1（Script）抛错、形态 2（函数体）返回 undefined 时
