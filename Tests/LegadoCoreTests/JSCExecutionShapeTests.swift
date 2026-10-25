@@ -58,6 +58,10 @@ final class JSCExecutionShapeTests: XCTestCase {
         // ⭐ 站方 JS 里放一个会累加的副作用 ⇒ 跑几次就加几次
         let code = "globalThis.__qrSideEffect = (globalThis.__qrSideEffect || 0) + 1; 'ok'"
         _ = try exec.run(code, context: c)
+        // ⭐⭐⭐ **必须 markGlobalsAsBaseline**（引擎的 `loadJsLib` 就是这么做的）
+        //   ⇒ 否则每次求值前的「全局治理」会把 `__qrSideEffect` **置 undefined** ⇒ 计数 0
+        //   ⇒ ⇒ 那不是「执行两次」，而是「全局被清」⇒ 两者要分清 ⭐⭐⭐
+        exec.markGlobalsAsBaseline()
         let after = try exec.run("String(globalThis.__qrSideEffect || 0)", context: c)
         XCTAssertEqual(after.scalarString, "1",
                        "⭐⭐⭐ 站方 JS 必须【只执行一次】（副作用计数应=1）"

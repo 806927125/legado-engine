@@ -114,6 +114,10 @@ final class LiveSourceJSCTests: XCTestCase {
         // ⭐ 先加载 jsLib（用真实的那份）
         let lib = try loadJsLib()
         _ = try js.runGlobal(lib, context: ctx)
+        // ⭐⭐⭐ **必须 markGlobalsAsBaseline**（引擎的 `loadJsLib` 就是这么做的）
+        //   ⇒ 否则每次求值前的「全局治理」会把 jsLib 的全局**置 undefined**
+        //   ⇒ ⇒ 那不是「jsLib 没导出」⇒ 两者要分清 ⭐⭐⭐
+        js.markGlobalsAsBaseline()
         // ⭐ 规则求值时能不能调到 jsLib 的函数
         let v = try js.run("typeof hjmDec", context: ctx)
         XCTAssertEqual(v.scalarString, "function",
@@ -145,6 +149,38 @@ final class LiveSourceJSCTests: XCTestCase {
         ].joined(separator: "\n")
         let v = try js.run(probe, context: ctx)
         print("⭐⭐⭐ [JSC 全局诊断] " + v.scalarString)
+    }
+
+    /// ⭐⭐⭐⭐⭐ **诊断探针：JSC 上 JM 的 bookList 到底看到什么**（2026-10-26）
+    ///
+    /// ⚠️ 只打印事实 ⇒ 让 CI 给出确切答案，而不是继续猜 ⭐⭐⭐
+    func testProbeJMBookListOnJSC() throws {
+        let src = try loadSource()
+        let response = try loadRealResponse()
+        let js = try JSCExecutor(api: LiveSourceJSCTests.NoopAPI())
+        let transport = MemTransport(body: response)
+        let engine = SourceEngine(source: src, fetcher: PageFetcher(transport: transport), js: js)
+        try engine.loadJsLib(try loadJsLib())
+
+        // ⭐ 手动跑一次 bookList 规则，打印每一步看到的东西
+        let ctx = JSRunContext(base: .page(response), baseUrl: "https://cof03.bahfn.cn/",
+                               raw: response, key: "", page: 1)
+        let bookList = src.ruleExplore?.bookList ?? ""
+        print("⭐⭐⭐ [JM bookList 规则] " + String(bookList.prefix(160)))
+        // ① scope 里 result 是什么
+        let probe = [
+            "(function(){",
+            "var out=[];",
+            "try{out.push('typeof result: '+(typeof result));}catch(e){out.push('result: ERR '+e);}",
+            "try{out.push('result head: '+String(result).slice(0,80));}catch(e){out.push('result head: ERR');}",
+            "try{out.push('typeof hjmDec: '+(typeof hjmDec));}catch(e){out.push('hjmDec: ERR');}",
+            "try{var j=JSON.parse(result);out.push('JSON.parse ok, data type: '+(typeof j.data)+', len '+String(j.data).length);}catch(e){out.push('JSON.parse ERR: '+e);}",
+            "try{var j=JSON.parse(result);var d=j.data;if(typeof d==='string'){d=JSON.parse(hjmDec(d));}out.push('decoded type: '+(typeof d)+', isArray: '+Array.isArray(d));}catch(e){out.push('decode ERR: '+e);}",
+            "return out.join(' || ');",
+            "})()"
+        ].joined(separator: "\n")
+        let v = try js.run(probe, context: ctx)
+        print("⭐⭐⭐ [JM bookList 诊断] " + v.scalarString)
     }
 
     /// ⭐⭐⭐ **空宿主**（这个测试不需要宿主能力）
