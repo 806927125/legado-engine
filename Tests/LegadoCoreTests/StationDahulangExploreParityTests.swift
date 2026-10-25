@@ -62,6 +62,7 @@ final class StationDahulangExploreParityTests: XCTestCase {
 
     // MARK: - 可比结构
 
+    /// ⭐ 老引擎的输出结构（`old-engine-explore.js` 写的）：`{ source, exploreKinds: {...} }`
     private struct Expected: Decodable {
         struct Kind: Decodable { let title: String; let url: String }
         struct Filter: Decodable {
@@ -70,10 +71,13 @@ final class StationDahulangExploreParityTests: XCTestCase {
             let chars: [String]
             let paramKey: String
         }
-        let kindCount: Int
-        let kinds: [Kind]
-        let filterCount: Int
-        let filters: [Filter]
+        struct Step: Decodable {
+            let kindCount: Int
+            let kinds: [Kind]
+            let filterCount: Int
+            let filters: [Filter]
+        }
+        let exploreKinds: Step
     }
 
     // MARK: - 门禁
@@ -112,20 +116,20 @@ final class StationDahulangExploreParityTests: XCTestCase {
         do {
             let (kinds, filters) = try engine.exploreKinds()
             // 分类：逐字比（标题 + url）
-            if kinds.count != expected.kinds.count {
-                diffs.append("⭐ 分类数不一致：老引擎 \(expected.kinds.count) / 新引擎 \(kinds.count)")
+            if kinds.count != expected.exploreKinds.kinds.count {
+                diffs.append("⭐ 分类数不一致：老引擎 \(expected.exploreKinds.kinds.count) / 新引擎 \(kinds.count)")
             }
-            for (i, e) in expected.kinds.enumerated() {
+            for (i, e) in expected.exploreKinds.kinds.enumerated() {
                 guard i < kinds.count else { diffs.append("  · 新引擎少第 \(i+1) 个分类「\(e.title)」"); continue }
                 let a = kinds[i]
                 if a.title != e.title { diffs.append("  · 分类[\(i+1)] 标题：老「\(e.title)」/ 新「\(a.title)」") }
                 if a.url != e.url { diffs.append("  · 分类[\(i+1)] url：老「\(e.url)」/ 新「\(a.url)」") }
             }
             // 筛选栏：逐字比（标题 / 类型 / 选项 / 参数名）
-            if filters.count != expected.filters.count {
-                diffs.append("⭐ 筛选栏数不一致：老引擎 \(expected.filters.count) / 新引擎 \(filters.count)")
+            if filters.count != expected.exploreKinds.filters.count {
+                diffs.append("⭐ 筛选栏数不一致：老引擎 \(expected.exploreKinds.filters.count) / 新引擎 \(filters.count)")
             }
-            for (i, e) in expected.filters.enumerated() {
+            for (i, e) in expected.exploreKinds.filters.enumerated() {
                 guard i < filters.count else { diffs.append("  · 新引擎少第 \(i+1) 个筛选栏「\(e.title)」"); continue }
                 let a = filters[i]
                 if a.title != e.title { diffs.append("  · 筛选[\(i+1)] 标题：老「\(e.title)」/ 新「\(a.title)」") }
