@@ -74,6 +74,25 @@ public enum JSHostAPI {
         .init(object: "java", name: "reLoginView", kind: .method),
         .init(object: "java", name: "refreshExplore", kind: .method),
 
+        // ⭐⭐⭐ **2026-10-25 补齐：老引擎上存在、但契约漏登记的 39 个**
+        //   ⇒ 老引擎 java 对象上**有**这些方法（宿主 op 缺失时只 resolve {ok:false} ⇒ **不抛**）
+        //   ⇒ 契约漏 = JS 侧**不生成包装函数** ⇒ 站方 `java.xxx()` 报 **TypeError**
+        //   ⇒ 而老引擎上**不抛** ⇒ 新引擎抛 = **回归**（站方 JS 第一句就炸 ⇒ 整条规则死定）⭐⭐⭐
+        //   （名单实测来源：conformance/fixtures/legacy-java-nothrow.json）
+        .init(object: "java", name: "ajaxAsync", kind: .method), .init(object: "java", name: "ajaxPromise", kind: .method), .init(object: "java", name: "base64DecodeToByteArray", kind: .method),
+        .init(object: "java", name: "cacheFile", kind: .method), .init(object: "java", name: "cacheText", kind: .method), .init(object: "java", name: "clear", kind: .method),
+        .init(object: "java", name: "connectAsync", kind: .method), .init(object: "java", name: "containsKey", kind: .method), .init(object: "java", name: "del", kind: .method),
+        .init(object: "java", name: "delete", kind: .method), .init(object: "java", name: "encodeURI", kind: .method), .init(object: "java", name: "encodeURIComponent", kind: .method),
+        .init(object: "java", name: "escape", kind: .method), .init(object: "java", name: "getAsync", kind: .method), .init(object: "java", name: "getFloat", kind: .method),
+        .init(object: "java", name: "getInt", kind: .method), .init(object: "java", name: "getLang", kind: .method), .init(object: "java", name: "getList", kind: .method),
+        .init(object: "java", name: "getObject", kind: .method), .init(object: "java", name: "getPromise", kind: .method), .init(object: "java", name: "getStrResponse", kind: .method),
+        .init(object: "java", name: "getStringArray", kind: .method), .init(object: "java", name: "getStringMatch", kind: .method), .init(object: "java", name: "getStringWrapper", kind: .method),
+        .init(object: "java", name: "head", kind: .method), .init(object: "java", name: "htmlFormat", kind: .method), .init(object: "java", name: "importScript", kind: .method),
+        .init(object: "java", name: "isWhiteList", kind: .method), .init(object: "java", name: "md5Encode16", kind: .method), .init(object: "java", name: "openBrowser", kind: .method),
+        .init(object: "java", name: "postAsync", kind: .method), .init(object: "java", name: "postPromise", kind: .method), .init(object: "java", name: "readFile", kind: .method),
+        .init(object: "java", name: "regex", kind: .method), .init(object: "java", name: "removeCookie", kind: .method), .init(object: "java", name: "setCookie", kind: .method),
+        .init(object: "java", name: "sha1Encode", kind: .method), .init(object: "java", name: "toString", kind: .method), .init(object: "java", name: "unescape", kind: .method),
+
         // ── source.*
         .init(object: "source", name: "header", kind: .property),
         .init(object: "source", name: "putVariable", kind: .method),
@@ -148,6 +167,38 @@ public enum JSHostAPI {
         for e in all { m[e.key] = e }
         return m
     }()
+
+    /// ⭐⭐⭐ **老引擎上「调用不抛异常」的 API**（**自动生成**，勿手改）
+    ///
+    /// 源：`conformance/fixtures/legacy-java-nothrow.json`
+    /// ⇒ 由 `tools/probe_legacy_java_nothrow.js`（**真跑老引擎** + 忠实宿主 mock）实测得出
+    /// ⇒ 再由 `tools/gen_legacy_nothrow.py` 写进本文件 ⭐⭐⭐
+    ///
+    /// ⚠️ **为什么要有它**（2026-10-25 真机：`java.longToast is not a function`）：
+    ///   宿主没实现 ⇒ 包装函数抛 TypeError ⇒ **站方 JS 第一句就炸** ⇒ 整条规则死定 ⭐⭐⭐
+    ///   ⇒ **但「抛不抛」不能一刀切**：
+    ///     · 老引擎上**压根没有**这个方法 ⇒ 站方 `try/catch` 探测平台 ⇒ **必须抛**（抛了站方才走对分支）⭐
+    ///     · 老引擎上**有**这个方法（宿主 op 缺失时 `nativeCall` 只 resolve `{ok:false}` ⇒ **不抛**）
+    ///       ⇒ 新引擎也**不许抛** ⇒ 否则站方脚本直接死 = **回归** ⭐⭐⭐
+    ///   ⇒ 名单内的：**宿主没实现 ⇒ 静默返回 undefined**（与老引擎一致）
+    ///   ⇒ 名单外的：**照旧抛 TypeError**（与老引擎一致）
+    public static let legacyPresentKeys: Set<String> = [
+"java.ajax", "java.ajaxAsync", "java.ajaxPromise", "java.androidId", "java.base64Decode",
+"java.base64DecodeToByteArray", "java.base64Encode", "java.cacheFile", "java.cacheText", "java.clear",
+"java.connect", "java.connectAsync", "java.containsKey", "java.createSymmetricCrypto", "java.del",
+"java.delete", "java.deviceID", "java.encodeURI", "java.encodeURIComponent", "java.escape", "java.get",
+"java.getAbsoluteURL", "java.getAsync", "java.getCookie", "java.getElement", "java.getElements",
+"java.getFloat", "java.getInt", "java.getLang", "java.getList", "java.getObject", "java.getPromise",
+"java.getStrResponse", "java.getString", "java.getStringArray", "java.getStringMatch",
+"java.getStringWrapper", "java.getWebViewUA", "java.head", "java.hexDecodeToString", "java.htmlFormat",
+"java.importScript", "java.isWhiteList", "java.log", "java.longToast", "java.md5Encode",
+"java.md5Encode16", "java.openBrowser", "java.post", "java.postAsync", "java.postPromise", "java.put",
+"java.randomUUID", "java.reLoginView", "java.readFile", "java.refreshExplore", "java.refreshTocUrl",
+"java.regex", "java.removeCookie", "java.searchBook", "java.setContent", "java.setCookie",
+"java.sha1Encode", "java.showBrowser", "java.showReadingBrowser", "java.startBrowser",
+"java.startBrowserAwait", "java.startBrowserDp", "java.t2s", "java.timeFormat", "java.timeFormatUTC",
+"java.toNumChapter", "java.toString", "java.toast", "java.unescape"
+    ]
 
     /// 契约里有哪些宿主对象
     public static var objects: Set<String> { Set(all.map { $0.object }) }
@@ -243,15 +294,26 @@ public enum JSScopeBuilder {
             let obj = e.object
             let name = e.name
             let params = (0..<4).map { "a\($0)" }.joined(separator: ",")
-            // ⭐⭐⭐ **宿主没实现 ⇒ 抛 TypeError**（**老引擎语义**，2026-10-24 真机「大灰狼简介/正文不一样」实证）
-            //   老引擎的 `java` 对象**只有它实现的那几个方法** ⇒ 站方 `java.qread()` 会 **TypeError**
-            //   ⇒ 站方用 try/catch 探测平台（`checkEnv()`：轻阅读/改版/苹果/安卓）⇒ 分支才对 ⭐
-            //   以前这里返回 **undefined**（**不抛**）⇒ 站方以为「有这个能力」⇒ **走错分支** ⭐⭐⭐
-            //   （🍅大灰狼：简介差 27 字、正文差 13 字 ⇒ 就是这一条）
+            // ⭐⭐⭐ **「宿主没实现」要不要抛 TypeError？——由「老引擎上存不存在」决定**（2026-10-25 真机实证）
+            //
+            //   ① **老引擎上压根没这个方法**（`java.qread` / `java.copyText` / `java.digestHex`）
+            //      ⇒ 站方 `try/catch` 探测平台（`checkEnv()`：轻阅读/改版/苹果/安卓）⇒ **必须抛**
+            //      ⇒ 抛了站方才走对分支；以前这里返回 undefined（**不抛**）⇒ 站方以为「有这个能力」
+            //      ⇒ **走错分支**（🍅大灰狼：简介差 27 字、正文差 13 字 ⇒ 就是这一条）⭐⭐⭐
+            //
+            //   ② **老引擎上有这个方法**（宿主 op 缺失时 `nativeCall` 只 resolve `{ok:false}` ⇒ **不抛**）
+            //      ⇒ 新引擎也**不许抛** ⇒ 否则 **站方 JS 第一句就炸** ⇒ 整条规则死定 ⭐⭐⭐
+            //      （真机实证：`java.longToast is not a function` ⇒ 站方 125 源 **114 处**在用）
+            //
+            //   ⇒ 名单 = 「老引擎上调用**不抛异常**」的方法（**实测**得出，见 legacyPresentKeys 的注释）⭐
+            let throwsWhenUnimplemented = !JSHostAPI.legacyPresentKeys.contains(e.key)
+            let guardClause = throwsWhenUnimplemented
+                ? "if (__r && __r.__qrNotImplemented) { throw new TypeError('\(obj).\(name) is not a function'); }"
+                : "if (__r && __r.__qrNotImplemented) { return undefined; }  // ⭐ 老引擎上不抛 ⇒ 新引擎也不抛"
             out.append("""
             try { \(obj).\(name) = function(\(params)){ \
               var __r = JSON.parse(__hostJSON('\(obj)','\(name)',JSON.stringify([\(params)]))); \
-              if (__r && __r.__qrNotImplemented) { throw new TypeError('\(obj).\(name) is not a function'); } \
+              \(guardClause) \
               return (__r && __r.length !== undefined) ? __r[0] : undefined; \
             }; } catch(e) {}
             """)
