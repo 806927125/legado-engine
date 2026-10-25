@@ -1760,7 +1760,20 @@ public final class SourceEngine {
                 if case .array(let arr) = v { flat.append(contentsOf: arr) } else { flat.append(v) }
             }
             let out = flat.map { ListItem.json($0) }
-            if out.isEmpty, strict { throw SourceError.emptyResult(field) }
+            if out.isEmpty, strict {
+                // ⭐⭐⭐⭐⭐ **空结果 ⇒ 把「实际请求的 URL + 响应摘要」记进诊断**（2026-10-25 真机实证）
+                //   ⇒ 以前只有「规则[...] 分支=JS」⇒ **看不出引擎到底看到了什么** ⇒ 只能猜 ⭐⭐⭐
+                //   ⇒ 现在：**URL + 响应长度 + 响应前 200 字 + isJSON** ⇒ 真机一次定位 ⭐⭐⭐
+                let resp = page.text.count > 200 ? String(page.text.prefix(200)) : page.text
+                var d = EngineDiagnostic(rule: "列表规则（\(field)）")
+                d.branch = "列表为空"
+                d.failure = .noMatch(reason:
+                    "URL=\(page.url)　isJSON=\(page.isJSON)　响应长度=\(page.text.count)"
+                    + "　响应前 200 字=\(resp)")
+                diagnostics.append(d)
+                logger?.log(Self.diagnosticLine(d))
+                throw SourceError.emptyResult(field)
+            }
             return out
         }
         let nodes = try listNodes(rule, page: page, field: field, strict: strict)
