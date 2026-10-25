@@ -212,8 +212,14 @@ public final class JSCExecutor: JSExecutor {
         if isObjectLiteral {
             attempts = [scope + "\n" + "( " + trimmed + "\n)"]
         } else {
+            // ⭐⭐⭐⭐⭐ **函数体形态：直接包住代码，不要再套 eval**
+            //
+            // ⚠️⚠️ **为什么**：\`eval("return 1;")\` ⇒ eval 作用域里 **顶层 return 仍是非法**
+            //   ⇒ 抛 "Return statements are only valid inside functions." ⭐⭐⭐
+            //   ⇒ ⇒ 站方「顶层 return」的写法在 JSC 下**永远失败** ⭐⭐⭐
+            //   ⇒ ⇒ 改成 **代码本身**放进函数体 ⇒ 顶层 return 就合法了 ⭐⭐⭐
             attempts = [scope + "\n" + trimmed,
-                        scope + "\n" + "(function(){ return eval(" + codeLiteral + "); })()"]
+                        scope + "\n" + "(function(){\n" + trimmed + "\n})()"]
         }
         // ⭐⭐⭐⭐⭐ **看门狗**:JS 跑太久 ⇒ **明确报出来**(是「站方 JS 卡住了」,不是「网络慢」)
         let t0 = Date()
@@ -274,8 +280,20 @@ public final class JSCExecutor: JSExecutor {
         currentBase = context.base
         currentHostObjects = Self.hostObjects(from: context)
         injectHostProperties(into: js)
-        let codeLiteral = JSScopeBuilder.jsonLiteral(.string(code))
-        let value = js.evaluateScript("(0, eval)(" + codeLiteral + ")")
+        // ⭐⭐⭐⭐⭐ **不要用 `(0, eval)`**（2026-10-26 真机回归实证：JM小说 0 本书）
+        //
+        // ⚠️⚠️⚠️ **原来的 bug**：\`(0, eval)(code)\` ⇒ eval 的代码在 **eval 作用域**
+        //   ⇒ **顶层 \`var\`/\`function\` 不进 globalThis**（JSC 的 eval 与 WebKit 不同）⭐⭐⭐
+        //   ⇒ 站方 jsLib 定义的 \`hjmDec\` 等函数 **规则求值时看不见** ⭐⭐⭐
+        //   ⇒ 站方 \`catch(e){return []}\` **把真凶吞掉** ⇒ **0 本书**
+        //   ⇒ 且 \`markGlobalsAsBaseline()\` 抓的是 globalThis ⇒ **基线里也没有它们**
+        //     ⇒ 每次求值前的「全局治理」也救不了 ⇒ **彻底丢失** ⭐⭐⭐
+        //
+        // ⭐⭐⭐ **正解**：**直接当脚本跑**（顶层 var = 脚本局部 ⇒ 同一段里能取到）
+        //   + **同一段末尾追加 \`globalThis.X = X\`** ⇒ 挂到**真正的 globalThis** ⭐⭐⭐
+        //   ⇒ 不依赖任何 eval 语义 ⇒ **JSC / Node / WebKit 行为一致** ⭐⭐⭐
+        let script = Self.withExplicitGlobalExport(code)
+        let value = js.evaluateScript(script)
         if let msg = caught.value { throw JSCError.scriptException(msg) }
         guard let value else { return .null }
         return Self.toJSON(value)

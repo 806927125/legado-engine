@@ -1002,8 +1002,44 @@ function runEval(code, scope) {
 }
 
 function runGlobal(code) {
-  const v = vm.runInContext('(0, eval)(' + JSON.stringify(code) + ')', ctx);
+  // ⭐⭐⭐⭐⭐ **不要用 `(0, eval)`**（2026-10-26 真机回归实证：JM小说 0 本书）
+  //
+  // ⚠️⚠️ **原来的 bug**：`(0, eval)(code)` ⇒ eval 作用域 ⇒ **顶层 var/function 不进全局**
+  //   ⇒ 站方 jsLib 定义的 `hjmDec` 等 **规则求值时看不见** ⇒ 站方 catch 吞掉 ⇒ 0 本书 ⭐⭐⭐
+  //   ⇒ 且基线快照抓的是全局 ⇒ **基线里也没有它们** ⇒ 全局治理也救不了 ⭐⭐⭐
+  //
+  // ⭐⭐⭐ **正解**：直接当脚本跑（顶层 var = 脚本局部 ⇒ 同一段里能取到）
+  //   + **同一段末尾追加 `globalThis.X = X`** ⇒ 挂到真正的 globalThis ⭐⭐⭐
+  //   ⇒ 不依赖 eval 语义 ⇒ **与 JSC 侧逐字一致** ⭐⭐⭐
+  const v = vm.runInContext(code + exportSuffix(code), ctx);
   return v === undefined ? null : v;
+}
+
+// ⭐⭐⭐⭐⭐ **显式导出 jsLib 的顶层符号**（与 Swift 侧 `JSScopeBuilder.withExplicitGlobalExport` 同语义）
+// ⚠️ 只扫**顶格**声明 ⇒ 不导出函数体内的局部变量（导出会污染全局 ⇒ 串源）⭐⭐⭐
+function exportSuffix(code) {
+  var names = [];
+  var seen = {};
+  var lines = String(code).split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+    if (!line.length) continue;
+    var first = line.charAt(0);
+    if (first === ' ' || first === '\t') continue;      // ⭐ 缩进的 = 函数体内 ⇒ 不导出
+    var t = line.trim();
+    if (t.indexOf('//') === 0 || t.indexOf('/*') === 0 || t.charAt(0) === '*') continue;
+    var m = /^(?:var|let|const)\s+([A-Za-z_$][A-Za-z0-9_$]*)/.exec(t);
+    if (!m) m = /^(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)/.exec(t);
+    if (m && !seen[m[1]]) { seen[m[1]] = 1; names.push(m[1]); }
+  }
+  if (!names.length) return '';
+  var out = '\n;try{';
+  for (var j = 0; j < names.length; j++) {
+    var n = names[j];
+    out += 'if(typeof ' + n + " !== 'undefined' && globalThis." + n + ' === undefined){globalThis.' + n + ' = ' + n + ';}';
+  }
+  out += '}catch(e){}';
+  return out;
 }
 
 // ⭐⭐⭐ **stdin 关闭时【不要】退出** —— Swift 侧会先发 `quit` 再关管道

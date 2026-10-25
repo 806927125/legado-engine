@@ -220,6 +220,63 @@ public protocol JSHostAPIProvider: Sendable {
 /// ⭐ **这一步是平台无关的** ⇒ JSC 与 Node 两个执行器**共用同一份 scope 源码**
 /// ⇒ 就可以**逐字对拍**（JSC vs Node）⇒ 「JSC 行为对不对」有了可验证的口径。
 public enum JSScopeBuilder {
+    /// ⭐⭐⭐⭐⭐ **把 jsLib 的顶层声明显式挂到 `globalThis`**（2026-10-26 真机回归实证）
+    ///
+    /// ⚠️ **为什么**：`evaluateScript` 的顶层 `var`/`function` **不进全局**（JSC ≠ WebKit）
+    ///   ⇒ 站方 jsLib 定义的 `hjmDec` 等函数在**规则求值时可能看不见**
+    ///   ⇒ 站方 `catch(e){return []}` 吞掉 ⇒ **0 本书**（真机症状）⭐⭐⭐
+    ///
+    /// ⭐⭐⭐ **做法**：扫出顶层符号 ⇒ 在**同一段脚本末尾**追加 `globalThis.X = X`
+    ///   ⇒ 同一段代码 = 同一作用域 ⇒ **一定可见** ⇒ 不依赖 eval 语义 ⭐⭐⭐
+    public static func withExplicitGlobalExport(_ code: String) -> String {
+        let names = topLevelDeclaredNames(code)
+        guard !names.isEmpty else { return code }
+        var out = code
+        out += "\n;try{"
+        for n in names {
+            out += "if(typeof \(n) !== 'undefined' && globalThis.\(n) === undefined){globalThis.\(n) = \(n);}"
+        }
+        out += "}catch(e){}"
+        return out
+    }
+
+    /// ⭐⭐⭐ **扫出 JS 源码的顶层声明名**（`var X` / `let X` / `const X` / `function X`）
+    ///
+    /// ⚠️ **只扫顶层**（行首缩进 0）⇒ 避免把**函数体内的局部变量**也导出
+    ///   （导出了会污染全局 ⇒ 别的源会读到 ⇒ 串源）⭐⭐⭐
+    public static func topLevelDeclaredNames(_ code: String) -> [String] {
+        var names: [String] = []
+        var seen = Set<String>()
+        for rawLine in code.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = String(rawLine)
+            // ⭐⭐⭐ **只看顶格**（不以空白开头）⇒ 排除函数体内的局部声明
+            guard let first = line.first, !first.isWhitespace else { continue }
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("//") || trimmed.hasPrefix("/*") || trimmed.hasPrefix("*") { continue }
+            // ① `var X =` / `let X =` / `const X =`
+            var name = firstCapture(trimmed, #"^(?:var|let|const)\s+([A-Za-z_$][A-Za-z0-9_$]*)"#)
+            // ② `function X(` / `async function X(`
+            if name == nil {
+                name = firstCapture(trimmed, #"^(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)"#)
+            }
+            if let n = name, !n.isEmpty, !seen.contains(n) {
+                seen.insert(n)
+                names.append(n)
+            }
+        }
+        return names
+    }
+
+    /// ⭐⭐⭐ **取正则的第 1 个捕获组**
+    public static func firstCapture(_ text: String, _ pattern: String) -> String? {
+        guard let re = try? NSRegularExpression(pattern: pattern),
+              let m = re.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+              m.numberOfRanges > 1,
+              let r = Range(m.range(at: 1), in: text) else { return nil }
+        return String(text[r])
+    }
+
+
 
     /// 构造 scope 源码（**只含变量与宿主对象**；宿主方法由执行器注入）
     ///
