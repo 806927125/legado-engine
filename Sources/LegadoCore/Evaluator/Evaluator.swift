@@ -587,25 +587,30 @@ public struct Evaluator {
     private func selectDOMChain(head: String, headIndex: Int?, steps: [ChainStep],
                                 base: RuleBase, ctx: EvalContext,
                                 diag: inout EngineDiagnostic, rawNodes: Bool = false) -> RuleValue {
+        // ⭐⭐⭐⭐⭐ **JSON 基准 ⇒ 裸字段名要按【JSON 相对路径】取**（2026-10-25 真机实证）
+        //
+        // ⚠️⚠️⚠️ **为什么必须放在 `guard baseNode` 【之前】**：
+        //   原来的兜底写在 `guard let node = baseNode(base, ctx: ctx) else { …JSON 兜底… }`
+        //   ⇒ **`.page` 基准时 `baseNode` 返回 `ctx.document`（真机上非 nil！）**
+        //   ⇒ **`guard` 直接通过** ⇒ **JSON 兜底那段永远不执行** ⭐⭐⭐
+        //   ⇒ 字段规则（`name` / `author` …）按 **CSS** 查 JSON ⇒ **0 命中**
+        //   ⇒ 症状：书**出得来但书名/作者/书 URL 全空** ⇒ App 判「结果不可信」⇒ **emptyResult** ⭐⭐⭐
+        //   ⇒ ⭐ 沙盒复现需要 `ctx.document` **非 nil**（否则兜底反而会触发 ⇒ 假绿）⭐⭐⭐
+        //
+        // ⇒ 修法：**JSON 基准时优先走 JSON 相对路径**（跟基准类型走，不看 document 有没有）⭐⭐⭐
+        if steps.isEmpty, headIndex == nil, Self.looksLikeJSONPath(head),
+           let j = Self.jsonBaseValue(base, ctx: ctx),
+           let hits = JSONPath.select(j, head), !hits.isEmpty {
+            diag.branch = "JSON 相对路径"
+            if rawNodes { return .list([]) }   // ⭐ JSON 项没有 DOM 节点
+            // ⭐ 与 JSONPath 分支同口径：**单个命中 ⇒ 单值**（空字符串也算空 ⇒ 兜底链能继续往下走）
+            if hits.count == 1 { return .json(hits[0]) }
+            return .list(hits.map { RuleValue.json($0) })
+        }
+        // ⭐⭐⭐ **JSON 基准的裸路径兜底已移到【函数开头】**（2026-10-25 真机实证）
+        //   ⇒ 原来在这里 ⇒ 被 `guard let node = baseNode(...)` 挡住 ⇒ 真机上永不执行 ⭐⭐⭐
+        //   ⇒ 站方 JSON 源的字段规则（`name` / `author` …）按 CSS 查 ⇒ **书名/作者全空** ⭐⭐⭐
         guard let node = baseNode(base, ctx: ctx) else {
-            // ⭐⭐⭐ **JSON 基准 + 裸路径** ⇒ 当成「相对 JSON 路径」取（Legado 语义）
-            //
-            // ⚠️ **为什么必须补这条**（换引擎时暴露的缺口）：
-            //   站方 JSON 源的字段规则是**裸字段名**（`name: "bookName"` / `author: "authorName"`）
-            //   ⇒ 老引擎（轻阅）在 JSON 基准上 `baseToNode` 返回 null ⇒ **直接返回空**
-            //   ⇒ **JSON 接口源一个都出不来**（列表 0 本 / 字段全空）⭐
-            //   ⇒ Legado 的语义是「**相对当前 JSON 对象**取字段」⇒ 这里补齐
-            //
-            // ⚠️ 判据要严：**只认裸路径**（不含 CSS 标记）⇒ 别把 `.content@p@text` 当 JSON 路径
-            if steps.isEmpty, headIndex == nil, Self.looksLikeJSONPath(head),
-               let j = Self.jsonBaseValue(base, ctx: ctx),
-               let hits = JSONPath.select(j, head), !hits.isEmpty {
-                diag.branch = "JSON 相对路径"
-                if rawNodes { return .list([]) }   // ⭐ JSON 项没有 DOM 节点
-                // ⭐ 与 JSONPath 分支同口径：**单个命中 ⇒ 单值**（空字符串也算空 ⇒ 兜底链能继续往下走）
-                if hits.count == 1 { return .json(hits[0]) }
-                return .list(hits.map { RuleValue.json($0) })
-            }
             diag.failure = .baseTypeMismatch(expected: "DOM", actual: baseTypeName(base))
             diag.branch = "默认规则链"
             return .void

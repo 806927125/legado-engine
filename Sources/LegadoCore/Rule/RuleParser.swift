@@ -121,7 +121,7 @@ public struct RuleParser {
         case .html:
             return .literal(body)
         case .selector:
-            return parseSelectorChain(body)
+            return parseSelectorChain(body, isJSON: isJSON)
         case .empty:
             return .empty
         }
@@ -159,7 +159,7 @@ public struct RuleParser {
     ///
     /// ⭐ **头段保留原文**（`head`），链段才做 KW 分类（`steps`）——
     /// 因为两者的翻译规则不同（见 `HeadTranslator` / `SegmentTranslator`）。
-    private func parseSelectorChain(_ s: String) -> RuleNode {
+    private func parseSelectorChain(_ s: String, isJSON: Bool = false) -> RuleNode {
         var r = s.trimmingCharacters(in: .whitespaces)
 
         // 站方有时多写一个 `@`：`@a.2@text` / `@class.book` —— 前面这个 @ 只是习惯性前缀
@@ -185,7 +185,7 @@ public struct RuleParser {
             $0.trimmingCharacters(in: .whitespaces)
         }
         if commaParts.count > 1, commaParts.allSatisfy({ $0.contains("@") }) {
-            return .fallback(commaParts.map { parseSelectorChain($0) })
+            return .fallback(commaParts.map { parseSelectorChain($0, isJSON: isJSON) })
         }
 
         // ⭐⭐ **整条规则就是一个取值模式** ⇒ 「取当前节点的这个值」
@@ -196,7 +196,19 @@ public struct RuleParser {
         // ⚠️ 以前这里当成 CSS 标签名去查（`select("text")`）⇒ **永远查不到**。
         //
         // 判定：整条规则**精确等于**一个取值模式名（且没有 `@` 分段）。
-        if segs.count == 1, let mode = Self.valueMode(of: segs[0]) {
+        // ⭐⭐⭐⭐⭐ **JSON 基准 ⇒ 不许判「取值模式」**（2026-10-25 真机实证）
+        //
+        // ⚠️⚠️⚠️ **这是「很多书源都是这样」的通用真凶**：
+        //   取值模式的名字表（`text` / `html` / `href` / **`name`** / `title` / `value` /
+        //   `type` / `class` / `id` / `alt` …）**全是常见的 JSON 字段名**！⭐⭐⭐
+        //   ⇒ 站方 JSON 接口源的字段规则（`"name": "name"` / `"author": "author"`）
+        //   ⇒ **被误判成「取值模式」** ⇒ 取值模式**只在 DOM 基准下**有意义
+        //   ⇒ JSON 基准 ⇒ `baseNode` = nil ⇒ **「基准类型不符」⇒ 字段取不到** ⭐⭐⭐
+        //   ⇒ 症状：书**出得来但书名/作者/书 URL 全空** ⇒ App 判「结果不可信」⇒ emptyResult ⭐⭐⭐
+        //
+        // ⇒ 修法：**JSON 基准时按 JSON 字段名取**（不是取值模式）⭐⭐⭐
+        //   ⇒ 与「JSON 基准上的裸字段名要相对当前对象取」是同一条语义 ⭐
+        if segs.count == 1, !isJSON, let mode = Self.valueMode(of: segs[0]) {
             return .value(mode: mode)
         }
 
