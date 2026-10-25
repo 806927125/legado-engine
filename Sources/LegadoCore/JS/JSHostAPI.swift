@@ -242,6 +242,18 @@ public enum JSScopeBuilder {
         if !ctx.vars.isEmpty {
             lines.append("var variables = \(jsonLiteral(.object(ctx.vars.mapValues { .string($0) })));")
         }
+        // ⭐⭐⭐ **消息收集**（登录链路用）—— 老引擎的 `QR.__qrMsgSink` 同款
+        //   站方**只**用 `java.toast` / `java.log` 报登录结果 ⇒ 这段原文是唯一依据 ⭐⭐⭐
+        //   ⚠️ 收集器必须是**局部 var**（`var` 在 eval 里是脚本作用域）
+        //   ⇒ 读的时候要**同一次 eval** 里取（分两次 eval 拿不到）⭐
+        // ⭐⭐⭐ **额外变量**（老引擎 `makeScope({ infoMap: … })` 同款）
+        //   ⇒ 发现页筛选栏的 action 靠它读 `infoMap['平台']` ⭐⭐⭐
+        for (k, v) in ctx.extra {
+            lines.append("var \(k) = \(jsonLiteral(v));")
+        }
+        if ctx.collectMessages {
+            lines.append("var __qrMsgs = []; var __qrMsgSink = function(m){ __qrMsgs.push(String(m == null ? '' : m)); };")
+        }
         return lines.joined(separator: "\n")
     }
 

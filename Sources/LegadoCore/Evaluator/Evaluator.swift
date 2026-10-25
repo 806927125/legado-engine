@@ -98,15 +98,28 @@ public struct JSRunContext {
     public var page: Int
     /// 当前页 DOM（站方 JS 里 `document.querySelectorAll` 要指向它）
     public var document: DOMNode?
+    /// ⭐⭐⭐ **要不要收集站方的 toast / log 原文**（登录链路用）
+    ///
+    /// 站方**只**用 `java.toast` / `java.log` 报登录结果（"✅️登录成功" / "💔登录失败"）
+    /// ⇒ 这段原文是**判断「登录成没成」的唯一依据**（老引擎的 `QR.__qrMsgSink` 同款）⭐⭐⭐
+    public var collectMessages: Bool = false
+    /// ⭐⭐⭐ **额外注入的变量**（站方 action 里读 `infoMap['平台']` 之类）
+    ///
+    /// 老引擎的 `rule.makeScope({ …, infoMap: infoMap })` 同款 ⭐
+    /// ⇒ 发现页筛选栏的 action 靠它拿到「用户选了什么」⭐⭐⭐
+    public var extra: [String: JSONValue] = [:]
 
     public init(base: RuleBase, baseUrl: String = "", raw: String = "",
                 book: HostObject? = nil, source: HostObject? = nil, chapter: HostObject? = nil,
                 vars: [String: String] = [:], varBox: VarBox? = nil,
-                key: String = "", page: Int = 1, document: DOMNode? = nil) {
+                key: String = "", page: Int = 1, document: DOMNode? = nil,
+                collectMessages: Bool = false, extra: [String: JSONValue] = [:]) {
         self.base = base; self.baseUrl = baseUrl; self.raw = raw
         self.book = book; self.source = source; self.chapter = chapter
         self.vars = vars; self.varBox = varBox
         self.key = key; self.page = page; self.document = document
+        self.collectMessages = collectMessages
+        self.extra = extra
     }
 }
 

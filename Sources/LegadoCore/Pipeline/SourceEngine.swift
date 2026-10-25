@@ -1055,6 +1055,189 @@ public final class SourceEngine {
         }
     }
 
+    // MARK: - ⭐⭐⭐ 登录 op（照老引擎 `engine.js` 的 `login` / `loginProbe` 语义，2026-10-25）
+    //
+    // ⇒ 老引擎退役 ⇒ 登录也必须由新引擎接管 ⇒ 这是「物理删除老引擎」的最后一步 ⭐⭐⭐
+    //
+    // ⚠️ **老引擎的 `login` op 不是调 `login()`，而是跑【宿主传来的 action 表达式】**
+    //   （App 的登录面板把 `loginUi` 里某个按钮的 `action` 传给宿主）
+    //   ⇒ 所以这里要做的 = 「跑 action + 收站方 toast 原文」⭐⭐⭐
+
+    // MARK: - ⭐⭐⭐ 源级变量 / 服务器列表 / 筛选栏动作（老引擎 `engine.js` 同款，2026-10-25）
+    //
+    // ⇒ 老引擎退役 ⇒ 这三个 op 也必须由新引擎接管 ⇒ 否则「默认变量表」「线路列表」「筛选栏」全废 ⭐⭐⭐
+
+    /// ⭐⭐⭐ **站方的默认书籍变量**（jsLib 里 `getArguments` 的兜底默认值）
+    ///
+    /// ⚠️ **为什么必须有**（2026-10-21 真机「目录 0 章」的根因）：
+    ///   站方 `getArguments(open_argument, key)` **只有变量串解析失败时**（= 空串）才给默认表
+    ///   ⇒ 一旦写入**任何一项** ⇒ `tab / sources / source_type / proxy …` 全变 undefined
+    ///   ⇒ 源被改坏（实测：只写 `{"proxy":"本地"}` ⇒ `server` 没了 ⇒ `undefined/catalog` ⇒ 4 本书全 0 章）⭐⭐⭐
+    public func sourceVars() throws -> [String: String] {
+        guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
+        // ⭐ jsLib 由**宿主在 session 建立时**加载（`engine.loadJsLib`）⇒ 这里直接用全局 ⭐
+        let ctx = JSRunContext(base: .json(.object([:])), baseUrl: source.bookSourceUrl, varBox: javaVars)
+        let code = """
+        (function(){
+          var out = {};
+          try {
+            if (typeof getArguments === 'function') {
+              var d = getArguments('', '');
+              if (d && typeof d === 'object') { for (var k in d) { if (Object.prototype.hasOwnProperty.call(d, k)) { out[k] = String(d[k]); } } }
+            }
+          } catch (e) { out = {}; }
+          return JSON.stringify(out);
+        })()
+        """
+        let out = try js.run(code, context: ctx)
+        let text: String = out.scalarString
+        guard let data = text.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: String] else { return [:] }
+        return obj
+    }
+
+    /// ⭐⭐⭐ **站方的服务器列表**（jsLib 里的 `var host = [...]`）
+    public func sourceHosts() throws -> [String] {
+        guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
+        // ⭐ jsLib 由**宿主在 session 建立时**加载（`engine.loadJsLib`）⇒ 这里直接用全局 ⭐
+        let ctx = JSRunContext(base: .json(.object([:])), baseUrl: source.bookSourceUrl, varBox: javaVars)
+        let code = """
+        (function(){
+          var arr = [];
+          try {
+            if (typeof host !== 'undefined' && host && host.length) {
+              for (var i = 0; i < host.length; i++) {
+                var s = String(host[i] || '').trim();
+                if (s && arr.indexOf(s) < 0) arr.push(s);
+              }
+            }
+          } catch (e) {}
+          return JSON.stringify(arr);
+        })()
+        """
+        let out = try js.run(code, context: ctx)
+        let text: String = out.scalarString
+        guard let data = text.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [String] else { return [] }
+        return arr
+    }
+
+    /// ⭐⭐⭐ **执行发现页筛选栏的 action**（老引擎 `filterAction` 同款）
+    ///
+    /// ⇒ 站方 action 里读 `infoMap['平台']` ⇒ 这里按【标题】塞进去 ⭐⭐⭐
+    public func runFilterAction(action: String, title: String, value: String) throws
+        -> (ok: Bool, error: String) {
+        guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
+        // ⭐ jsLib 由**宿主在 session 建立时**加载（`engine.loadJsLib`）⇒ 这里直接用全局 ⭐
+        let trimmed = action.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return (false, "没有筛选动作") }
+        var infoMap: [String: JSONValue] = [:]
+        if !title.isEmpty { infoMap[title] = .string(value) }
+        let ctx = JSRunContext(base: .json(.object([:])), baseUrl: source.bookSourceUrl,
+                               varBox: javaVars, extra: ["infoMap": .object(infoMap)])
+        let code = """
+        (function(){
+          try { (\(trimmed)); return JSON.stringify({ ok: true }); }
+          catch (e) { return JSON.stringify({ ok: false, error: String((e && e.message) || e) }); }
+        })()
+        """
+        let out = try js.run(code, context: ctx)
+        let text: String = out.scalarString
+        guard let data = text.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return (false, "筛选动作没有返回结果")
+        }
+        let ok = obj["ok"] as? Bool ?? false
+        return (ok, obj["error"] as? String ?? "")
+    }
+
+    /// ⭐⭐⭐ **执行站方的登录 action**（宿主传来的 JS 表达式）
+    /// - Parameter formValues: 表单值（站方 `putLoginInfo(JSON.stringify(result))` 用的就是它）
+    /// - Returns: `(ok, result, messages)` —— `messages` = 站方 toast/log 原文（判断成败的唯一依据）⭐
+    public func runLoginAction(_ action: String,
+                                formValues: [String: String]) throws
+        -> (ok: Bool, result: String, messages: [String]) {
+        guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
+        // ① 站方的 `loginUrl`（定义 `function login()` 等）⇒ 加载进**全局** ⭐
+        try? loadLoginScript()
+        // ② 表单值 ⇒ `result`（老引擎：`result: formValues`）⭐
+        let vars = formValues.mapValues { JSONValue.string($0) }
+        let ctx = JSRunContext(base: .json(.object(vars)),
+                               baseUrl: source.bookSourceUrl,
+                               varBox: javaVars,
+                               collectMessages: true)
+        // ③ ⭐⭐⭐ **同一次 eval 里**「跑 action + 取消息」
+        //   ⚠️ `__qrMsgs` 是 eval 的**局部 var** ⇒ 分两次 eval 拿不到 ⇒ 必须包在一个 IIFE 里 ⭐
+        let code = """
+        (function(){
+          var __r;
+          try { __r = (\(action)); }
+          catch (e) { return JSON.stringify({ ok: false, error: String((e && e.message) || e), messages: (__qrMsgs || []) }); }
+          return JSON.stringify({ ok: true, result: (__r == null ? '' : String(__r)), messages: (__qrMsgs || []) });
+        })()
+        """
+        let out = try js.run(code, context: ctx)
+        let text: String = out.scalarString
+        guard let data = text.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return (false, "", [])
+        }
+        let ok = obj["ok"] as? Bool ?? false
+        let err = obj["error"] as? String ?? ""
+        let msgs = (obj["messages"] as? [String]) ?? []
+        return (ok, ok ? (obj["result"] as? String ?? "") : err, msgs)
+    }
+
+    /// ⭐⭐⭐ **登录状态检测**（老引擎的 `loginProbe`）
+    /// - Returns: `(baseUrl, messages, stationCheck)`
+    public func probeLoginStatus() throws -> (baseUrl: String, messages: [String], stationCheck: Bool) {
+        guard let js = evaluator.js else { throw SourceError.unsupported("JS 后端未接") }
+        try? loadLoginScript()
+        let ctx = JSRunContext(base: .json(.object([:])),
+                               baseUrl: source.bookSourceUrl,
+                               varBox: javaVars,
+                               collectMessages: true)
+        // ⭐ 站方自己的 `checkStatus()`（会员卡片走 `java.log` + `java.longToast`）
+        //   ⚠️ **必须走引擎的 runJs**（站方 `java.ajax` 是同步的 ⇒ 直接调会拿到 Promise）⭐⭐⭐
+        let code = """
+        (function(){
+          var __has = false;
+          try { __has = (typeof checkStatus === 'function'); } catch (e) {}
+          if (!__has) { return JSON.stringify({ baseUrl: '', messages: (__qrMsgs || []), stationCheck: false, hasCheck: false }); }
+          try { checkStatus(); } catch (e) { return JSON.stringify({ baseUrl: '', messages: (__qrMsgs || []), stationCheck: false, hasCheck: true, error: String((e && e.message) || e) }); }
+          return JSON.stringify({ baseUrl: '', messages: (__qrMsgs || []), stationCheck: true, hasCheck: true });
+        })()
+        """
+        let out = try js.run(code, context: ctx)
+        let text: String = out.scalarString
+        guard let data = text.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return ("", [], false)
+        }
+        let msgs = (obj["messages"] as? [String]) ?? []
+        let hasCheck = obj["hasCheck"] as? Bool ?? false
+        let stationCheck = obj["stationCheck"] as? Bool ?? false
+        // ⭐ 服务器地址：站方 `getArgument('server')`（登录后会存进书籍变量）⇒ 回退 jsLib 的 `host[0]`
+        var base = obj["baseUrl"] as? String ?? ""
+        if base.isEmpty {
+            let probe = """
+            (function(){
+              var b = '';
+              try { if (typeof getArgument === 'function') b = String(getArgument('server') || ''); } catch (e) {}
+              if (!b) { try { if (typeof host !== 'undefined' && host && host.length) b = String(host[0]); } catch (e) {} }
+              return JSON.stringify({ baseUrl: b });
+            })()
+            """
+            if let p = try? js.run(probe, context: ctx) {
+                if let d = p.scalarString.data(using: .utf8),
+                   let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
+                    base = o["baseUrl"] as? String ?? ""
+                }
+            }
+        }
+        return (base, msgs, stationCheck && hasCheck)
+    }
+
     /// ⭐ **执行站方的登录动作**（`function login()`）⇒ 返回它的返回值。
     ///
     /// ⚠️ 站方常返回 **JSON 串**（猫眼：`return JSON.stringify(loginUI)`）
@@ -1099,6 +1282,12 @@ public final class SourceEngine {
         guard let json = try? JSONSerialization.data(withJSONObject: info),
               let text = String(data: json, encoding: .utf8) else { return }
         storage?.setString(text, forKey: Self.loginInfoKey)
+    }
+
+    /// ⭐⭐⭐ **当前登录头**（栖阅机制：站方 `putLoginHeader` 写 ⇒ 自动注入到每次请求头）
+    /// ⇒ 宿主登录后要把它取回落盘（老引擎的 `__loginHeader` 同款）⭐⭐⭐
+    public func currentLoginHeaderString() -> String {
+        Self.currentLoginHeader("", storage: storage)
     }
 
     /// ⭐ **读取登录信息**

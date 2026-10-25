@@ -1,39 +1,714 @@
 {
  "bookInfo": {
-  "name": "测试书名",
-  "author": "测试作者",
-  "introLen": 313,
-  "intro": "\n📡 当前服务：https://v5.langge.uk\n🔑 欢迎回来：测试用户\n🏷 数据来源：番茄\n🔄 当前模式：undefined\n⚙️ 访问模式：服务器网络\n📖 阅读至：未开始\n❇️───────❇️───────❇️\n🌈 书籍分类： 都市|热血\n👑 书籍主角： undefined\n📚 最新章节： 第1章\n⏳ 更新时间： undefined\n📊 书籍字数： 12万字\n🚩 书籍状态： 连载中\n⭐ 书籍评分： 9.0\n&lrm;\n&lrm;\n📖 书籍简介：\n测试简介\n❇️───────❇️───────❇️\n© undefined\n\n&lrm;\n&lrm;\n💠💠💠 数据更新于 <时间戳>\n",
-  "tocUrl": "data:;base64,eyJib29rX2lkIjoiNzY1MDM1NDc4MDYyNTAyMzUxMiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian2\"}",
-  "coverUrl": "https://example.com/c.jpg"
+  "name": "终极：我雷婷他哥，开局战力三万",
+  "author": "三文共舞",
+  "introLen": 728,
+  "intro": "\n📡 当前服务：https://v5.langge.uk\n🔑 欢迎回来：测试用户\n🏷 数据来源：番茄\n🔄 当前模式：小说\n⚙️ 访问模式：服务器网络\n📖 阅读至：未开始\n❇️───────❇️───────❇️\n🌈 书籍分类： 男频衍生\n👑 书籍主角： 雷烬\n📚 最新章节： 第138章 关羽vs吕布\n⏳ 更新时间： 2026-08-31 14:48:58\n📊 书籍字数： 30万\n🚩 书籍状态： 已断更\n⭐ 书籍评分： 5.9\n&lrm;\n&lrm;\n📖 书籍简介：\n【不拆东婷】\n穿越终极宇宙，成为雷家的养子，终极一班老大雷婷的哥哥雷烬，但却是一个身体病弱没有任何战力指数的麻瓜。\n\n　　开局遭神秘势力绑架，直接病发身亡？\n\n　　濒死之际觉醒前世记忆，并绑定最强签到系统，当场死而复生！\n\n　　蛰伏两年后，剧情正式开始，他以30000战力指数强势归来！\n\n　　当雷烬再次踏入芭乐高中时，整个终极一班都炸了！\n\n　　汪大东：“现在的高中生都这么强的吗？”\n\n　　花灵龙：“King居然让他坐在自己的沙发上？”\n\n　　裘球：“他们不会是在交往吧？”\n\n　　金宝三：“开什么玩笑！他是King失踪两年的哥哥！”\n\n　　然而所有人都不知道，这个看似温和的转学生，早已是让无数强者闻风丧胆的存在。\n\n　　银时空势力暗中布局，神秘组织虎视眈眈。\n\n　　当终极危机降临，雷烬手持霸王枪横扫八方。\n\n　　“敢动我妹妹的人，都得死！”\n❇️───────❇️───────❇️\n© 版权信息：本书的数字版权由 番茄小说 提供并授权发行，如有任何疑问，请通过“我的-意见反馈”告知我们\n\n&lrm;\n&lrm;\n💠💠💠 数据更新于 <时间戳>\n",
+  "tocUrl": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian2\"}",
+  "coverUrl": "https://p3-reading-sign.fqnovelpic.com/novel-pic/p2ofa3027129ce66ae9e83678301138e8c1~tplv-noop.image?lk3s=45961287&x-expires=1798076815&x-signature=KuLne27HHJ7qrMmyuOkb2NlMF7Q%3D"
  },
  "toc": {
-  "count": 3,
+  "count": 138,
   "chapters": [
    {
-    "title": "第一章 风起",
-    "url": "data:;base64,eyJib29rX2lkIjoiNzY1MDM1NDc4MDYyNTAyMzUxMiIsIml0ZW1faWQiOiI3NDAwMDAwMDAwMDAwMDAwMDAxIiwidGl0bGUiOiLnrKzkuIDnq6Ag6aOO6LW3IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "title": "第1章 雷烬",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTExODg4NzM0NzgxNDkzNiIsInRpdGxlIjoi56ysMeeroCDpm7fng6wiLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
     "isVolume": false
    },
    {
-    "title": "第二章 云涌",
-    "url": "data:;base64,eyJib29rX2lkIjoiNzY1MDM1NDc4MDYyNTAyMzUxMiIsIml0ZW1faWQiOiI3NDAwMDAwMDAwMDAwMDAwMDAyIiwidGl0bGUiOiLnrKzkuoznq6Ag5LqR5raMIiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "title": "第2章 转学终极一班",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTEyNjk2NDYyNTIyODMxMiIsInRpdGxlIjoi56ysMueroCDovazlrabnu4jmnoHkuIDnj60iLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
     "isVolume": false
    },
    {
-    "title": "第三章 破晓",
-    "url": "data:;base64,eyJib29rX2lkIjoiNzY1MDM1NDc4MDYyNTAyMzUxMiIsIml0ZW1faWQiOiI3NDAwMDAwMDAwMDAwMDAwMDAzIiwidGl0bGUiOiLnrKzkuInnq6Ag56C05pmTIiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "title": "第3章 坐到雷婷旁边",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTEyNzExMjk1MjU5NDk2OCIsInRpdGxlIjoi56ysM+eroCDlnZDliLDpm7flqbfml4HovrkiLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第4章 和雷婷的约定",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTEyNzI1Njk5MzM2NjU1MiIsInRpdGxlIjoi56ysNOeroCDlkozpm7flqbfnmoTnuqblrpoiLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第5章 暗影兵团",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTEyNzQ4NDM2MjQwODQ3MiIsInRpdGxlIjoi56ysNeeroCDmmpflvbHlhbXlm6IiLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第6章 汪大东",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTE4MDAzNzE1ODYxNzYyNCIsInRpdGxlIjoi56ysNueroCDmsarlpKfkuJwiLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第7章 雷烬vs汪大东",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTE4MDIwMTUyNTAwMjc3NiIsInRpdGxlIjoi56ysN+eroCDpm7fng6x2c+axquWkp+S4nCIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第8章 忽悠汪大东",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTE4MDM5NTEzNDA3NTQxNiIsInRpdGxlIjoi56ysOOeroCDlv73mgqDmsarlpKfkuJwiLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第9章 断肠人",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTE4NzM4MDEzNTAxOTAzMiIsInRpdGxlIjoi56ysOeeroCDmlq3ogqDkuroiLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第10章 厉嫣嫣",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTU4NzU1MTE1NTA3NzY1NiIsInRpdGxlIjoi56ysMTDnq6Ag5Y6J5auj5aujIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第11章 雷烬的猜测",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTY0Njc4Mjg4MTI2ODI0OCIsInRpdGxlIjoi56ysMTHnq6Ag6Zu354Os55qE54yc5rWLIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第12章 汪大东的大舅哥",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NTk2NTgwMDk4OTE5NjgyNCIsInRpdGxlIjoi56ysMTLnq6Ag5rGq5aSn5Lic55qE5aSn6IiF5ZOlIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第13章 雷婷和汪大东的第一张合照",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NjAyMTQ4NjI4MDM3Njg1NiIsInRpdGxlIjoi56ysMTPnq6Ag6Zu35am35ZKM5rGq5aSn5Lic55qE56ys5LiA5byg5ZCI54WnIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第14章 单细胞的直觉",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NjMwODM3NzE4MTQ4NzY0MCIsInRpdGxlIjoi56ysMTTnq6Ag5Y2V57uG6IOe55qE55u06KeJIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第15章 提升战力指数的面包",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NjQwODAxMzMwNTAzNzMzNiIsInRpdGxlIjoi56ysMTXnq6Ag5o+Q5Y2H5oiY5Yqb5oyH5pWw55qE6Z2i5YyFIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第16章 一袋就要三万台币",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NjcwMDYyMjQwNTY0ODkyMCIsInRpdGxlIjoi56ysMTbnq6Ag5LiA6KKL5bCx6KaB5LiJ5LiH5Y+w5biBIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第17章 幽雪带来的消息",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1Njc3MTEwNDA3MzA1Njc5MiIsInRpdGxlIjoi56ysMTfnq6Ag5bm96Zuq5bim5p2l55qE5raI5oGvIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第18章 小苹果三人组",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NjgxODUzOTEyMjEzMTQ4MCIsInRpdGxlIjoi56ysMTjnq6Ag5bCP6Iu55p6c5LiJ5Lq657uEIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第19章 雷烬没有弱点",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NzE0Mzc1NzMzODMxMzI0MCIsInRpdGxlIjoi56ysMTnnq6Ag6Zu354Os5rKh5pyJ5byx54K5Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第20章 使用摄心术",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NzQwOTAwNDQ1NjM5NTI4OCIsInRpdGxlIjoi56ysMjDnq6Ag5L2/55So5pGE5b+D5pyvIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第21章 幕后之人？",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1NzUwMDA5NDAwMTg0MDY2NCIsInRpdGxlIjoi56ysMjHnq6Ag5bmV5ZCO5LmL5Lq677yfIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第22章 消失的鬼脸面具男",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1Nzc3Njk4NDM4NjE5MTg5NiIsInRpdGxlIjoi56ysMjLnq6Ag5raI5aSx55qE6ay86IS46Z2i5YW355S3Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第23章 辜单戈",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1Nzg4MzA2NjYyMjI4MDIxNiIsInRpdGxlIjoi56ysMjPnq6Ag6L6c5Y2V5oiIIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第24章 去找黑龙",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODE3OTk4OTQxNzc3MTU0NCIsInRpdGxlIjoi56ysMjTnq6Ag5Y675om+6buR6b6ZIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第25章 黑龙，我是来谈条件的",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODI2MTM4NzYwODU4ODgyNCIsInRpdGxlIjoi56ysMjXnq6Ag6buR6b6Z77yM5oiR5piv5p2l6LCI5p2h5Lu255qEIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第26章 雷烬是KO.1 ？",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODUyNzM5NTk0NjcwOTUyOCIsInRpdGxlIjoi56ysMjbnq6Ag6Zu354Os5pivS08uMSDvvJ8iLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第27章 雷烬的“坦白”",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODYyMTgwMjI0MjkwMDUwNCIsInRpdGxlIjoi56ysMjfnq6Ag6Zu354Os55qE4oCc5Z2m55m94oCdIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第28章 选择不理汪大东",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODYyMTk3NjM3NzgzNjA1NiIsInRpdGxlIjoi56ysMjjnq6Ag6YCJ5oup5LiN55CG5rGq5aSn5LicIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第29章 暗中窥探的目光",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODYyMjE5NTM2NjYyNTgxNiIsInRpdGxlIjoi56ysMjnnq6Ag5pqX5Lit56ql5o6i55qE55uu5YWJIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第30章 和裘球的气息相似",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODYyNDIzMzcwNjExMTUxMiIsInRpdGxlIjoi56ysMzDnq6Ag5ZKM6KOY55CD55qE5rCU5oGv55u45Ly8Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第31章 辜战被秒了",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODgzOTcyNDA5NzgxNTA2NCIsInRpdGxlIjoi56ysMzHnq6Ag6L6c5oiY6KKr56eS5LqGIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第32章 雷烬救场",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODgzOTg2NjI3NjMxNTY3MiIsInRpdGxlIjoi56ysMzLnq6Ag6Zu354Os5pWR5Zy6Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第33章 送辜单戈去医院",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODg0MDA0MTQ5MzM2NTI3MiIsInRpdGxlIjoi56ysMzPnq6Ag6YCB6L6c5Y2V5oiI5Y675Yy76ZmiIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第34章 金笔客",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODg0MjY3OTc5NDQ2NzM1MiIsInRpdGxlIjoi56ysMzTnq6Ag6YeR56yU5a6iIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第35章 雷烬的特别之处",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1ODg0MjkyMTc3MjI3MDEwNCIsInRpdGxlIjoi56ysMzXnq6Ag6Zu354Os55qE54m55Yir5LmL5aSEIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第36章 遇到转学三人组",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1OTI2Mjk3ODEyMTc5NDA3MiIsInRpdGxlIjoi56ysMzbnq6Ag6YGH5Yiw6L2s5a2m5LiJ5Lq657uEIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第37章 只有止戈不认识雷烬",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1OTM1MzYxNTk0NDkyNTcyMCIsInRpdGxlIjoi56ysMzfnq6Ag5Y+q5pyJ5q2i5oiI5LiN6K6k6K+G6Zu354OsIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第38章 奇怪的雷烬",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1OTY0MDY4NzE0NjU2NjE2OCIsInRpdGxlIjoi56ysMzjnq6Ag5aWH5oCq55qE6Zu354OsIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第39章 似曾相识的台词",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1OTY2MDcxMzI0NTI3ODc0NCIsInRpdGxlIjoi56ysMznnq6Ag5Ly85pu+55u46K+G55qE5Y+w6K+NIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第40章 KO.1要出手了",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY1OTcyOTE2NDI2NTU4NzIyNCIsInRpdGxlIjoi56ysNDDnq6AgS08uMeimgeWHuuaJi+S6hiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第41章 雷烬VS辜战",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MDAwNDI2NjEzNTc4MTkxMiIsInRpdGxlIjoi56ysNDHnq6Ag6Zu354OsVlPovpzmiJgiLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第42章 不愧是KO.1",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MDA5NDMzNTkyNDMwNjQ1NiIsInRpdGxlIjoi56ysNDLnq6Ag5LiN5oSn5pivS08uMSIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第43章 呼延觉罗修",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MDM3NDk2Mzk4NzE1MzQzMiIsInRpdGxlIjoi56ysNDPnq6Ag5ZG85bu26KeJ572X5L+uIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第44章 银时空东汉书院",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MDQ3NzU5NzA3OTMwNjc3NiIsInRpdGxlIjoi56ysNDTnq6Ag6ZO25pe256m65Lic5rGJ5Lmm6ZmiIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第45章 曹校长",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MDc0OTg4NDIwNjYyOTQwMCIsInRpdGxlIjoi56ysNDXnq6Ag5pu55qCh6ZW/Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第46章 不存在的司马懿",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MDg0Mzg0NjE1ODI3MTAwMCIsInRpdGxlIjoi56ysNDbnq6Ag5LiN5a2Y5Zyo55qE5Y+46ams5oe/Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第47章 单独留在银时空调查",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MTExODcyNjIyMTEyMDAyNCIsInRpdGxlIjoi56ysNDfnq6Ag5Y2V54us55WZ5Zyo6ZO25pe256m66LCD5p+lIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第48章 关羽",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MTIwOTAxMDY2MTQ5MTIyNCIsInRpdGxlIjoi56ysNDjnq6Ag5YWz5769Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第49章 曹操来电",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MTQ5NDA2MjQ2NTE3MTk5MiIsInRpdGxlIjoi56ysNDnnq6Ag5pu55pON5p2l55S1Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第50章 魔化异能行者",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MTU4NTEzNzcyOTAyODYzMiIsInRpdGxlIjoi56ysNTDnq6Ag6a2U5YyW5byC6IO96KGM6ICFIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第51章 在关羽面前用摄心术",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MTg2ODQ1ODA4MjA1ODc3NiIsInRpdGxlIjoi56ysNTHnq6Ag5Zyo5YWz57696Z2i5YmN55So5pGE5b+D5pyvIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第52章 纯种日行者",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MTk1MDE1OTMxMTM1NjQ0MCIsInRpdGxlIjoi56ysNTLnq6Ag57qv56eN5pel6KGM6ICFIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第53章 回东汉书院",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MjAxMTQxMDkxNzg4NDQ0MCIsInRpdGxlIjoi56ysNTPnq6Ag5Zue5Lic5rGJ5Lmm6ZmiIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第54章 返回金时空",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MjMyNjg3MjQyODAwMzg2NCIsInRpdGxlIjoi56ysNTTnq6Ag6L+U5Zue6YeR5pe256m6Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第55章 探望厉嫣嫣",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MjYwOTg0NjQxNTM5MzMwNCIsInRpdGxlIjoi56ysNTXnq6Ag5o6i5pyb5Y6J5auj5aujIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第56章 大战黑龙",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MjcwMjAwMDUzODE0MTIwOCIsInRpdGxlIjoi56ysNTbnq6Ag5aSn5oiY6buR6b6ZIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第57章 黑龙吃大力丸",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2Mjk5NTM2NzgzODg3NjE4NCIsInRpdGxlIjoi56ysNTfnq6Ag6buR6b6Z5ZCD5aSn5Yqb5Li4Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第58章 三人战力全破四万",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MzA2Njc0MzA3MzQwNzUxMiIsInRpdGxlIjoi56ysNTjnq6Ag5LiJ5Lq65oiY5Yqb5YWo56C05Zub5LiHIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第59章 黑龙败逃",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MzM0MzQ0NTE4ODAxODcxMiIsInRpdGxlIjoi56ysNTnnq6Ag6buR6b6Z6LSl6YCDIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第60章 雷克斯",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MzQzNjYwMDUwNzkwODYzMiIsInRpdGxlIjoi56ysNjDnq6Ag6Zu35YWL5pavIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第61章 独孤狼抓黑龙",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2Mzc1NTM1ODk4MDAxNDYxNiIsInRpdGxlIjoi56ysNjHnq6Ag54us5a2k54u85oqT6buR6b6ZIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第62章 雷克斯带来的线索",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2MzgyMjA0OTAxNzYxMDc3NiIsInRpdGxlIjoi56ysNjLnq6Ag6Zu35YWL5pav5bim5p2l55qE57q/57SiIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第63章 斩魔刃",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NDA4NTk3MzI1MjE3ODQ1NiIsInRpdGxlIjoi56ysNjPnq6Ag5pap6a2U5YiDIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第64章 调查独孤狼的线索",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NDE4MDE5MzkxMjY4NTA4MCIsInRpdGxlIjoi56ysNjTnq6Ag6LCD5p+l54us5a2k54u855qE57q/57SiIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第65章 炼狱魔君",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NDQ2MDc0NjY5NjE2Mzg2NCIsInRpdGxlIjoi56ysNjXnq6Ag54K854ux6a2U5ZCbIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第66章 斩魔刃显威力",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NDU0OTU5NTcwMzE2NTQ2NCIsInRpdGxlIjoi56ysNjbnq6Ag5pap6a2U5YiD5pi+5aiB5YqbIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第67章 斩杀魔君",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NDgzMjE5OTYzOTcxMjI4MCIsInRpdGxlIjoi56ysNjfnq6Ag5pap5p2A6a2U5ZCbIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第68章 雷克斯的真实身份",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NDkzMTk3MDc3Nzg5MTM1MiIsInRpdGxlIjoi56ysNjjnq6Ag6Zu35YWL5pav55qE55yf5a6e6Lqr5Lu9Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第69章 浑沌堂",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NTIwNTI2MzkwMDYwNzAwMCIsInRpdGxlIjoi56ysNjnnq6Ag5rWR5rKM5aCCIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第70章 司马昭的真正目的",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NTU4MDA1NzM4NDk5MzMwNCIsInRpdGxlIjoi56ysNzDnq6Ag5Y+46ams5pit55qE55yf5q2j55uu55qEIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第71章 联系上修",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NTk0MTIzMjkxNjM4MjIzMiIsInRpdGxlIjoi56ysNzHnq6Ag6IGU57O75LiK5L+uIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第72章 与时空之门签订契约",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NjMyNDM1MzA4ODIyNTgxNiIsInRpdGxlIjoi56ysNzLnq6Ag5LiO5pe256m65LmL6Zeo562+6K6i5aWR57qmIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第73章 断肠人的担忧",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NjY5MDkwMDgxNDIxNzc1MiIsInRpdGxlIjoi56ysNzPnq6Ag5pat6IKg5Lq655qE5ouF5b+nIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第74章 耿烈",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NzA2NzEyODU4Njk3NzgxNiIsInRpdGxlIjoi56ysNzTnq6Ag6IC/54OIIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第75章 想要变强的辜单戈",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2NzQyOTIxMjYwMDQxODg0MCIsInRpdGxlIjoi56ysNzXnq6Ag5oOz6KaB5Y+Y5by655qE6L6c5Y2V5oiIIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第76章 魔化刀疯",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2Nzc5NjA0NzgwODIxNzYyNCIsInRpdGxlIjoi56ysNzbnq6Ag6a2U5YyW5YiA55avIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第77章 你也是盟主的人？",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2ODE3MTM3NjYyNDE1NzIwOCIsInRpdGxlIjoi56ysNzfnq6Ag5L2g5Lmf5piv55uf5Li755qE5Lq677yfIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第78章 王亚瑟丁小雨",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2ODUzOTE2ODc0MTM5MjkyMCIsInRpdGxlIjoi56ysNzjnq6Ag546L5Lqa55Gf5LiB5bCP6ZuoIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第79章 终极一街四天王",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2ODkxOTU5NTk2NDU4MDM3NiIsInRpdGxlIjoi56ysNznnq6Ag57uI5p6B5LiA6KGX5Zub5aSp546LIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第80章 各自的对手",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2OTAwNTE2Mzg1NTYyNjc3NiIsInRpdGxlIjoi56ysODDnq6Ag5ZCE6Ieq55qE5a+55omLIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第81章 飞轮海？",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2OTI4NzAzNDAxNTQ2NjAwOCIsInRpdGxlIjoi56ysODHnq6Ag6aOe6L2u5rW377yfIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第82章 Zack",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2OTM3MzUwNjQwODE3MDAwOCIsInRpdGxlIjoi56ysODLnq6AgWmFjayIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第83章 全员都是魔",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2OTY1NzU3OTAxMzgxNjg1NiIsInRpdGxlIjoi56ysODPnq6Ag5YWo5ZGY6YO95piv6a2UIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第84章 恶魔退散",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY2OTc0OTEyMzM1MTg1NTY0MCIsInRpdGxlIjoi56ysODTnq6Ag5oG26a2U6YCA5pWjIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第85章 铜时空统治者加百列",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MDAyODY1Njk0MDQxNzU2MCIsInRpdGxlIjoi56ysODXnq6Ag6ZOc5pe256m657uf5rK76ICF5Yqg55m+5YiXIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第86章 拔魔战士技安",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MDExNjI0OTA2OTY4MzIyNCIsInRpdGxlIjoi56ysODbnq6Ag5ouU6a2U5oiY5aOr5oqA5a6JIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第87章 雷烬的绝对碾压",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MDM5NzU0NDU5MDU1NzcyMCIsInRpdGxlIjoi56ysODfnq6Ag6Zu354Os55qE57ud5a+556K+5Y6LIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第88章 日音王",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MDUwNjg3OTU2MjMwMTk3NiIsInRpdGxlIjoi56ysODjnq6Ag5pel6Z+z546LIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第89章 金时空出现危机",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MDc2NTYzMTI1MTE1MzQzMiIsInRpdGxlIjoi56ysODnnq6Ag6YeR5pe256m65Ye6546w5Y2x5py6Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第90章 刷被动",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MDg1NjcwMTg1NTE1NDcxMiIsInRpdGxlIjoi56ysOTDnq6Ag5Yi36KKr5YqoIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第91章 雷烬VS叶思提",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MTA5NTAwMTgxMTUzNDM2MCIsInRpdGxlIjoi56ysOTHnq6Ag6Zu354OsVlPlj7bmgJ3mj5AiLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第92章 独孤狼、司马昭来袭",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MTIyMzgxODk5NTY0NzAwMCIsInRpdGxlIjoi56ysOTLnq6Ag54us5a2k54u844CB5Y+46ams5pit5p2l6KKtIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第93章 雷克斯（真）",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MTUyNjAxNTYxNjY4MDQ3MiIsInRpdGxlIjoi56ysOTPnq6Ag6Zu35YWL5pav77yI55yf77yJIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第94章 终极一班四人组大战司马昭",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MTYxMTExNTIyNjI2ODE4NCIsInRpdGxlIjoi56ysOTTnq6Ag57uI5p6B5LiA54+t5Zub5Lq657uE5aSn5oiY5Y+46ams5pitIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第95章 霸王心经第二层",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MTg4OTE2NTU3ODk0NTA0OCIsInRpdGxlIjoi56ysOTXnq6Ag6Zy4546L5b+D57uP56ys5LqM5bGCIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第96章 霸王心经vs黯黑真经",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MTk3MDUxNTY0NDMxODIzMiIsInRpdGxlIjoi56ysOTbnq6Ag6Zy4546L5b+D57uPdnPpu6/pu5HnnJ/nu48iLCJzb3VyY2VzIjoi55Wq6IyEIiwidGFiIjoi5bCP6K+0IiwidXJsIjoiIn0=,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第97章 独孤狼吸收叶思提魔功",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MjI1MDA4NDE5MjQzNjc2MCIsInRpdGxlIjoi56ysOTfnq6Ag54us5a2k54u85ZC45pS25Y+25oCd5o+Q6a2U5YqfIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第98章 司马懿",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MjM0NDAxMjYzOTk3ODAwOCIsInRpdGxlIjoi56ysOTjnq6Ag5Y+46ams5oe/Iiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第99章 东城卫与武虎将到来",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MjYyMDE4NDM2Mzg2MDUwNCIsInRpdGxlIjoi56ysOTnnq6Ag5Lic5Z+O5Y2r5LiO5q2m6JmO5bCG5Yiw5p2lIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第100章 司马懿的疯狂",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MjcxODg3MDE3NTU0NzkyOCIsInRpdGxlIjoi56ysMTAw56ugIOWPuOmprOaHv+eahOeWr+eLgiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第101章 最终决战落幕",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3Mjk5NDY1MTQ3MjY3NTM1MiIsInRpdGxlIjoi56ysMTAx56ugIOacgOe7iOWGs+aImOiQveW5lSIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第102章 十年前、银时空",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MzA5MDg4NDM3NTY3NTQxNiIsInRpdGxlIjoi56ysMTAy56ugIOWNgeW5tOWJjeOAgemTtuaXtuepuiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第103章 《绝世武功》",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MzM4Mjg0NDc5NzgxMzI3MiIsInRpdGxlIjoi56ysMTAz56ugIOOAiue7neS4luatpuWKn+OAiyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第104章 黄巾贼",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MzQ2Mjc1NTYwODc3MzE0NCIsInRpdGxlIjoi56ysMTA056ugIOm7hOW3vui0vCIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第105章 雷烬抢劫黄金贼",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MzczNDUyOTM2MTY0MjAwOCIsInRpdGxlIjoi56ysMTA156ugIOmbt+eDrOaKouWKq+m7hOmHkei0vCIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第106章 入住曹家大院",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3MzgzMjk0NDg5MjM5NjA1NiIsInRpdGxlIjoi56ysMTA256ugIOWFpeS9j+abueWutuWkp+mZoiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第107章 暗影将军",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NDExNDM3NDg1MTYyNTQ5NiIsInRpdGxlIjoi56ysMTA356ugIOaal+W9seWwhuWGmyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第108章 刘（修）关张",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NDE5ODA4NDQ4NTY2MTIwOCIsInRpdGxlIjoi56ysMTA456ugIOWImO+8iOS/ru+8ieWFs+W8oCIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第109章 张飞vs雷烬",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NDQ3ODc3MzEyMjYzMDE2OCIsInRpdGxlIjoi56ysMTA556ugIOW8oOmjnnZz6Zu354OsIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第110章 八门金锁阵",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NDU3NDg2MDQ2NjUzNjk4NCIsInRpdGxlIjoi56ysMTEw56ugIOWFq+mXqOmHkemUgemYtSIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第111章 四人破阵",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NDg1MTI1NDAyMjk2MzczNiIsInRpdGxlIjoi56ysMTEx56ugIOWbm+S6uuegtOmYtSIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第112章 和修摊牌",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NDk0MTE5NzEzMDk0MDk1MiIsInRpdGxlIjoi56ysMTEy56ugIOWSjOS/ruaRiueJjCIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第113章 打破瓶颈",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NTIyNDMxMjQ5OTk0NjAwOCIsInRpdGxlIjoi56ysMTEz56ugIOaJk+egtOeTtumiiCIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第114章 五虎上将",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NTMwNzA4NzAwMTMwNTYyNCIsInRpdGxlIjoi56ysMTE056ugIOS6lOiZjuS4iuWwhiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第115章 关羽刮骨疗毒的故事",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NTU5MzEwMjAxMDA5MDAwOCIsInRpdGxlIjoi56ysMTE156ugIOWFs+e+veWIrumqqOeWl+avkueahOaVheS6iyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第116章 张梁找上门讨债",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NTY4NzQwMjY1MTc3OTYwOCIsInRpdGxlIjoi56ysMTE256ugIOW8oOaigeaJvuS4iumXqOiuqOWAuiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第117章 “大哥”出手了",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NTk2Mjc4MTU2ODM1Mjc5MiIsInRpdGxlIjoi56ysMTE356ugIOKAnOWkp+WTpeKAneWHuuaJi+S6hiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第118章 ‘第一高手’张角",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NjA1MTEyNjcxMzU5ODQ4OCIsInRpdGxlIjoi56ysMTE456ugIOKAmOesrOS4gOmrmOaJi+KAmeW8oOinkiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第119章 想学啊你？我教你啊！",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NjMzNjk4NDEwODg0MzU0NCIsInRpdGxlIjoi56ysMTE556ugIOaDs+WtpuWViuS9oO+8n+aIkeaVmeS9oOWViu+8gSIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第120章 越战越勇体质提升",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NjMzNzE0NzA1MzM0MzI1NiIsInRpdGxlIjoi56ysMTIw56ugIOi2iuaImOi2iuWLh+S9k+i0qOaPkOWNhyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第121章 收服张角",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NjcxMDE5MzMyMDY5MDIwMCIsInRpdGxlIjoi56ysMTIx56ugIOaUtuacjeW8oOinkiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第122章 前后各大五十大板",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3Njc5OTA0MjQ1NzcxNTIyNCIsInRpdGxlIjoi56ysMTIy56ugIOWJjeWQjuWQhOWkp+S6lOWNgeWkp+advyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第123章 约董卓谈话",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NzA5NTk2NDcyMDUxMzU2MCIsInRpdGxlIjoi56ysMTIz56ugIOe6puiRo+WNk+iwiOivnSIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第124章 敲诈董卓",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NzE2NzMzNzc2NTYxODIwMCIsInRpdGxlIjoi56ysMTI056ugIOaVsuiviOiRo+WNkyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第125章 目标是夺取河东高校",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NzQ0NTYyODgxNjgwMjMyOCIsInRpdGxlIjoi56ysMTI156ugIOebruagh+aYr+WkuuWPluays+S4nOmrmOagoSIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第126章 四虎战吕布",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NzU0MDU0MzA1OTk4NDkyMCIsInRpdGxlIjoi56ysMTI256ugIOWbm+iZjuaImOWQleW4gyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第127章 让吕布两只手",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NzgxNzY0NTgwMTk0NzY3MiIsInRpdGxlIjoi56ysMTI356ugIOiuqeWQleW4g+S4pOWPquaJiyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第128章 吕布认输",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3NzkyMDQyMjgzNDIwOTMwNCIsInRpdGxlIjoi56ysMTI456ugIOWQleW4g+iupOi+kyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第129章 五虎将想要雷烬当陪练",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3ODIxMDYyNTcyNTUzMDY0OCIsInRpdGxlIjoi56ysMTI556ugIOS6lOiZjuWwhuaDs+imgembt+eDrOW9k+mZque7gyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第130章 修的担忧",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3ODI4ODUyMDIyMTMxMTUxMiIsInRpdGxlIjoi56ysMTMw56ugIOS/rueahOaLheW/pyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第131章 雷烬vs关羽赵云",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3ODU1ODU3NDMxMzc1MTA2NCIsInRpdGxlIjoi56ysMTMx56ugIOmbt+eDrHZz5YWz57696LW15LqRIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第132章 指点两人",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3ODY1MDk0MDYzNDY5NDE2OCIsInRpdGxlIjoi56ysMTMy56ugIOaMh+eCueS4pOS6uiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第133章 自己坑自己的张飞",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3ODk3MzczMzI4OTA4MzQxNiIsInRpdGxlIjoi56ysMTMz56ugIOiHquW3seWdkeiHquW3seeahOW8oOmjniIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第134章 控制住脾气就能变强",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3ODk3Mzg1OTM2MTQ1NjY2NCIsInRpdGxlIjoi56ysMTM056ugIOaOp+WItuS9j+iEvuawlOWwseiDveWPmOW8uiIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第135章 最强的男生",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3OTM0ODU2MjM5OTg1NTEyOCIsInRpdGxlIjoi56ysMTM156ugIOacgOW8uueahOeUt+eUnyIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第136章 特训关羽",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY3OTM0ODY4NzQ4NjU4MzMyMCIsInRpdGxlIjoi56ysMTM256ugIOeJueiureWFs+e+vSIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第137章 白门楼之战",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY4MDA4Mzg3ODYzOTMyMTYyNCIsInRpdGxlIjoi56ysMTM356ugIOeZvemXqOalvOS5i+aImCIsInNvdXJjZXMiOiLnlarojIQiLCJ0YWIiOiLlsI/or7QiLCJ1cmwiOiIifQ==,{\"type\":\"qingtian3\"}",
+    "isVolume": false
+   },
+   {
+    "title": "第138章 关羽vs吕布",
+    "url": "data:;base64,eyJib29rX2lkIjoiTnpZMU5Ea3pPVE0xTnpJeE5UY3lNalV5TUEiLCJpdGVtX2lkIjoiNzY4MDA4NDAyNDQwODE0NjQ1NiIsInRpdGxlIjoi56ysMTM456ugIOWFs+e+vXZz5ZCV5biDIiwic291cmNlcyI6IueVquiMhCIsInRhYiI6IuWwj+ivtCIsInVybCI6IiJ9,{\"type\":\"qingtian3\"}",
     "isVolume": false
    }
   ]
  },
  "content": {
-  "len": 25,
-  "head": "这是测试正文的第一段，用来验证正文链路。\n第二段。",
-  "text": "这是测试正文的第一段，用来验证正文链路。\n第二段。"
+  "len": 57,
+  "head": "您的书源版本过低，请及时更新书源！点击登录进行书源更新。\n您的书源版本过低，请及时更新书源！点击登录进行书源更新。",
+  "text": "您的书源版本过低，请及时更新书源！点击登录进行书源更新。\n您的书源版本过低，请及时更新书源！点击登录进行书源更新。"
  },
  "full": {
-  "intro": "\n📡 当前服务：https://v5.langge.uk\n🔑 欢迎回来：测试用户\n🏷 数据来源：番茄\n🔄 当前模式：undefined\n⚙️ 访问模式：服务器网络\n📖 阅读至：未开始\n❇️───────❇️───────❇️\n🌈 书籍分类： 都市|热血\n👑 书籍主角： undefined\n📚 最新章节： 第1章\n⏳ 更新时间： undefined\n📊 书籍字数： 12万字\n🚩 书籍状态： 连载中\n⭐ 书籍评分： 9.0\n&lrm;\n&lrm;\n📖 书籍简介：\n测试简介\n❇️───────❇️───────❇️\n© undefined\n\n&lrm;\n&lrm;\n💠💠💠 数据更新于 <时间戳>\n",
-  "content": "这是测试正文的第一段，用来验证正文链路。\n第二段。"
+  "intro": "\n📡 当前服务：https://v5.langge.uk\n🔑 欢迎回来：测试用户\n🏷 数据来源：番茄\n🔄 当前模式：小说\n⚙️ 访问模式：服务器网络\n📖 阅读至：未开始\n❇️───────❇️───────❇️\n🌈 书籍分类： 男频衍生\n👑 书籍主角： 雷烬\n📚 最新章节： 第138章 关羽vs吕布\n⏳ 更新时间： 2026-08-31 14:48:58\n📊 书籍字数： 30万\n🚩 书籍状态： 已断更\n⭐ 书籍评分： 5.9\n&lrm;\n&lrm;\n📖 书籍简介：\n【不拆东婷】\n穿越终极宇宙，成为雷家的养子，终极一班老大雷婷的哥哥雷烬，但却是一个身体病弱没有任何战力指数的麻瓜。\n\n　　开局遭神秘势力绑架，直接病发身亡？\n\n　　濒死之际觉醒前世记忆，并绑定最强签到系统，当场死而复生！\n\n　　蛰伏两年后，剧情正式开始，他以30000战力指数强势归来！\n\n　　当雷烬再次踏入芭乐高中时，整个终极一班都炸了！\n\n　　汪大东：“现在的高中生都这么强的吗？”\n\n　　花灵龙：“King居然让他坐在自己的沙发上？”\n\n　　裘球：“他们不会是在交往吧？”\n\n　　金宝三：“开什么玩笑！他是King失踪两年的哥哥！”\n\n　　然而所有人都不知道，这个看似温和的转学生，早已是让无数强者闻风丧胆的存在。\n\n　　银时空势力暗中布局，神秘组织虎视眈眈。\n\n　　当终极危机降临，雷烬手持霸王枪横扫八方。\n\n　　“敢动我妹妹的人，都得死！”\n❇️───────❇️───────❇️\n© 版权信息：本书的数字版权由 番茄小说 提供并授权发行，如有任何疑问，请通过“我的-意见反馈”告知我们\n\n&lrm;\n&lrm;\n💠💠💠 数据更新于 <时间戳>\n",
+  "content": "您的书源版本过低，请及时更新书源！点击登录进行书源更新。\n您的书源版本过低，请及时更新书源！点击登录进行书源更新。"
  }
 }
