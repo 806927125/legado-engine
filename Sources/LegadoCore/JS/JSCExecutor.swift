@@ -224,7 +224,9 @@ public final class JSCExecutor: JSExecutor {
         // ⭐⭐⭐ **形态 ②：顶层 \`return\` 合法**（站方真的这么写）
         //   ⚠️ \`eval('{ return 7; }')\` ⇒ Illegal return statement ⇒ 需要形态 ② 兜底 ⭐⭐⭐
         //   ⇒ **只有「顶层有 return」时才用 ②** ⇒ 副作用**只发生一次** ⭐⭐⭐
-        let codeLiteral2 = JSScopeBuilder.jsonLiteral(.string(code))
+        // ⭐⭐⭐ **对象字面量判定**（首尾 `{ }`）⇒ 走「整段当表达式」
+        //   ⚠️ 不能塞进 eval 块 ⇒ 块里 `{a:1}` 会被当**标签语句** ⇒ 值是 undefined ⭐⭐⭐
+        let isObjectLiteral = trimmed.hasPrefix("{") && trimmed.hasSuffix("}")
         let blockLiteral = JSScopeBuilder.jsonLiteral(.string("{ " + code + " }"))
         let hasTopLevelReturn = JSScopeBuilder.hasTopLevelReturn(code)
         let attempts: [String]
