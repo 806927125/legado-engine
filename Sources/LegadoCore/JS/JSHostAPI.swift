@@ -307,9 +307,17 @@ public enum JSScopeBuilder {
             //
             //   ⇒ 名单 = 「老引擎上调用**不抛异常**」的方法（**实测**得出，见 legacyPresentKeys 的注释）⭐
             let throwsWhenUnimplemented = !JSHostAPI.legacyPresentKeys.contains(e.key)
-            let guardClause = throwsWhenUnimplemented
-                ? "if (__r && __r.__qrNotImplemented) { throw new TypeError('\(obj).\(name) is not a function'); }"
-                : "if (__r && __r.__qrNotImplemented) { return undefined; }  // ⭐ 老引擎上不抛 ⇒ 新引擎也不抛"
+            // ⚠️⚠️⚠️ **注释必须单独一行**：`//` 是**行注释** ⇒ 写在语句后面会把**下一行也吃掉**
+            //   ⇒ 生成的 JS 语法坏 ⇒ **整段 hostWrappers 注入失败** ⇒ 所有 java.* 方法全没了
+            //   ⇒ 症状：站方 `java.xxx is not a function`（不是引擎抛的，是 JSC 说属性不存在）⭐⭐⭐
+            //   （2026-10-25 build248 真机事故：这一行注释把 return 吃掉 ⇒ 整段挂）
+            let guardClause: String
+            if throwsWhenUnimplemented {
+                guardClause = "if (__r && __r.__qrNotImplemented) { throw new TypeError('\(obj).\(name) is not a function'); }"
+            } else {
+                // ⭐ 老引擎上不抛 ⇒ 新引擎也不抛（静默返回 undefined）
+                guardClause = "if (__r && __r.__qrNotImplemented) { return undefined; }"
+            }
             out.append("""
             try { \(obj).\(name) = function(\(params)){ \
               var __r = JSON.parse(__hostJSON('\(obj)','\(name)',JSON.stringify([\(params)]))); \
