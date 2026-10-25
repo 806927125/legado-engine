@@ -53,7 +53,7 @@ final class LiveSourceNodeJSTests: XCTestCase {
     ///
     /// ⇒ 这条在 2026-10-25 **复现了真机的 `emptyResult("bookList")`** ⇒ 修好后必须绿 ⭐⭐⭐
     func testRealSourceRealResponseProducesBooks() throws {
-        try XCTSkipUnless(NodeJSExecutor.nodeAvailable, "没装 node ⇒ 跑不了（显式 SKIP，不许假绿）")
+        try XCTSkipUnless(NodeJSExecutor.isAvailable, "没装 node ⇒ 跑不了（显式 SKIP，不许假绿）")
 
         let src = try loadSource()
         let response = try loadRealResponse()
@@ -80,7 +80,7 @@ final class LiveSourceNodeJSTests: XCTestCase {
     /// ⇒ 以前诊断只有「规则[...] 分支=JS」⇒ **看不出引擎看到了什么** ⇒ 只能猜 ⭐⭐⭐
     /// ⇒ 现在：**URL + 响应长度 + 响应前 200 字 + isJSON** ⇒ 真机一次定位 ⭐⭐⭐
     func testEmptyResultDiagnosticHasURLAndResponse() throws {
-        try XCTSkipUnless(NodeJSExecutor.nodeAvailable, "没装 node")
+        try XCTSkipUnless(NodeJSExecutor.isAvailable, "没装 node")
         let src = try loadSource()
         let response = try loadRealResponse()
         let js = try NodeJSExecutor()
@@ -114,7 +114,7 @@ final class LiveSourceNodeJSTests: XCTestCase {
 
     /// ⭐⭐⭐ **诊断 2**：字段规则 `@js:result.title` 在列表项上取值
     func testFieldRuleOnListItem() throws {
-        try XCTSkipUnless(NodeJSExecutor.nodeAvailable, "没装 node")
+        try XCTSkipUnless(NodeJSExecutor.isAvailable, "没装 node")
         let js = try NodeJSExecutor()
         let ev = Evaluator(js: js)
         // 列表项 = 一个 JSON 对象（站方 record）
@@ -130,7 +130,7 @@ final class LiveSourceNodeJSTests: XCTestCase {
 
     /// ⭐⭐⭐ **诊断**：如果上面红了，这条会**指出到底哪一步空**
     func testDiagnoseWhereItFails() throws {
-        try XCTSkipUnless(NodeJSExecutor.nodeAvailable, "没装 node ⇒ 跑不了")
+        try XCTSkipUnless(NodeJSExecutor.isAvailable, "没装 node ⇒ 跑不了")
         let src = try loadSource()
         let response = try loadRealResponse()
         let js = try NodeJSExecutor()

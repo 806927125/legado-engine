@@ -54,6 +54,19 @@ public struct RuleParser {
             return .reparse(parseInternal(String(s.dropFirst(2)), isJSON: isJSON))
         }
 
+        // ⭐⭐⭐⭐⭐ **②' `@js:` 整块 —— 不能按 `||` / `&&` 拆**（2026-10-25 真机实证）
+        //
+        // ⚠️⚠️⚠️ **这是「很多书源都是这样」的通用真凶**：
+        //   `@js:` 后面是**站方的 JavaScript 代码** ⇒ 里面的 `||` 是 **JS 的「或」运算符**
+        //   ⇒ 而解析器会把规则按 `||` 拆成「兜底链」⇒ **JS 代码被腰斩** ⇒ 规则失败 ⭐⭐⭐
+        //   ⇒ 例：`@js:var t = result.tab || "小说"; …` ⇒ 被拆成两段 ⇒ 两段都不是合法 JS ⭐⭐⭐
+        //
+        // ⇒ 修法：**`@js:` 前缀的规则整体当 JS**（跟 `<js>…</js>` 整块一个待遇）⭐⭐⭐
+        //   ⚠️ 这与 `<js>…</js>` 的既有保护**同款**（`RuleParser` 的 ①）⭐⭐⭐
+        if s.hasPrefix("@js:") || s.hasPrefix("@JS:") {
+            return .js(String(s.dropFirst(4)))
+        }
+
         // ③ `||` 择一（§S-FBK-01）—— 优先级最高
         let orParts = Self.splitTopLevel(s, separators: ["||"])
         if orParts.count > 1 {

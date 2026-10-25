@@ -258,6 +258,135 @@ if let idx = CommandLine.arguments.firstIndex(of: "--audit") {
     exit(0)
 }
 
+/// ⭐⭐⭐⭐⭐ **有 JSC 就用 JSC**（macOS）—— 没有就返回 nil（Linux ⇒ 走 Node 后端）
+func JSCExecutorIfAvailable() -> JSExecutor? {
+    #if canImport(JavaScriptCore)
+    return JSCExecutor(api: MinimalHostAPI())
+    #else
+    return nil
+    #endif
+}
+
+// ===============================================================
+// ⭐⭐⭐⭐⭐ `--sourceVars` 模式：**问站方要默认变量表**
+//
+// ⚠️ **为什么需要**（2026-10-25 老 JS 引擎物理删除）：
+//   轻阅的「站方默认变量」门禁原本在 jsdom 里跑老引擎 ⇒ 老引擎删了 ⇒ 门禁的对象没了
+//   ⇒ 现在**直接调新引擎的 `sourceVars` op** ⇒ 语义完全对齐 + 覆盖不丢 ⭐⭐⭐
+//
+// 用法：`swift run conformance --sourceVars '<json>'`
+//   json = {"bookSourceUrl":"…", "jsLib":"…"}
+//   输出：一行 JSON（变量表）
+// ===============================================================
+if let si = CommandLine.arguments.firstIndex(of: "--sourceVars") {
+    let payload = si + 1 < CommandLine.arguments.count
+        ? CommandLine.arguments[si + 1] : "{}"
+    guard let d = payload.data(using: .utf8),
+          let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {
+        print("{}")
+        exit(2)
+    }
+    let url = obj["bookSourceUrl"] as? String ?? ""
+    let jsLib = obj["jsLib"] as? String ?? ""
+    // ⭐⭐⭐ 引擎的 `BookSource` **没有 jsLib 字段**（站方 jsLib 由宿主单独带进来）
+    //   ⇒ 这里直接 `loadJsLib`（与 App 侧 `Session.init` 同款）⭐⭐⭐
+    let src = BookSource(bookSourceName: "probe", bookSourceUrl: url)
+    // ⭐⭐⭐⭐⭐ **选 JS 后端**：JSC 优先，没有就用 **Node**（Linux 沙盒）⭐⭐⭐
+    let jsBackend: JSExecutor?
+    if let jsc = JSCExecutorIfAvailable() {
+        jsBackend = jsc
+    } else if NodeJSExecutor.isAvailable {
+        jsBackend = try NodeJSExecutor()
+    } else {
+        jsBackend = nil
+    }
+    guard let jsBackend else {
+        print("{\"__skip\":\"本平台既没有 JSC 也没有 node ⇒ jsLib 用例没法验\"}")
+        exit(0)
+    }
+    let engine = SourceEngine(source: src, fetcher: PageFetcher(transport: URLSessionTransport()),
+                               js: jsBackend)
+    try? engine.loadJsLib(jsLib)
+    let vars = (try? engine.sourceVars()) ?? [:]
+    let d2 = try! JSONSerialization.data(withJSONObject: vars)
+    print(String(data: d2, encoding: .utf8)!)
+    exit(0)
+}
+
+// ===============================================================
+// ⭐⭐⭐⭐⭐ `--eval` 模式：**任意规则 + 基准 ⇒ 求值结果 JSON**
+//
+// ⚠️ **为什么需要**（2026-10-25 老 JS 引擎物理删除）：
+//   轻阅那 7 个「规则语义」门禁原本**在 jsdom 里跑老引擎 JS**
+//   ⇒ 老引擎删了 ⇒ 门禁的对象没了 ⇒ **覆盖就丢了** ⭐⭐⭐
+//   ⇒ 正解：让它们**跑新引擎**（本模式）⇒ 门禁继续有效，而且验的是**真正在跑的代码** ⭐⭐⭐
+//
+// 用法：`swift run conformance --eval '<json>'`
+//   json = {"rule":"…", "base":"…", "baseType":"page|json|node",
+//           "isJSON":true, "raw":"…", "baseUrl":"…", "vars":{…}}
+//   输出：一行 JSON `{"ok":true,"value":…,"text":"…","branch":"…","failure":"…"}`
+// ===============================================================
+if let ei = CommandLine.arguments.firstIndex(of: "--eval") {
+    let payload = ei + 1 < CommandLine.arguments.count
+        ? CommandLine.arguments[ei + 1] : "{}"
+    guard let d = payload.data(using: .utf8),
+          let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {
+        print("{\"ok\":false,\"error\":\"bad payload\"}")
+        exit(2)
+    }
+    let rule = obj["rule"] as? String ?? ""
+    let baseText = obj["base"] as? String ?? ""
+    let baseType = obj["baseType"] as? String ?? "page"
+    let isJSON = obj["isJSON"] as? Bool ?? false
+    let raw = obj["raw"] as? String ?? baseText
+    let baseUrl = obj["baseUrl"] as? String ?? ""
+    let vars = obj["vars"] as? [String: String] ?? [:]
+
+    let base: RuleBase
+    switch baseType {
+    case "json":
+        // ⭐⭐⭐ **baseJSON 是个对象** ⇒ 不能 `JSONValue.from(字典)`（那会走「当普通字符串」分支）
+        //   ⇒ 必须直接 `JSONValue.from(Any)`（字典 ⇒ `.object`）⭐⭐⭐
+        base = .json(JSONValue.from(obj["baseJSON"] ?? [:]))
+    default:
+        base = .page(baseText)
+    }
+    let ctx = EvalContext(base: base, baseUrl: baseUrl, raw: raw,
+                          vars: vars, isJSON: isJSON)
+    // ⭐⭐⭐⭐⭐ **选 JS 后端**：有 JSC 用 JSC（macOS）；没有就**用 Node 顶替**（Linux 沙盒）
+    //   ⇒ 沙盒里也能真跑站方 JS ⇒ **JS 类门禁不用 SKIP** ⭐⭐⭐
+    let ev: Evaluator
+    if let jsc = JSCExecutorIfAvailable() {
+        ev = Evaluator(js: jsc)
+    } else if NodeJSExecutor.isAvailable {
+        ev = Evaluator(js: try NodeJSExecutor())
+    } else {
+        print("{\"ok\":false,\"error\":\"本平台既没有 JSC 也没有 node ⇒ JS 用例没法验\"}")
+        exit(0)
+    }
+    // ⭐⭐⭐ **可选：先加载站方 jsLib**（2026-10-25 老引擎退役 ⇒ 门禁改验新引擎）
+    //   ⇒ 站方 jsLib 定义的 `getArguments` / `host` 等**全局**必须先在同一个 JS 上下文里跑 ⭐⭐⭐
+    //   ⇒ Linux 上没有 JSC ⇒ **JS 后端不可用** ⇒ jsLib 相关的用例会跳过（显式 SKIP）⭐⭐⭐
+    if let jsLib = obj["jsLib"] as? String, !jsLib.isEmpty {
+        guard let js = ev.js else {
+            print("{\"ok\":false,\"error\":\"本平台没有 JS 后端（jsLib 用例没法验）\"}")
+            exit(0)
+        }
+        try? js.runGlobal(jsLib, context: JSRunContext(base: .page(""), baseUrl: baseUrl))
+    }
+    let e = ev.evalOne(rule, base: base, ctx: ctx)
+    let out: [String: Any] = [
+        "ok": true,
+        "value": e.value.jsonValue.foundationValue,
+        "text": e.value.text,
+        "branch": e.diagnostic.branch ?? "",
+        "failure": e.diagnostic.failure.map { "\($0)" } ?? "",
+    ]
+    let d2 = try! JSONSerialization.data(withJSONObject: out)
+    print(String(data: d2, encoding: .utf8)!)
+    exit(0)
+}
+
 let fixturePath = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
     : "conformance/fixtures/semantics-cases.json"
