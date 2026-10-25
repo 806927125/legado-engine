@@ -268,6 +268,124 @@ func JSCExecutorIfAvailable() -> JSExecutor? {
 }
 
 // ===============================================================
+// ⭐ `--crypto` 模式：直接调 Crypto（调试归一化/解码）
+// ===============================================================
+if CommandLine.arguments.contains("--crypto") {
+    let s = CommandLine.arguments.last ?? ""
+    print("norm: \(Crypto.b64Normalize(s))")
+    print("dec : \(Crypto.base64Decode(s) ?? "nil")")
+    print("hex : \(Crypto.hexDecodeToString(s) ?? "nil")")
+    exit(0)
+}
+
+// ===============================================================
+// ⭐⭐⭐⭐⭐ `--js` 模式：**执行任意 JS**（宿主 API / Java 兼容层都在）
+//
+// ⚠️ **为什么需要**（2026-10-25 老 JS 引擎物理删除）：
+//   轻阅的门禁会 `win.eval("java.hexDecodeToString(…)")` 这种**直接调宿主 API**的 JS
+//   ⇒ 自己 createContext ⇒ `java` 是 undefined ⇒ 全部失败 ⭐⭐⭐
+//   ⇒ 所以：**交给引擎的 node 进程跑**（那儿有宿主壳 + 包装函数 + Java 兼容层）⭐⭐⭐
+//
+// 用法：`swift run conformance --js '<json>'`
+//   json = {"code":"…", "base":"", "isJSON":false, "baseUrl":""}
+//   输出：一行 JSON（`{"ok":true,"value":…,"text":…,"branch":…}`）
+// ===============================================================
+if let ji = CommandLine.arguments.firstIndex(of: "--js") {
+    let payload = ji + 1 < CommandLine.arguments.count ? CommandLine.arguments[ji + 1] : "{}"
+    guard let d = payload.data(using: .utf8),
+          let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {
+        print("{\"ok\":false,\"error\":\"bad payload\"}")
+        exit(2)
+    }
+    var code = obj["code"] as? String ?? ""
+    // ⭐⭐⭐ **自动补 `@js:` 前缀**（2026-10-25 踩过）
+    //   ⇒ 门禁的 `win.eval("java.xxx(…)")` 是**普通 JS** ⇒ 引擎当规则解析会走「默认规则链」⇒ 空 ⭐⭐⭐
+    //   ⇒ 这里统一当 **JS** 求值 ⇒ 与门禁的语义一致 ⭐⭐⭐
+    let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.hasPrefix("@js:") && !trimmed.hasPrefix("@JS:")
+        && !trimmed.hasPrefix("<js>") && !trimmed.hasPrefix("<JS>") {
+        code = "@js:" + code
+    }
+    let baseText = obj["base"] as? String ?? ""
+    let baseType = obj["baseType"] as? String ?? "page"
+    let isJSON = obj["isJSON"] as? Bool ?? false
+    let raw = obj["raw"] as? String ?? baseText
+    let baseUrl = obj["baseUrl"] as? String ?? ""
+    let vars = obj["vars"] as? [String: String] ?? [:]
+
+    let base: RuleBase
+    switch baseType {
+    case "json": base = .json(JSONValue.from(obj["baseJSON"] ?? [:]))
+    default: base = .page(baseText)
+    }
+    // ⭐⭐⭐⭐⭐ **假服务器路由**（内联）⇒ 门禁能在沙盒测 `java.ajax` 语义
+    //   （2026-10-25 老 JS 引擎物理删除 ⇒ 假服务器从 JS 层下沉到 transport 层）⭐⭐⭐
+    let inlineRoutes = (obj["routes"] as? [[String: Any]]) ?? []
+    var routeTransport: RouteTransport? = nil
+    if !inlineRoutes.isEmpty {
+        let rules = inlineRoutes.compactMap { d -> RouteTransport.Rule? in
+            guard let m = d["match"] as? String else { return nil }
+            return RouteTransport.Rule(match: m,
+                                       status: d["status"] as? Int ?? 200,
+                                       body: d["body"] as? String ?? "",
+                                       headers: (d["headers"] as? [String: String]) ?? [:])
+        }
+        routeTransport = RouteTransport(rules: rules)
+    }
+    let ctx = EvalContext(base: base, baseUrl: baseUrl, raw: raw,
+                          vars: vars, isJSON: isJSON)
+    // ⭐⭐⭐ **引擎**（带假服务器）⇒ `java.ajax` 在沙盒能跑 ⭐⭐⭐
+    let engine: SourceEngine? = {
+        guard let srcDict = obj["source"] as? [String: Any],
+              let srcData = try? JSONSerialization.data(withJSONObject: srcDict),
+              let source = try? JSONDecoder().decode(BookSource.self, from: srcData) else { return nil }
+        let jsBackend: JSExecutor?
+        if let jsc = JSCExecutorIfAvailable() { jsBackend = jsc }
+        else if NodeJSExecutor.isAvailable { jsBackend = try? NodeJSExecutor() }
+        else { jsBackend = nil }
+        let transport = routeTransport ?? (HTTPTransportShim.failing())
+        let e = SourceEngine(source: source, fetcher: PageFetcher(transport: transport), js: jsBackend)
+        if let lib = obj["jsLib"] as? String, !lib.isEmpty { try? e.loadJsLib(lib) }
+        return e
+    }()
+    let ev: Evaluator
+    if let jsc = JSCExecutorIfAvailable() {
+        ev = Evaluator(js: jsc)
+    } else if NodeJSExecutor.isAvailable {
+        ev = Evaluator(js: try NodeJSExecutor())
+    } else {
+        print("{\"ok\":false,\"error\":\"本平台既没有 JSC 也没有 node\"}")
+        exit(0)
+    }
+    // ⭐⭐⭐ **把引擎挂到 JS 后端** ⇒ `java.ajax` 走引擎（能打到假服务器）⭐⭐⭐
+    if let engine {
+        ev.js?.setEngineAPI({ method, args, base in engine.engineJava(method, args, base) })
+    }
+    // ⭐⭐⭐⭐⭐ **静态路由给 Node 后端** ⇒ `java.ajax` 能**同步**查表
+    //   （2026-10-25：Node 的宿主往返是异步 ⇒ 同步包装函数拿不到结果 ⇒ 路由必须下沉到 JS 侧）⭐⭐⭐
+    if let node = ev.js as? NodeJSExecutor, !inlineRoutes.isEmpty {
+        node.setRoutes(inlineRoutes)
+    }
+    let e = ev.evalOne(code, base: base, ctx: ctx)
+    var out: [String: Any] = [
+        "ok": true,
+        "value": e.value.jsonValue.foundationValue,
+        "text": e.value.text,
+        "branch": e.diagnostic.branch ?? "",
+        "failure": e.diagnostic.failure.map { "\($0)" } ?? "",
+    ]
+    // ⭐⭐⭐ **请求记录**（门禁要看「发了哪几条」）⭐⭐⭐
+    if let node = ev.js as? NodeJSExecutor, !inlineRoutes.isEmpty {
+        out["requests"] = node.recordedRequests()
+    } else if let rt = routeTransport {
+        out["requests"] = rt.recorder.urls
+    }
+    let d2 = try! JSONSerialization.data(withJSONObject: out)
+    print(String(data: d2, encoding: .utf8)!)
+    exit(0)
+}
+
+// ===============================================================
 // ⭐⭐⭐⭐⭐ `--analyzeUrl` 模式：**URL 规则解析**（老 JS 引擎物理删除后的门禁入口）
 //
 // ⚠️ **为什么需要**：轻阅的 `qiyue-parity` 门禁原本在 jsdom 里跑老引擎的
@@ -340,7 +458,11 @@ if let oi = CommandLine.arguments.firstIndex(of: "--op") {
 
     let op = obj["op"] as? String ?? "explore"
     let dir = URL(fileURLWithPath: (obj["dir"] as? String) ?? ".")
-    let routes = (obj["routes"] as? [[String]] ?? []).map { ($0[0], $0[1]) }
+    // ⭐⭐⭐⭐⭐ **内联路由**（假服务器 ⇒ 门禁不用造 fixture 文件）
+    //   （老门禁用 JS 层的 `nativeMock` ⇒ 现在必须下沉到 transport 层）⭐⭐⭐
+    let inlineRoutes = (obj["routes"] as? [[String: Any]]) ?? []
+    let fileRoutes = (obj["fileRoutes"] as? [[String]] ?? []).map { ($0[0], $0[1]) }
+    let routes = fileRoutes
     guard let srcDict = obj["source"] as? [String: Any],
           let srcData = try? JSONSerialization.data(withJSONObject: srcDict),
           let source = try? JSONDecoder().decode(BookSource.self, from: srcData) else {
@@ -354,8 +476,25 @@ if let oi = CommandLine.arguments.firstIndex(of: "--op") {
     } else if NodeJSExecutor.isAvailable {
         jsBackend = try? NodeJSExecutor()
     }
-    let transport = FileTransport(dir: dir, routes: routes)
+    // ⭐⭐⭐ **transport**：有内联路由 ⇒ 用 `RouteTransport`；否则用文件 fixture
+    var routeTransport: RouteTransport? = nil
+    if !inlineRoutes.isEmpty {
+        let rules = inlineRoutes.compactMap { d -> RouteTransport.Rule? in
+            guard let m = d["match"] as? String else { return nil }
+            return RouteTransport.Rule(match: m,
+                                       status: d["status"] as? Int ?? 200,
+                                       body: d["body"] as? String ?? "",
+                                       headers: (d["headers"] as? [String: String]) ?? [:])
+        }
+        routeTransport = RouteTransport(rules: rules)
+    }
+    let transport: HTTPTransport = routeTransport ?? FileTransport(dir: dir, routes: routes)
     let engine = SourceEngine(source: source, fetcher: PageFetcher(transport: transport), js: jsBackend)
+    // ⭐⭐⭐⭐⭐ **静态路由给 Node 后端** ⇒ `java.ajax` 能**同步**查表
+    //   （Node 的宿主往返是异步 ⇒ 同步包装函数拿不到结果 ⇒ 路由必须下沉到 JS 侧）⭐⭐⭐
+    if let node = jsBackend as? NodeJSExecutor, !inlineRoutes.isEmpty {
+        node.setRoutes(inlineRoutes)
+    }
     if let lib = obj["jsLib"] as? String, !lib.isEmpty {
         try? engine.loadJsLib(lib)
     }
@@ -397,6 +536,12 @@ if let oi = CommandLine.arguments.firstIndex(of: "--op") {
     } catch {
         out["ok"] = false
         out["error"] = "\(error)"
+    }
+    // ⭐⭐⭐ **请求记录**（门禁要断言「发了哪几条」）⭐⭐⭐
+    if let node = jsBackend as? NodeJSExecutor, !inlineRoutes.isEmpty {
+        out["requests"] = node.recordedRequests()
+    } else if let rt = routeTransport {
+        out["requests"] = rt.recorder.urls
     }
     let d2 = try! JSONSerialization.data(withJSONObject: out)
     print(String(data: d2, encoding: .utf8)!)

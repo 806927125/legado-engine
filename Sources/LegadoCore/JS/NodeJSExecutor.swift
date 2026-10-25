@@ -55,6 +55,12 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
     private var hostObjects: [String: HostObject] = [:]
     /// ⭐⭐⭐ **全局基线**（每次求值前清掉「不在基线里」的全局 ⇒ 站方 jsLib 的全局要留着）
     private var baselineGlobals: Set<String> = []
+    /// ⭐⭐⭐⭐⭐ **静态路由表**（假服务器 ⇒ Node 侧的 `java.ajax` 能同步查表）
+    ///
+    /// ⚠️ **为什么需要**（2026-10-25）：站方包装函数是**同步**调 `__hostJSON`
+    ///   ⇒ Node 的宿主往返是**异步** ⇒ 同步代码拿不到结果
+    ///   ⇒ 路由是**静态**的 ⇒ **在 JS 侧查表**才是同步的正解 ⭐⭐⭐
+    private var routeTable: [[String: Any]] = []
 
     public init() throws {
         guard NodeJSExecutor.isAvailable else {
@@ -89,7 +95,8 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
         // ⭐ 初始化：注入 Java 兼容层 + 宿主包装函数
         _ = try send(["cmd": "init",
                       "compat": JavaCompat.sources,
-                      "wrappers": JSScopeBuilder.hostWrappers()])
+                      "wrappers": JSScopeBuilder.hostWrappers(),
+                      "routes": routeTable])
     }
 
     deinit {
@@ -180,6 +187,22 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
     /// ⭐⭐⭐ **引擎侧接管 `java.*`**
     public func setEngineAPI(_ handler: JSEngineAPIHandler?) {
         engineAPI = handler
+    }
+
+    /// ⭐⭐⭐⭐⭐ **设置静态路由表（假服务器）** ⇒ `java.ajax` 在 Node 侧同步查表
+    public func setRoutes(_ routes: [[String: Any]]) {
+        lock.lock(); defer { lock.unlock() }
+        routeTable = routes
+        _ = try? send(["cmd": "routes", "routes": routes])
+    }
+
+    /// ⭐⭐⭐⭐⭐ **取回请求记录**（门禁要看「发了哪几条」）
+    public func recordedRequests() -> [String] {
+        lock.lock(); defer { lock.unlock() }
+        guard let reply = try? send(["cmd": "requests"]), let r = reply["requests"] as? [String] else {
+            return []
+        }
+        return r
     }
 
     /// ⭐⭐⭐ **标记全局基线**（jsLib 跑完后调）
@@ -303,21 +326,62 @@ ctx.__qrPure = {
   base64Encode: function(s) {
     return Buffer.from(String(s === undefined ? '' : s), 'utf8').toString('base64');
   },
+  // ⭐⭐⭐⭐⭐ **base64 解码必须与 Swift 的 `Crypto.base64Decode` 同语义**（2026-10-25 真机/沙盒不一致）
+  //
+  // ⚠️⚠️ **原来的 bug**：`Buffer.from(s,'base64')` **静默忽略非法字符**
+  //   ⇒ `aGVsbG8%2B` ⇒ 丢掉 `%2` ⇒ 解出 `hello6`（**错的**）
+  //   ⇒ 而 Swift 侧 `Crypto.base64Decode` 会**先归一化**（%2B ⇒ +）⇒ 解出 `hello>`（**对的**）
+  //   ⇒ ⇒ **沙盒 ≠ 真机** ⇒ 门禁跑出来的是假象 ⇒ 既会掩盖真 bug，也会造出假 bug ⭐⭐⭐
+  //
+  // ⭐ 正解：**在 JS 侧实现同一套归一化**（b64normalize）
+  //   ① 百分号转义还原（只还原 base64 合法字符）
+  //   ② URL 安全字符（- / _）⇒ 标准 base64（+ / /）
+  //   ③ 空格 ⇒ +
+  b64normalize: function(s) {
+    var t = String(s === undefined ? '' : s);
+    // ① 百分号转义还原
+    t = t.replace(/%([0-9A-Fa-f]{2})/g, function(m, hex) {
+      var ch = String.fromCharCode(parseInt(hex, 16));
+      return /[A-Za-z0-9+/=\-_]/.test(ch) ? ch : m;
+    });
+    // ② URL 安全字符 ⇒ 标准 base64
+    t = t.replace(/-/g, '+').replace(/_/g, '/');
+    // ③ 空格 ⇒ +
+    t = t.replace(/ /g, '+');
+    return t;
+  },
   base64Decode: function(s) {
-    try { return Buffer.from(String(s), 'base64').toString('utf8'); } catch (e) { return ''; }
+    try {
+      var t = ctx.__qrPure.b64normalize(s);
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(t)) return '';
+      var buf = Buffer.from(t, 'base64');
+      // ⚠️ Node 的 base64 解码**静默忽略非法字符** ⇒ 必须自己校验长度
+      if (t.replace(/=+$/, '').length % 4 === 1) return '';
+      return buf.toString('utf8');
+    } catch (e) { return ''; }
   },
   md5Encode: function(s) {
     return require('crypto').createHash('md5')
       .update(String(s === undefined ? '' : s), 'utf8').digest('hex');
   },
+  // ⭐⭐⭐⭐⭐ **hexDecodeToString 必须与 Swift 的 `Crypto.hexDecodeToString` 同语义**
+  //
+  // ⚠️ **原来的 bug**：JS 版**只做 hex** ⇒ base64 载荷一律返回空
+  //   ⇒ 而 Swift 侧是「**先试 hex，失败再按 base64 试一次**」（站方约定：载荷可能是两种）
+  //   ⇒ 站方（大灰狼）拿 base64 喂 `hexDecodeToString` ⇒ **沙盒解不出来，真机能解** ⭐⭐⭐
+  //   ⇒ ⇒ **沙盒 ≠ 真机** ⇒ 门禁跑出来的是假象 ⭐⭐⭐
   hexDecodeToString: function(s) {
-    const t = String(s === undefined ? '' : s);
-    if (!/^[0-9a-fA-F]*$/.test(t)) return '';
-    let out = '';
-    for (let i = 0; i + 1 < t.length; i += 2) {
-      out += String.fromCharCode(parseInt(t.slice(i, i + 2), 16));
+    const t = String(s === undefined ? '' : s).trim();
+    // ① 先试严格 hex（长度偶数 + 字符合法）
+    if (t.length > 0 && t.length % 2 === 0 && /^[0-9a-fA-F]+$/.test(t)) {
+      let out = '';
+      for (let i = 0; i + 1 < t.length; i += 2) {
+        out += String.fromCharCode(parseInt(t.slice(i, i + 2), 16));
+      }
+      return out;
     }
-    return out;
+    // ② 失败 ⇒ 按 base64 再试一次（与 Swift 一致）
+    return ctx.__qrPure.base64Decode(t);
   },
   hexEncodeToString: function(s) {
     let out = '';
@@ -329,12 +393,54 @@ ctx.__qrPure = {
   },
 };
 
+// ⭐⭐⭐⭐⭐ **假服务器（静态路由）** —— 让 Node 后端能跑 `java.ajax`
+//
+// ⚠️ **为什么必须做在 JS 侧**（2026-10-25 踩过）：
+// · 站方包装函数是**同步**调 `__hostJSON(...)`
+// · 而 Node 的宿主往返是**异步**（stdin/stdout）⇒ 同步代码拿不到结果
+// · ⇒ 「Swift 侧发请求再回传」这条路在 Node 后端**走不通** ⭐⭐⭐
+//
+// ⭐ **正解**：路由是**静态**的（URL → 固定 body）⇒ **在 JS 侧查表**即可
+//   ⇒ 完全同步 ⇒ 站方的 catch 换线 / 重试逻辑能原样跑 ⭐⭐⭐
+//   ⇒ 真机走真网络，但**站方看到的语义一样**（ajax 返回 body 字符串）⇒ 门禁语义对得上 ⭐⭐⭐
+//
+// ⭐ 路由格式：[{ match: 'a.example.com', status: 502, body: '…' }]
+//   · `match` 是**子串匹配**（对 URL 去 query 后匹配）
+//   · 未命中 ⇒ 404（**明确失败** ⇒ 不静默 200 造成假绿）⭐⭐⭐
+ctx.__qrRoutes = ctx.__qrRoutes || [];
+ctx.__qrRequests = ctx.__qrRequests || [];
+
+ctx.__qrAjax = function(url, optionsJSON) {
+  var u = String(url === undefined ? '' : url);
+  ctx.__qrRequests.push(u);
+  var bare = u.split('?')[0];
+  for (var i = 0; i < ctx.__qrRoutes.length; i++) {
+    var r = ctx.__qrRoutes[i];
+    if (bare.indexOf(r.match) >= 0 || u.indexOf(r.match) >= 0) {
+      // ⚠️⭐⭐ **非 2xx ⇒ 返回「带原因的串」**（与 Swift 侧 `SourceEngine.ajax` 同语义）⭐⭐⭐
+      //   ⇒ 站方 `JSON.parse(正文)` 抛 ⇒ **catch 换线** ⇒ 与真机一致 ⭐⭐⭐
+      if (r.status < 200 || r.status >= 300) {
+        return '请求失败(' + r.status + '): ' + u;
+      }
+      return r.body === undefined || r.body === null ? '' : String(r.body);
+    }
+  }
+  return '请求失败(404): ' + u;
+};
+
 ctx.__hostJSON = function(object, method, argsJSON) {
   // ① ⭐ 纯计算方法 ⇒ JS 侧直接算（**有参数也能算**）⭐⭐⭐
   if (object === 'java' && ctx.__qrPure[method]) {
     let args = [];
     try { args = JSON.parse(argsJSON); } catch (e) { args = []; }
     const v = ctx.__qrPure[method].apply(null, args);
+    return JSON.stringify([v === undefined ? null : v]);
+  }
+  // ⭐⭐⭐ **`java.ajax` 走【静态路由】**（同步 ⇒ 站方换线逻辑能跑）
+  if (object === 'java' && method === 'ajax' && ctx.__qrRoutes.length > 0) {
+    let a = [];
+    try { a = JSON.parse(argsJSON); } catch (e) { a = []; }
+    const v = ctx.__qrAjax(a[0], a[1]);
     return JSON.stringify([v === undefined ? null : v]);
   }
   // ② 预置缓存（Swift 侧算好的）
@@ -355,6 +461,20 @@ const rl = readline.createInterface({ input: process.stdin, terminal: false });
 
 function globals() {
   try { return Object.keys(ctx); } catch (e) { return []; }
+}
+
+// ⭐⭐⭐⭐⭐ **宿主对象壳**（与 JSCExecutor 的 `makeContext` 同款）
+//   ⇒ `var source={},book={},chapter={},cookie={},cache={},java={};`
+//   ⇒ **包装函数是挂在这些对象上的**（`java.hexDecodeToString = …`）
+//   ⇒ 不先建壳 ⇒ 包装函数注入失败 ⇒ `java.xxx` 是 undefined ⇒ **规则静默失效** ⭐⭐⭐
+function initHostShells() {
+  try {
+    vm.runInContext(
+      'var source={},book={},chapter={},cookie={},cache={},java={};'
+      // ⭐⭐⭐ **window 别名**（真机的 JSC 里 `window` 就是全局）
+      //   ⇒ 站方/门禁常用 `window.java.xxx(...)` ⇒ 没有 window ⇒ undefined ⇒ 规则静默失效 ⭐⭐⭐
+      + 'var window = globalThis;', ctx);
+  } catch (e) { /* 建壳失败 ⇒ 包装函数会失败 ⇒ 记到全局错误里 */ }
 }
 
 function injectCompat(sources) {
@@ -388,20 +508,85 @@ function runEval(code, scope) {
   // ② **Script 形态** ⇒ 末行表达式的完成值（Legado 的主语义）
   // ③ **整段当表达式** `(<code>)` ⇒ 对象字面量当规则时能用（老引擎/栖阅同款）⭐⭐⭐
   // ⇒ **谁先出值用谁**；①抛错 ⇒ 记下来，继续试 ②③ ⭐⭐⭐
-  const attempts = [
-    (scope || '') + '\n' + '(function(){\n' + code + '\n})()',
-    (scope || '') + '\n' + code,
-    (scope || '') + '\n' + '( ' + code + '\n)',
-  ];
+  // ⭐⭐⭐⭐⭐ **scope 后面必须补分号**（2026-10-25 真 bug，Node 后端）
+  //
+  // ⚠️ **原来的 bug**：scope 和 code 之间只隔了一个换行
+  //   ⇒ scope 是 `var book={},source={};` 这种**声明**（末尾**可能没有分号**）
+  //   ⇒ 声明后面直接跟 `(function(){…})()` ⇒ **ASI 不会插入分号**
+  //   ⇒ 语法错 ⇒ 第一级兜底直接炸 ⇒ **整条规则死** ⭐⭐⭐
+  //   ⇒ 症状：Node JS 报错 "Unexpected token '('" / "Unexpected token 'var'" ⭐⭐⭐
+  //
+  // ⭐ 修法：scope 后补 `;` ⇒ 声明与后续代码彻底断开 ⭐⭐⭐
+  const sc = (scope || '').replace(/\s*$/, '') + ';\n';
+
+  // ⭐⭐⭐⭐⭐ **只执行一次（或两次）的形态选择**（2026-10-25 真 bug）
+  //
+  // ⚠️⚠️⚠️ **原来的 bug**：三级兜底是「**跑到有值为止**」
+  //   ⇒ 第一级（函数体形态）执行完**没有值**（站方是末行表达式风格 ⇒ 函数体里没 return）
+  //   ⇒ **继续跑第二级、第三级** ⇒ **站方 JS 被执行 3 次**！⭐⭐⭐
+  //   ⇒ ⇒ 站方的 `java.ajax` 被调 **3 次** ⇒ **请求翻 3 倍** ⇒ 限流打爆（番茄 3 次/天）⭐⭐⭐
+  //   ⇒ **真机（JSC）没有这个问题**（JSC 只 eval 一次）⇒ **沙盒 ≠ 真机** ⭐⭐⭐
+  //   ⇒ ⇒ 门禁跑出来的是假象 ⇒ 也会掩盖真机的 bug ⭐⭐⭐
+  //
+  // ⭐⭐⭐ **正解**：**静态选形态** ⇒ 正常只跑一次
+  //   ① 代码**首尾是 `{ }`** ⇒ 对象字面量 ⇒ 直接用「整段当表达式」
+  //   ② 代码里有**顶层 return** ⇒ 用「函数体形态」（顶层 return 才合法）
+  //   ③ 否则 ⇒ 用「Script 形态」（末行表达式的完成值）⭐⭐⭐
+  //   ⇒ **只有真的抛语法错时**才追加一次「整段当表达式」⇒ 副作用最多 2 次（且只在语法错时）⭐⭐⭐
+  const trimmed = String(code || '').trim();
+  // ⭐⭐⭐ **对象字面量**（首尾 `{ }`）⇒ 直接用「整段当表达式」（**只跑一次**）
+  //   （Script 形态会把 `{a:1}` 当**语句块** ⇒ 不抛错但返回 undefined ⇒ 拿不到值）⭐⭐⭐
+  const isObjectLiteral = trimmed.charAt(0) === '{' && trimmed.charAt(trimmed.length - 1) === '}';
+
+  // ⭐⭐⭐⭐⭐ **形态顺序（2026-10-25 定稿）**
+  //
+  // ① **对象字面量** ⇒ 「整段当表达式」⇒ 只跑一次 ⭐⭐⭐
+  // ② **其它** ⇒ 先「Script 形态」（末行表达式的完成值 = Legado 主语义）⭐⭐⭐
+  //    ⇒ **只有抛语法错**（顶层 `return` 在 Script 里是非法 return ⇒ SyntaxError）
+  //      ⇒ 才改用「函数体形态」（顶层 return 才合法）⭐⭐⭐
+  //    ⇒ ⚠️ **不要静态判断「有没有顶层 return」** ⇒ `(function(){return [];})()`
+  //      这种**函数体内的 return** 会被误判 ⇒ 整条规则死 ⭐⭐⭐
+  // ③ 追加「整段当表达式」（对象字面量之外的怪写法）
+  //
+  // ⭐⭐⭐ **副作用只发生一次**（形态 ① 一次 / 形态 ② 正常一次、
+  //   **只有语法错**才再跑一次）⇒ 站方 `java.ajax` 不会被重复调 ⭐⭐⭐
+  let attempts;
+  if (isObjectLiteral) {
+    attempts = [sc + '( ' + trimmed + '\n)'];
+  } else {
+    attempts = [sc + trimmed, sc + '(function(){\n' + trimmed + '\n})()'];
+  }
+
   let firstErr = null;
+  const errs = [];
   for (let i = 0; i < attempts.length; i++) {
     let v = null, err = null;
     try { v = vm.runInContext(attempts[i], ctx); } catch (e) { err = e; }
-    if (err) { if (!firstErr) firstErr = err; continue; }
-    if (v !== undefined && v !== null) return v;
+    if (err) {
+      errs.push('#' + (i + 1) + ': ' + String(err && err.message || err));
+      if (!firstErr) firstErr = err;
+      continue;
+    }
+    // ⭐⭐⭐ **执行成功就返回**（哪怕是 undefined/null）⇒ **不重复执行** ⭐⭐⭐
+    if (v === undefined || v === null) {
+      // ⚠️ 只有「对象字面量之外 + 明确是对象字面量形态」才追加表达式形态
+      if (i === attempts.length - 1 && !isObjectLiteral) {
+        try {
+          const v2 = vm.runInContext(sc + '( ' + trimmed + '\n)', ctx);
+          if (v2 !== undefined && v2 !== null) return v2;
+        } catch (e2) { /* 忽略 ⇒ 报第一个错 */ }
+      }
+      return null;
+    }
+    return v;
   }
-  // 全都没值 ⇒ 若第一次是语法错 ⇒ **把它抛出去**（让 Swift 侧知道「语法错」）
-  if (firstErr) throw firstErr;
+  // 全都抛错 ⇒ 把错误抛出去（让 Swift 侧知道「语法错」）
+  // ⭐⭐⭐ **带上各级错误**（否则只看到最后一个 ⇒ 定位不到真凶）⭐⭐⭐
+  if (firstErr) {
+    const e = new Error(String(firstErr && firstErr.message || firstErr)
+      + ' | 形态尝试: ' + errs.join(' || '));
+    throw e;
+  }
   return null;
 }
 
@@ -420,6 +605,7 @@ rl.on('line', function(line) {
   try { req = JSON.parse(line); } catch (e) { return; }
   try {
     if (req.cmd === 'init') {
+      initHostShells();
       injectCompat(req.compat);
       injectWrappers(req.wrappers);
       process.stdout.write(JSON.stringify({ ok: true }) + '\n');
@@ -430,6 +616,11 @@ rl.on('line', function(line) {
       setHostProps(req.hostProps, req.hostCache);
       const v = runEval(req.code, req.scope);
       process.stdout.write(JSON.stringify({ ok: true, value: v, globals: globals() }) + '\n');
+    } else if (req.cmd === 'routes') {
+      ctx.__qrRoutes = req.routes || [];
+      process.stdout.write(JSON.stringify({ ok: true }) + '\n');
+    } else if (req.cmd === 'requests') {
+      process.stdout.write(JSON.stringify({ ok: true, requests: ctx.__qrRequests || [] }) + '\n');
     } else if (req.cmd === 'globals') {
       process.stdout.write(JSON.stringify({ ok: true, globals: globals() }) + '\n');
     } else if (req.cmd === 'invalidate') {
