@@ -45,6 +45,40 @@ final class JSCExecutionShapeTests: XCTestCase {
                      key: "kw", page: 1)
     }
 
+    /// ⭐⭐⭐⭐⭐ **基础求值探针：JSC 的 evaluateScript 到底返回什么**（2026-10-26）
+    ///
+    /// ⚠️ 前面的失败说明 **JSC 上【所有形态】都出不来值** ⇒ ⇒ 必须先验最基础的：
+    ///   `evaluateScript("1+2")` 到底给不给 3？⭐⭐⭐
+    /// ⇒ 这一条把每个形态的结果**逐个列出来** ⇒ 失败消息里就是答案 ⭐⭐⭐
+    func testProbeBasicEvaluationOnJSC() throws {
+        let js = try JSCExecutor(api: JSCExecutionShapeTests.NoopAPI())
+        let ctx = JSRunContext(base: .page(""), baseUrl: "https://x.example/")
+        var report: [String] = []
+        let cases: [(String, String)] = [
+            ("数字表达式", "1+2"),
+            ("字符串字面量", "'ok'"),
+            ("var+末行", "var a=1; a+2"),
+            ("IIFE", "(function(){return 5;})()"),
+            ("对象字面量", "{ name: '书名' }"),
+            ("对象字面量加括号", "({ name: '书名' })"),
+            ("顶层return", "return 7;"),
+            ("let+末行", "let device_type = '安卓'; device_type;"),
+            ("eval块", "eval('{ 1+2 }')"),
+            ("eval直接", "eval('1+2')"),
+        ]
+        for (name, code) in cases {
+            do {
+                let v = try js.run(code, context: ctx)
+                report.append("\(name): \(v.scalarString.isEmpty ? "<空>" : v.scalarString)")
+            } catch {
+                report.append("\(name): 抛错 \(error)")
+            }
+        }
+        // ⭐⭐⭐ **断言 + 把全部结果挂在消息上** ⇒ 一次 CI 拿到所有形态的答案 ⭐⭐⭐
+        XCTAssertTrue(report.contains { $0.hasPrefix("数字表达式: 3") },
+                      "⭐⭐⭐ [JSC 基础求值] " + report.joined(separator: " | "))
+    }
+
     // MARK: - ① 站方 JS 只执行一次（副作用不重复）
 
     /// ⭐⭐⭐⭐⭐ **核心回归**：站方 JS 的副作用**只该发生一次**
