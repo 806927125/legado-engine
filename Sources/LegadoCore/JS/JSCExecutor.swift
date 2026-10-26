@@ -482,7 +482,12 @@ public final class JSCExecutor: JSCExecutorSurface {
             // ⚠️ JSC 的 block 约定：返回 `JSValue!`；且 Swift 闭包**不能直接当 `Any!` 传**
             //    ⇒ 必须 `unsafeBitCast` 成 ObjC block（macOS 上编译不过的元凶之二）
             // ⚠️ 返回 `JSValue?`（不是 `JSValue!`）—— Swift 6.2+ 不允许对 IUO 用 `!`
-            let block: @convention(block) ([JSValue]) -> JSValue? = { args in
+            // ⭐⭐⭐ **必须弱捕获 `js`**（2026-10-26 闪退真凶之一）
+            //   ⇒ 强捕获会形成 **JSContext → block → JSContext** 的 retain cycle
+            //   ⇒ **context 永远不释放** ⇒ 每建一个源就永久多占一份 JSC 堆
+            //   ⇒ 75 个源 ≈ 11.6GB ⇒ jetsam 杀进程 ⇒ 表现为「闪退 + 没有 .ips」⭐⭐⭐
+            let block: @convention(block) ([JSValue]) -> JSValue? = { [weak js] args in
+                guard let js else { return nil }
                 let jsonArgs = args.map { Self.toJSON($0) }
                 guard let r = host.call(name, jsonArgs),
                       let jv = Self.toJS(r, in: js) else {
@@ -505,13 +510,16 @@ public final class JSCExecutor: JSCExecutorSurface {
     /// `java.*` ⇒ 一个 JS 对象（方法都转到宿主）
     private func makeJavaObject(in js: JavaScriptCore.JSContext) -> JSValue? {
         guard let out = js.evaluateScript("({})") else { return nil }
-        let provider = self.api
         for entry in JSHostAPI.methods where entry.object == "java" {
             let name = entry.name
             // ⚠️ 返回 `JSValue?`（不是 `JSValue!`）—— Swift 6.2+ 不允许对 IUO 用 `!`
-            let block: @convention(block) ([JSValue]) -> JSValue? = { args in
+            // ⭐⭐⭐ **弱捕获 `js` 与 `self`**（2026-10-26）—— 强捕获 = retain cycle
+            //   ⇒ JSContext → block → JSContext ⇒ **context 永不释放** ⇒ 每源永久泄漏一份堆 ⭐⭐⭐
+            //   ⇒ `self.api`（宿主）也**不能强捕获**（宿主 → session → engine → executor → context ⇒ 又一个环）⭐
+            let block: @convention(block) ([JSValue]) -> JSValue? = { [weak js, weak self] args in
+                guard let js, let self else { return nil }
                 let jsonArgs = args.map { Self.toJSON($0) }
-                guard let r = provider.callJava(name, jsonArgs),
+                guard let r = self.api.callJava(name, jsonArgs),
                       let jv = Self.toJS(r, in: js) else {
                     return js.evaluateScript("undefined")
                 }
@@ -532,14 +540,15 @@ public final class JSCExecutor: JSCExecutorSurface {
     /// （Swift 数组/对象在 block 里会被 JSC 拒 ⇒ "Cannot convert primitive value"）
     private func makeHostBlock(in js: JavaScriptCore.JSContext)
         -> (@convention(block) (String, String, String) -> String)? {
-        let provider = self.api
-        // ⭐⭐ **当前基准** —— `java.getString('$.x')` 的 JSONPath 要对基准求值
-        //    ⚠️ block 只收 `object/method/argsJSON` ⇒ 基准得**捕获进来**（不能引用 context）
-        //    ⇒ 捕获 **self**、读 `self.currentBase` ⇒ block **只需注入一次** ⭐
-        let owner = self
-        // ⭐⭐ **引擎侧优先接管 `java.*`**（宿主不用实现引擎能做的那些）
+        // ⭐⭐⭐ **弱捕获 `self`**（2026-10-26 闪退真凶之一）
+        //   ⇒ 强捕获 `self`（老代码 `let owner = self`）会形成
+        //   **JSContext → block → JSCExecutor → cachedContext(JSContext)** 的 retain cycle
+        //   ⇒ **context 永不释放** ⇒ 每建一个源就永久多占一份 JSC 堆
+        //   ⇒ 宿主（App）也被强捕获 ⇒ 宿主 → session → engine → executor → context ⇒ 第二个环 ⭐⭐⭐
+        // ⇒ **引擎侧弱捕获 `self`** ⇒ 宿主对象改从 `self.api` 现取（`self` 活着时才有）⭐
         let engineAPI = self.engineAPI
-        let block: @convention(block) (String, String, String) -> String = { object, method, argsJSON in
+        let block: @convention(block) (String, String, String) -> String = { [weak self] object, method, argsJSON in
+            guard let self else { return "null" }
             var args: [JSONValue] = []
             if let data = argsJSON.data(using: .utf8),
                let arr = try? JSONSerialization.jsonObject(with: data) as? [Any] {
@@ -550,7 +559,7 @@ public final class JSCExecutor: JSCExecutorSurface {
             //
             // ⭐ **返回 nil = 「我不接管」** ⇒ 落回宿主实现
             //   （⇒ 引擎只抢它真做的那几个，其余仍归宿主）
-            if object == "java", let engineAPI, let r = engineAPI(method, args, owner.currentBase) {
+            if object == "java", let engineAPI, let r = engineAPI(method, args, self.currentBase) {
                 // ⚠️ 顶层标量不能 JSON 序列化 ⇒ 统一包一层数组（JS 侧取 `[0]`）
                 let any = Self.toFoundation(r)
                 guard let data = try? JSONSerialization.data(withJSONObject: [any]),
@@ -559,11 +568,11 @@ public final class JSCExecutor: JSCExecutorSurface {
             }
             let result: JSONValue?
             if object == "java" {
-                result = provider.callJava(method, args)
+                result = self.api.callJava(method, args)
             } else {
                 // ⭐⭐⭐ **ctx 的宿主对象优先**（引擎自建的那套：带引擎侧状态）⇒ api 的兜底 ⭐
-                result = owner.currentHostObjects[object]?.call(method, args)
-                    ?? provider.hostObject(named: object)?.call(method, args)
+                result = self.currentHostObjects[object]?.call(method, args)
+                    ?? self.api.hostObject(named: object)?.call(method, args)
             }
             // ⭐⭐⭐ **没人实现这个方法 ⇒ 标记给包装函数**（包装函数会**抛 TypeError**）
             //   ⇒ 行为跟老引擎一致（老引擎：方法根本不存在 ⇒ 调用就抛）⭐
