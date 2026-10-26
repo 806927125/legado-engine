@@ -137,7 +137,7 @@ final class JSCMemoryProbeTests: XCTestCase {
 
         // ④ 书单（13.6KB 的响应 ⇒ 27 本）
         //   ⚠️ **结果必须【留着】**（像 App 的缓存那样）⇒ 否则量不到「结果拽住内存」⭐⭐⭐
-        let target = try XCTUnwrap(kindsAll.first { /get_discover/.test(String($0.url)) },
+        let target = try XCTUnwrap(kindsAll.first { String($0.url).contains("get_discover") },
                                   "应有一个 get_discover 分类")
         let booksAll = try engine.explore(target.url)
         let books = booksAll.count
