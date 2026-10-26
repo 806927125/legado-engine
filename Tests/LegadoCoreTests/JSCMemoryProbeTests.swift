@@ -146,9 +146,8 @@ final class JSCMemoryProbeTests: XCTestCase {
         for (k, v) in defaults { engine.varBox.set(k, v) }
         mark("②b 灌入站方默认表（\(defaults.count) 项）后")
         let kindsWithDefaults = try engine.exploreKinds().kinds
-        let urlBytesDefaults = kindsWithDefaults.reduce(0) { $0 + String($1.url).utf8.count }
-        NSLog("JSC-MEM-PROBE ③A 默认表 ⇒ 分类 %ld 个，url 合计 %ld 字节",
-              kindsWithDefaults.count, urlBytesDefaults)
+        let urlBytesDefaults = kindsWithDefaults.reduce(0) { acc, k in acc + String(k.url).utf8.count }
+        NSLog("JSC-MEM-PROBE ③A 默认表 ⇒ 分类 \(kindsWithDefaults.count) 个，url 合计 \(urlBytesDefaults) 字节")
         let baseAfterDefaults = mark("③A 默认表 exploreKinds 后")
 
         // ② 再用【App 灌的用户变量】跑一遍（这才是真机路径）
@@ -162,8 +161,8 @@ final class JSCMemoryProbeTests: XCTestCase {
         // ③ 分类（用【用户变量】⇒ 真机路径）
         let kindsAll = try engine.exploreKinds().kinds
         let kinds = kindsAll.count
-        let urlBytes = kindsAll.reduce(0) { $0 + String($1.url).utf8.count }
-        NSLog("JSC-MEM-PROBE ③B 用户变量 ⇒ 分类 %ld 个，url 合计 %ld 字节", kinds.count, urlBytes)
+        let urlBytes = kindsAll.reduce(0) { acc, k in acc + String(k.url).utf8.count }
+        NSLog("JSC-MEM-PROBE ③B 用户变量 ⇒ 分类 \(kinds.count) 个，url 合计 \(urlBytes) 字节")
         XCTAssertGreaterThan(kinds, 0, "探针没跑出分类 ⇒ 探针本身失效了（不是内存没问题）")
         let afterKinds = mark("③B 用户变量 exploreKinds 后（\(kinds) 个分类，url 合计 \(urlBytes) 字节）")
         XCTAssertLessThan(afterKinds - base, Self.budgetDeltaMB,
