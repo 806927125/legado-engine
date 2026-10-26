@@ -4,25 +4,32 @@ import XCTest
 import JavaScriptCore
 @testable import LegadoCore
 
-/// ⭐⭐⭐⭐⭐ **JSC 上下文到底被谁抓着**（2026-10-26 · 一次 CI 问完全部）
+/// ⭐⭐⭐⭐⭐ **JSC 上下文到底被谁抓着 + 每个源到底吃多少内存**（2026-10-26）
 ///
-/// 背景：`JSCContextLeakTests` 红了 ⇒ 说明「执行器释放 ⇒ context 已死」**不成立**。
-/// ⇒ 但**具体是谁在持有**还没定 ⇒ 本文件把**每种可能的构造**各试一遍
-///    ⇒ 一次 CI 的日志里就能看到「哪种构造会留住 context」⭐⭐⭐
+/// 背景：`JSCContextLeakTests` 红了 ⇒「执行器释放 ⇒ context 已死」**不成立**。
+/// ⇒ 但**具体是谁持有**未定 ⇒ 本文件把**每种构造**各试一遍 ⇒ 一次 CI 的日志给全答案 ⭐⭐⭐
 ///
-/// ⭐ **每种构造都只做一件事**：建出来 → 拿弱引用 → 释放 → 看弱引用是不是还活着
-/// ⇒ 活着 = 有人强持有它（环）⇒ 死了 = 没人持有 ⭐
+/// ⚠️⚠️ **输出必须用 `NSLog`**（`print` 在 XCTest 里被吞掉 ⇒ 日志里啥也没有 ⇒ 白跑一轮）
+///   ⇒ 而且**结尾用 XCTFail 把汇总贴进断言消息** ⇒ 就算 NSLog 也被吞，断言消息照样进日志 ⭐⭐⭐
 final class JSCRetentionBisectTests: XCTestCase {
 
     /// ⭐ 弱引用盒子（**必须弱** ⇒ 否则测试自己把它钉住了 ⇒ 恒活 ⇒ 假结论）
     final class Box: @unchecked Sendable { weak var ctx: JavaScriptCore.JSContext? }
 
-    private static func report(_ name: String, _ box: Box) {
-        let alive = box.ctx != nil
-        print("[JSC-BISECT] \(name) => \(alive ? "ALIVE(有人强持有)" : "RELEASED(没人持有)")")
+    /// jetsam 判杀用的同一个口径
+    private static func footprintMB() -> Int {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let kr: kern_return_t = withUnsafeMutablePointer(to: &info) { p in
+            p.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { r in
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), r, &count)
+            }
+        }
+        guard kr == KERN_SUCCESS else { return 0 }
+        return Int(info.phys_footprint) / (1024 * 1024)
     }
 
-    // ① 裸 context（什么都不做）
     private func bare() -> Box {
         let box = Box()
         guard let ctx = JavaScriptCore.JSContext() else { return box }
@@ -30,7 +37,6 @@ final class JSCRetentionBisectTests: XCTestCase {
         return box
     }
 
-    // ② context + evaluateScript（会创建 JSValue 包装）
     private func evaluated() -> Box {
         let box = Box()
         guard let ctx = JavaScriptCore.JSContext() else { return box }
@@ -39,7 +45,6 @@ final class JSCRetentionBisectTests: XCTestCase {
         return box
     }
 
-    // ③ context + 挂一个**弱捕获自己**的 block（我修完的样子）
     private func weakBlockOnContext() -> Box {
         let box = Box()
         guard let ctx = JavaScriptCore.JSContext() else { return box }
@@ -49,7 +54,6 @@ final class JSCRetentionBisectTests: XCTestCase {
         return box
     }
 
-    // ④ context + 挂一个**强捕获自己**的 block（老代码的样子 ⇒ 必环）
     private func strongBlockOnContext() -> Box {
         let box = Box()
         guard let ctx = JavaScriptCore.JSContext() else { return box }
@@ -59,7 +63,6 @@ final class JSCRetentionBisectTests: XCTestCase {
         return box
     }
 
-    // ⑤ context + 注入 Java 兼容层（2197 行 JS ⇒ 真实路径的一半）
     private func withJavaCompat() -> Box {
         let box = Box()
         guard let ctx = JavaScriptCore.JSContext() else { return box }
@@ -70,38 +73,67 @@ final class JSCRetentionBisectTests: XCTestCase {
         return box
     }
 
-    // ⑥ ⭐ **显式 VM + context，然后两个都放掉**
     private func explicitVMBothReleased() -> Box {
         let box = Box()
         let vm = JavaScriptCore.JSVirtualMachine()
         guard let ctx = JavaScriptCore.JSContext(virtualMachine: vm) else { return box }
         box.ctx = ctx
-        // vm 在这里出作用域 ⇒ 只剩 context 自己撑着
         return box
     }
 
-    // ⑦ ⭐ **显式 VM 被一个独立盒子持有**（模拟「执行器持有 VM」的真实修法）
+    /// ⭐ 显式 VM 被独立盒子持有（= 「执行器持有 VM」的真实修法）
     private func explicitVMHeldByBox() -> Box {
         let box = Box()
         final class VMBox { let vm: JavaScriptCore.JSVirtualMachine; init() { vm = JavaScriptCore.JSVirtualMachine() } }
         let holder = VMBox()
         guard let ctx = JavaScriptCore.JSContext(virtualMachine: holder.vm) else { return box }
         box.ctx = ctx
-        // holder 出作用域 ⇒ VM 没人持有了 ⇒ 若 context 还活着 ⇒ 说明 context 自己抱着 VM（环）
         return box
     }
 
+    /// ⭐⭐ **每个「源」到底吃多少内存**（这才是 6.8GB 的关键数字）
+    private func makeExecutorAndRelease() -> Int {
+        let exec = JSCExecutor(api: StubAPI())
+        _ = try? exec.run("1+1", context: JSRunContext(base: .page(""), baseUrl: "https://x.example/"))
+        return 0
+    }
+
+    final class StubAPI: JSHostAPIProvider, @unchecked Sendable {
+        func hostObject(named name: String) -> HostObject? { nil }
+        func callJava(_ method: String, _ args: [JSONValue]) -> JSONValue? { nil }
+    }
+
     func testBisectWhoRetainsTheContext() throws {
-        print("[JSC-BISECT] ===== 谁在持有 JSContext =====")
-        let b1 = bare();                          Self.report("1-bare-context", b1)
-        let b2 = evaluated();                     Self.report("2-eval", b2)
-        let b3 = weakBlockOnContext();            Self.report("3-weak-block", b3)
-        let b4 = strongBlockOnContext();          Self.report("4-strong-block", b4)
-        let b5 = withJavaCompat();                Self.report("5-java-compat", b5)
-        let b6 = explicitVMBothReleased();        Self.report("6-explicit-vm-both-released", b6)
-        let b7 = explicitVMHeldByBox();           Self.report("7-explicit-vm-held-by-box", b7)
-        print("[JSC-BISECT] ===== 结束 =====")
-        // ⭐ 本测试**只打印**（不判定）⇒ 结论由 CI 日志读出来 ⇒ 不做假断言
+        var lines: [String] = []
+        func probe(_ name: String, _ make: () -> Box) {
+            let box = make()
+            let alive = box.ctx != nil
+            let tag = alive ? "ALIVE-有人强持有" : "RELEASED-没人持有"
+            NSLog("JSC-BISECT %@ => %@", name, tag)
+            lines.append("\(name)=\(tag)")
+        }
+
+        NSLog("JSC-BISECT ===== 谁在持有 JSContext =====")
+        probe("1-bare-context", bare)
+        probe("2-eval", evaluated)
+        probe("3-weak-block", weakBlockOnContext)
+        probe("4-strong-block", strongBlockOnContext)
+        probe("5-java-compat", withJavaCompat)
+        probe("6-explicit-vm-both-released", explicitVMBothReleased)
+        probe("7-explicit-vm-held-by-box", explicitVMHeldByBox)
+
+        // ⭐⭐⭐ 每个源吃多少内存（造 N 个执行器 ⇒ 释放 ⇒ 看涨多少）
+        let n = 30
+        let before = Self.footprintMB()
+        for _ in 0..<n { _ = makeExecutorAndRelease() }
+        let after = Self.footprintMB()
+        let perSource = (after - before) / n
+        NSLog("JSC-BISECT %d 个执行器用完即扔 ⇒ footprint %d MB → %d MB ⇒ 每个约 %d MB",
+              n, before, after, perSource)
+        lines.append("per-source-delta=\(perSource)MB (total \(before)→\(after))")
+
+        // ⭐⭐⭐ 汇总塞进断言消息 ⇒ 就算 NSLog 被吞也能看到
+        XCTFail("JSC-BISECT 汇总：" + lines.joined(separator: " | "))
     }
 }
 #endif
