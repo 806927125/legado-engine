@@ -43,6 +43,12 @@ final class JSCMemoryProbeTests: XCTestCase {
         }
     }
 
+    /// ⭐ 假宿主（引擎只需要 `java.ajax` 走我们自己的桥）
+    final class ProbeAPI: JSHostAPIProvider, @unchecked Sendable {
+        func hostObject(named name: String) -> HostObject? { nil }
+        func callJava(_ method: String, _ args: [JSONValue]) -> JSONValue? { nil }
+    }
+
     private static let fixtureDir: URL = {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()   // LegadoCoreTests
@@ -66,10 +72,11 @@ final class JSCMemoryProbeTests: XCTestCase {
         return f > 0 ? f : Int(info.resident_size)
     }
 
-    /// ⭐⭐⭐ **预算**（超了 ⇒ 红）
-    /// 站在 74KB 响应上 ⇒ 正常应该是「几 MB 级」⇒ 给 **300MB** 的 generous 上限
-    /// ⇒ 真出现 20 万倍放大时（GB 级）⇒ 必红 ⭐⭐⭐
-    static let budgetMB = 300
+    /// ⭐⭐⭐ **预算 = 相对基线的增量**（超了 ⇒ 红）
+    /// ⚠️ 测试进程本身基线就有 170MB ⇒ 只能看**增量** ⭐⭐⭐
+    /// 站在 74KB 响应上 ⇒ 增量应该是「几 MB 级」⇒ 给 **200MB** 的 generous 上限
+    /// ⇒ 真出现 20 万倍放大时（增量几百 MB~GB）⇒ 必红 ⭐⭐⭐
+    static let budgetDeltaMB = 200
 
     func testMemoryFootprintPerOp() throws {
         let dir = Self.fixtureDir
@@ -79,7 +86,20 @@ final class JSCMemoryProbeTests: XCTestCase {
             .init(pattern: "/discovestyle", file: "resp-kinds.txt"),
             .init(pattern: "/get_discover", file: "resp-books.txt"),
         ])
-        let engine = SourceEngine(source: source, fetcher: PageFetcher(transport: transport))
+        // ⭐⭐⭐ **必须挂 JS 后端**（JSC）—— 站方的规则全是 JS ⭐⭐⭐
+        //   ⇒ 引擎的 `java.ajax` 走 `setEngineAPI` 的桥 ⇒ 打到假服务器 ⭐⭐⭐
+        let exec = JSCExecutor(api: ProbeAPI())
+        exec.setEngineAPI { method, args, _ in
+            guard method == "ajax" else { return nil }
+            var req = HTTPRequest(url: args.first?.scalarString ?? "", method: "GET")
+            if let o = args.count > 1 ? args[1] : nil, case .object(let oo) = o {
+                if let m = oo["method"]?.scalarString { req.method = m.uppercased() }
+                if let b = oo["body"], !b.isNull { req.body = Data(b.scalarString.utf8) }
+            }
+            guard let resp = try? transport.send(req) else { return nil }
+            return .string(String(data: resp.body, encoding: .utf8) ?? "")
+        }
+        let engine = SourceEngine(source: source, fetcher: PageFetcher(transport: transport), js: exec)
 
         func mb() -> Int { Self.footprintBytes() / (1024 * 1024) }
         func mark(_ label: String) -> Int {
@@ -89,7 +109,6 @@ final class JSCMemoryProbeTests: XCTestCase {
         }
 
         let base = mark("① 基线（引擎刚建）")
-        XCTAssertLessThan(base, Self.budgetMB, "基线就已经超预算了 ⇒ 环境不对")
 
         // ② 加载站方 jsLib（真站方的 32KB jsLib）
         let srcDict = try JSONSerialization.jsonObject(with: sourceData) as? [String: Any] ?? [:]
@@ -97,13 +116,14 @@ final class JSCMemoryProbeTests: XCTestCase {
             try engine.loadJsLib(lib)
         }
         let afterLib = mark("② 加载站方 jsLib 后")
-        XCTAssertLessThan(afterLib, Self.budgetMB, "加载 jsLib 就把内存撑到 \(afterLib) MB ⇒ jsLib 加载有放大")
+        XCTAssertLessThan(afterLib - base, Self.budgetDeltaMB,
+                          "加载 jsLib 就涨了 \(afterLib - base) MB ⇒ **jsLib 加载有放大**")
 
         // ③ 分类（站方 exploreUrl ⇒ 74.7KB 的响应 ⇒ 355 个分类）
         let kinds = (try? engine.exploreKinds().kinds.count) ?? 0
         let afterKinds = mark("③ exploreKinds 后（\(kinds) 个分类）")
-        XCTAssertLessThan(afterKinds, Self.budgetMB,
-                          "分类这一步就把内存撑到 \(afterKinds) MB ⇒ **放大点在「响应 → 分类对象」**")
+        XCTAssertLessThan(afterKinds - base, Self.budgetDeltaMB,
+                          "分类这一步涨了 \(afterKinds - base) MB ⇒ **放大点在「响应 → 分类对象」**")
 
         // ④ 书单（13.6KB 的响应 ⇒ 27 本）
         var books = 0
@@ -111,10 +131,10 @@ final class JSCMemoryProbeTests: XCTestCase {
             books = (try? engine.explore(url).count) ?? 0
         }
         let afterBooks = mark("④ explore 后（\(books) 本）")
-        XCTAssertLessThan(afterBooks, Self.budgetMB,
-                          "书单这一步就把内存撑到 \(afterBooks) MB ⇒ **放大点在「响应 → 书对象」**")
+        XCTAssertLessThan(afterBooks - base, Self.budgetDeltaMB,
+                          "书单这一步涨了 \(afterBooks - base) MB ⇒ **放大点在「响应 → 书对象」**")
 
-        print("⭐ [JSC 内存探针] 全部步骤的 footprint 都在 \(Self.budgetMB) MB 以内 ⇒ 没有放大")
+        print("⭐ [JSC 内存探针] 全部步骤的增量都在 \(Self.budgetDeltaMB) MB 以内 ⇒ 没有放大")
     }
 }
 #endif
