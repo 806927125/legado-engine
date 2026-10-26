@@ -98,6 +98,13 @@ final class ScopeDocumentStubTests: XCTestCase {
         var QRHost = { log: function(m) { var el = document.getElementById('logList'); return m; } };
         """
         _ = try exec.runGlobal(jsLib, context: ctx)
+        // ⭐⭐⭐⭐⭐ **必须重设全局基线**（2026-10-26 macOS CI 实证）
+        //
+        // ⚠️⚠️⚠️ **JSC 侧真实失败**：不重设基线 ⇒ `run` 开头的「清全局」把站方 jsLib 的
+        //   `QRHost` **删掉** ⇒ 规则求值时 `QRHost.log is not a function` ⇒ 整条链死 ⭐⭐⭐
+        //   ⇒ 真身流程（`SourceEngine.loadJsLib`）就是：runGlobal 之后 `markGlobalsAsBaseline()` ⭐⭐⭐
+        //   ⇒ 门禁**照抄真身流程**（不是照抄我以为的流程）⭐⭐⭐
+        exec.markGlobalsAsBaseline()
         XCTAssertEqual(try exec.run("QRHost.log('hi')", context: ctx).scalarString, "hi",
                        "⭐⭐⭐ 站方 jsLib（用 document 的那种）必须能正常加载并被规则调到")
     }
