@@ -392,6 +392,13 @@ public final class JSCExecutor: JSCExecutorSurface {
         //
         // ⭐ 注入点必须在 **基线快照之前**（第 383 行）⇒ `document` 属于「壳」⇒ 全局治理不会把它清掉 ⭐
         _ = created.evaluateScript(JSScopeBuilder.documentStub)
+        // ⭐⭐⭐⭐⭐ **`org.jsoup` 兼容层**（2026-10-26 补）
+        //
+        // ⚠️ **为什么必须注入全局**：站方 `jsLib` / 规则代码里 **43 处 `org.jsoup.Jsoup.parse`**
+        //   （125 源语料，剥注释后统计，7 个源）⇒ 缺了 ⇒ 这些源的目录/正文/搜索全废 ⭐⭐⭐
+        // ⇒ **纯 JS 实现**（JSC / Node 共用同一份 ⇒ 沙盒验的就是真机跑的）⭐⭐⭐
+        // ⚠️ 注入点同样必须在**基线快照之前** ⇒ 否则被「每次求值前清全局」当垃圾清掉 ⭐⭐⭐
+        _ = created.evaluateScript(OrgJsoupCompat.source)
         // ③ 基线快照（此刻还没跑站方 JS ⇒ 基线 = 壳 + 兼容层 ⇒ 后面不会被清）
         baselineGlobals = Self.currentGlobals(in: created)
         return created

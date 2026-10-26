@@ -123,6 +123,8 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
                       //   ⇒ 必须注入到 **vm 全局上下文** ⇒ 否则 jsLib 里 `document.` ⇒ ReferenceError
                       //   ⇒ **内容与 scope 前导里那份完全同源**（`JSScopeBuilder.documentStub`）⇒ 不会漂移 ⭐
                       "document": JSScopeBuilder.documentStub,
+                      // ⭐⭐⭐⭐⭐ **`org.jsoup` 兼容层**（与 JSC 侧**同一份 JS** ⇒ 不会漂移）
+                      "org": OrgJsoupCompat.source,
                       "routes": routeTable])
     }
 
@@ -1000,6 +1002,8 @@ rl.on('line', function(line) {
       injectWrappers(req.wrappers);
       // ⭐⭐⭐⭐⭐ **`document` 替身注入全局**（jsLib / loginUrl 走 runGlobal ⇒ 必须在这儿）
       if (req.document) { vm.runInContext(req.document, ctx); }
+      // ⭐⭐⭐⭐⭐ **`org.jsoup` 兼容层注入全局**（站方 43 处在用 ⇒ 缺了这些源全废）
+      if (req.org) { vm.runInContext(req.org, ctx); }
       // ⭐⭐⭐ **宿主对象的实现**（覆盖包装函数 ⇒ Node 侧查快照，不回调 Swift）⭐⭐⭐
       installHostObjectImpls();
       process.stdout.write(JSON.stringify({ ok: true }) + '\n');
