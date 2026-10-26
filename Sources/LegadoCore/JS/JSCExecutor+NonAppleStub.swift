@@ -23,9 +23,9 @@ import Foundation
 #if !canImport(JavaScriptCore)
 
 /// ⭐⭐⭐ **非 Apple 平台上的 `JSCExecutor` stub**（签名与真身一致 ⇒ 引用方不用改）
-public final class JSCExecutor: JSExecutor, @unchecked Sendable {
-    /// ⭐ **永远 false**（没有 JavaScriptCore ⇒ 这条路不存在）
-    public static var isAvailable: Bool { false }
+public final class JSCExecutor: JSCExecutorSurface, @unchecked Sendable {
+    // ⭐⭐⭐ **`isAvailable` 不在这里定义** ⇒ 统一由 `JSCExecutorSurface.swift` 的共享扩展提供
+    //   ⇒ macOS 真身 / Linux stub **只有一份实现** ⇒ **不可能漂移** ⭐⭐⭐
 
     public init(api: JSHostAPIProvider) {
         self.api = api

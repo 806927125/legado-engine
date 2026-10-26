@@ -19,7 +19,9 @@ import JavaScriptCore
 /// 站方 JS 是**末行表达式**风格（不是顶层 `return`）⇒ 直接 `evaluateScript` 就能拿到
 /// **Script 的完成值**（末行表达式的值）⇒ **不要包成函数体**
 /// （`(function(){ 1 + 2 })()` 返回 undefined！——函数体要显式 return）
-public final class JSCExecutor: JSExecutor {
+// ⭐⭐⭐ **conform `JSCExecutorSurface`**（2026-10-26 实证：两份实现漂移 ⇒ macOS CI 编译失败）
+//   ⇒ 协议是**两份实现共用的 API 面清单** ⇒ 少一个成员 ⇒ macOS CI 会指出来 ⭐⭐⭐
+public final class JSCExecutor: JSCExecutorSurface {
 
     /// 宿主 API 提供者（`java.*` 与宿主对象的实现）
     private let api: JSHostAPIProvider
