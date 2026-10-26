@@ -35,6 +35,15 @@ public final class JSCExecutor: JSCExecutorSurface {
     ///   vs「复用」**0.003 ms/次** ⇒ **省 340×**（macOS CI 实测，见 JSCPerfTests）
     private var cachedContext: JavaScriptCore.JSContext?
 
+    /// ⭐⭐⭐ **弱引用**（只用来「观察 context 死没死」）—— 自己持有强引用会**制造新环** ⭐
+    private weak var contextRef: JavaScriptCore.JSContext?
+
+    /// ⭐⭐⭐ **测试钩子**（门禁用）—— 当前 context 的**弱引用**
+    ///
+    /// ⚠️ **为什么需要它**：JSC 没有「context 死了吗」的 API ⇒ 泄漏**测不出来** ⭐⭐⭐
+    /// ⇒ 有了这个弱引用 ⇒ 门禁可以断言「**执行器释放 ⇒ context 已死**」⇒ 确定性、不受内存基线噪声影响 ⭐
+    internal var debugContextRef: JavaScriptCore.JSContext? { contextRef }
+
     /// 宿主通道 / 包装函数**是否已注入**（契约不变 ⇒ 只注入一次）
 
     /// ⭐⭐⭐ **当前基准** —— `java.getString('$.x')` 的 JSONPath 要对它求值
@@ -401,6 +410,8 @@ public final class JSCExecutor: JSCExecutorSurface {
         _ = created.evaluateScript(OrgJsoupCompat.source)
         // ③ 基线快照（此刻还没跑站方 JS ⇒ 基线 = 壳 + 兼容层 ⇒ 后面不会被清）
         baselineGlobals = Self.currentGlobals(in: created)
+        // ⭐⭐⭐ **记下弱引用**（门禁据此断言「context 真的死了」）⇒ 2026-10-26 闪退修复
+        contextRef = created
         return created
     }
 
