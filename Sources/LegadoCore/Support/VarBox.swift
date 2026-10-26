@@ -19,9 +19,26 @@ public final class VarBox: @unchecked Sendable {
         return storage[key]
     }
 
+    /// ⭐⭐⭐ **单个值的上限**（2026-10-26 jetsam 4.2GB 实证）
+    ///
+    /// ⚠️⚠️⚠️ **为什么必须有**：站方会把大块数据缓存进源变量
+    ///   （聚合源把几百个分类的载荷 base64 塞进一个变量）⇒ 值涨到 **GB 级**
+    ///   ⇒ 而宿主每次 op 都要把它**序列化回传**（字典 + Data + String ⇒ **好几份拷贝**）
+    ///   ⇒ ⇒ **一个 GB 级变量能撑到几个 GB** ⇒ jetsam 秒杀（现象 = 闪退 + 没有 .ips）⭐⭐⭐
+    ///   ⇒ 而且 JSC 的 **VM 会抓着跑过脚本的 context** ⇒ `invalidate()` 放不掉 ⇒ **「清会话后内存不降」** ⭐⭐⭐
+    /// ⇒ ⇒ **宿主必须给变量值封顶**（站方缓存丢了只是多抓一次 ⇒ 不会崩）⭐
+    public static let maxValueBytes = 2 * 1024 * 1024
+
     public func set(_ key: String, _ value: String) {
+        // ⭐ 超大值 ⇒ **截断**（保留前缀，够站方判断「有缓存」；但不再无限涨）⭐
+        let stored: String
+        if value.utf8.count > Self.maxValueBytes {
+            stored = String(value.prefix(Self.maxValueBytes / 4))
+        } else {
+            stored = value
+        }
         lock.lock(); defer { lock.unlock() }
-        storage[key] = value
+        storage[key] = stored
     }
 
     public func remove(_ key: String) {
