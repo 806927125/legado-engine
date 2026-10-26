@@ -45,7 +45,14 @@ final class JSCMemoryProbeTests: XCTestCase {
 
     /// ⭐ 假宿主（引擎只需要 `java.ajax` 走我们自己的桥）
     final class ProbeAPI: JSHostAPIProvider, @unchecked Sendable {
-        func hostObject(named name: String) -> HostObject? { nil }
+        /// ⭐ 引擎建好后回填 ⇒ 探针能拿到**真的** `source` 宿主对象
+        ///   （App 侧 `EngineHostAPI` 就是这么给的 ⇒ 缺了它站方 JS 会报
+        ///   「source.getVariable is not a function」⇒ 上一版探针就死在这）⭐⭐⭐
+        weak var engineRef: SourceEngine?
+        func hostObject(named name: String) -> HostObject? {
+            if name == "source" { return engineRef?.sourceObject }
+            return nil
+        }
         func callJava(_ method: String, _ args: [JSONValue]) -> JSONValue? { nil }
     }
 
@@ -88,7 +95,8 @@ final class JSCMemoryProbeTests: XCTestCase {
         ])
         // ⭐⭐⭐ **必须挂 JS 后端**（JSC）—— 站方的规则全是 JS ⭐⭐⭐
         //   ⇒ 引擎的 `java.ajax` 走 `setEngineAPI` 的桥 ⇒ 打到假服务器 ⭐⭐⭐
-        let exec = JSCExecutor(api: ProbeAPI())
+        let api = ProbeAPI()
+        let exec = JSCExecutor(api: api)
         exec.setEngineAPI { method, args, _ in
             guard method == "ajax" else { return nil }
             var req = HTTPRequest(url: args.first?.scalarString ?? "", method: "GET")
@@ -100,6 +108,7 @@ final class JSCMemoryProbeTests: XCTestCase {
             return .string(String(data: resp.body, encoding: .utf8) ?? "")
         }
         let engine = SourceEngine(source: source, fetcher: PageFetcher(transport: transport), js: exec)
+        api.engineRef = engine      // ⭐ 回填 ⇒ 站方 JS 能用 `source.getVariable()`
 
         func mb() -> Int { Self.footprintBytes() / (1024 * 1024) }
         func mark(_ label: String) -> Int {
