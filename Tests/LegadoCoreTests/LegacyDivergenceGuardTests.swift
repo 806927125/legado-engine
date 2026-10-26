@@ -106,6 +106,12 @@ final class LegacyDivergenceGuardTests: XCTestCase {
         run.arguments = ["node", runner.path]
         var env2 = ProcessInfo.processInfo.environment
         env2["LEGADO_ENGINE_DIR"] = engineDir.path
+        // ⭐⭐⭐ **必须把 NODE_PATH 传给真正跑 runner 的进程**（2026-10-26 实证）：
+        //   上面探测 jsdom 时用了 `env["NODE_PATH"] = 候选路径`，但**真正跑 runner 时没传** ⇒
+        //   ⇒ node 找不到 jsdom ⇒ **runner 直接崩 ⇒ 零输出** ⇒
+        //   ⇒ 「失败集合为空」会被误读成「参考侧全过」⇒ ⭐ **空输出 ≠ 通过** ⭐
+        //   ⇒ 这次就是靠 `failed.isEmpty` 那条断言把它抓出来的 ⭐⭐⭐
+        env2["NODE_PATH"] = candidatePaths.joined(separator: ":")
         run.environment = env2
         let outPipe = Pipe()
         run.standardOutput = outPipe
@@ -116,12 +122,17 @@ final class LegacyDivergenceGuardTests: XCTestCase {
         let text = String(data: data, encoding: .utf8) ?? ""
 
         var failed: [String] = []
+        var ranCount = 0
         for line in text.split(separator: "\n") {
             guard let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
-                  let ok = obj["ok"] as? Bool, ok == false,
-                  let id = obj["id"] as? String else { continue }
-            failed.append(id)
+                  let ok = obj["ok"] as? Bool, let id = obj["id"] as? String else { continue }
+            ranCount += 1
+            if ok == false { failed.append(id) }
         }
+        // ⭐⭐⭐ **零输出 = runner 崩了**（不是「参考侧全过」）⇒ 单独报错，别混进 failed 语义里
+        XCTAssertGreaterThan(ranCount, 0,
+                             "⭐⭐⭐ JS 参考侧**一条用例都没跑出来**（runner 崩了 / 没输出）⇒ 这次对比没有意义"
+                             + "（别把它当成『全绿』）⭐\n原始输出前 300 字：\(String(text.prefix(300)))")
         XCTAssertFalse(failed.isEmpty, "JS 参考侧一条都没跑 ⇒ 这次对比没有意义（别把它当成『全绿』）⭐")
 
         let listURL = root.appendingPathComponent("conformance/fixtures/known-legacy-divergences.json")

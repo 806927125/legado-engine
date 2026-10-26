@@ -379,6 +379,17 @@ public final class JSCExecutor: JSExecutor {
         for src in JSScopeBuilder.hostWrappers() {
             _ = created.evaluateScript(src)
         }
+        // ⭐⭐⭐⭐⭐ **`document` 替身要注入【全局】**（2026-10-26 实证）
+        //
+        // ⚠️⚠️⚠️ **只放在 scope 前导里是不够的**：
+        //   · 站方 **`jsLib`**（99 处 `document.`）是走 `runGlobal` 加载的 ⇒ **不在 scope 前导里**
+        //   · 站方 **`loginUrl`**（54 处 `document.`）同理
+        //   ⇒ 只放 scope ⇒ jsLib 里 `document.getElementById(...)` ⇒ **ReferenceError**
+        //     ⇒ jsLib 整个加载失败 ⇒ 规则链半残 ⇒ 症状离根因十万八千里 ⭐⭐⭐
+        // ⇒ 所以：**全局 + scope 各放一份**（内容同一份 ⇒ 不会漂移）⭐
+        //
+        // ⭐ 注入点必须在 **基线快照之前**（第 383 行）⇒ `document` 属于「壳」⇒ 全局治理不会把它清掉 ⭐
+        _ = created.evaluateScript(JSScopeBuilder.documentStub)
         // ③ 基线快照（此刻还没跑站方 JS ⇒ 基线 = 壳 + 兼容层 ⇒ 后面不会被清）
         baselineGlobals = Self.currentGlobals(in: created)
         return created

@@ -118,6 +118,11 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
         _ = try send(["cmd": "init",
                       "compat": JavaCompat.sources,
                       "wrappers": JSScopeBuilder.hostWrappers(),
+                      // ⭐⭐⭐⭐⭐ **`document` 替身**（2026-10-26 实证）
+                      //   ⇒ 站方 jsLib / loginUrl 走 `runGlobal`（**全局作用域**）⇒ scope 前导里够不着
+                      //   ⇒ 必须注入到 **vm 全局上下文** ⇒ 否则 jsLib 里 `document.` ⇒ ReferenceError
+                      //   ⇒ **内容与 scope 前导里那份完全同源**（`JSScopeBuilder.documentStub`）⇒ 不会漂移 ⭐
+                      "document": JSScopeBuilder.documentStub,
                       "routes": routeTable])
     }
 
@@ -993,6 +998,8 @@ rl.on('line', function(line) {
       initHostShells();
       injectCompat(req.compat);
       injectWrappers(req.wrappers);
+      // ⭐⭐⭐⭐⭐ **`document` 替身注入全局**（jsLib / loginUrl 走 runGlobal ⇒ 必须在这儿）
+      if (req.document) { vm.runInContext(req.document, ctx); }
       // ⭐⭐⭐ **宿主对象的实现**（覆盖包装函数 ⇒ Node 侧查快照，不回调 Swift）⭐⭐⭐
       installHostObjectImpls();
       process.stdout.write(JSON.stringify({ ok: true }) + '\n');

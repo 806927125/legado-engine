@@ -350,6 +350,36 @@ public enum JSScopeBuilder {
 
 
 
+    /// ⭐⭐⭐⭐⭐ **`document` 替身的源码**（挂在 scope 顶层 ⇒ 两个后端共享 ⇒ 不会漂移）
+    ///
+    /// ⚠️ **只给「不抛异常 + 语义正确」的部分**：
+    ///   · `getElementById` → **null**（老引擎在真机上也是 null ⇒ 语义一致）⭐⭐⭐
+    ///   · `querySelector` → null ／ `querySelectorAll` → **[]**（真 DOM 能力待吸收；现在至少不抛）⭐⭐⭐
+    ///   · `createElement` → 一个**最小假元素**（站方只是 `var e = document.createElement('div')` 挂属性用）⭐⭐⭐
+    ///   · 全屏 API（番茄源的 `fullscreenElement` / `exitFullscreen`）→ **安全的空实现**（不抛）⭐⭐⭐
+    static let documentStub = """
+    var document = {
+      getElementById: function(id) { return null; },
+      querySelector: function(sel) { return null; },
+      querySelectorAll: function(sel) { return []; },
+      createElement: function(tag) {
+        return { tagName: String(tag || ''), style: {}, children: [], textContent: '',
+                 innerHTML: '', value: '',
+                 setAttribute: function(k, v) { this[k] = v; },
+                 getAttribute: function(k) { return this[k]; },
+                 appendChild: function(c) { this.children.push(c); return c; },
+                 removeChild: function(c) { return c; },
+                 addEventListener: function() {}, removeEventListener: function() {},
+                 click: function() {}, focus: function() {}, blur: function() {} };
+      },
+      addEventListener: function() {}, removeEventListener: function() {},
+      documentElement: null, body: null, head: null, title: '',
+      fullscreenElement: null, webkitFullscreenElement: null,
+      exitFullscreen: function() {}, webkitExitFullscreen: function() {},
+      cookie: ''
+    };
+    """
+
     /// 构造 scope 源码（**只含变量与宿主对象**；宿主方法由执行器注入）
     ///
     /// - Parameter ctx: 求值上下文
@@ -371,6 +401,26 @@ public enum JSScopeBuilder {
         if !ctx.vars.isEmpty {
             lines.append("var variables = \(jsonLiteral(.object(ctx.vars.mapValues { .string($0) })));")
         }
+        // ⭐⭐⭐⭐⭐ **`document` 替身**（2026-10-26 实证：老引擎有、新引擎没有 ⇒ 站方 JS 直接 ReferenceError）
+        //
+        // ⚠️ **为什么必须有**：老引擎的 scope 里 `document` 指向**当前页面的 doc**
+        //   （轻阅 `reference/js/engine.js` 注释原文：「base 传 page.doc ⇒ document 指向当前列表页」）
+        //   ⇒ 站方 jsLib 里有 **117 处 `document.getElementById(...)`**（大灰狼 / 番茄小说TS）
+        //   ⇒ 新引擎没有 `document` ⇒ **`document is not defined` ⇒ 站方 jsLib 半残 ⇒ 整条链死** ⭐⭐⭐
+        //
+        // ⭐⭐⭐ **语义对齐老引擎**（不是「随便造个假对象」）：
+        //   · 站方那 117 处拿的都是**站方 App 自己的 UI 元素**（logList / loading / container / playBtn…）
+        //   · 老引擎在真机上也是 **null**（当前页是 API 响应/列表页 ⇒ 没有那些 id）⇒ ⇒ **返回 null 就是正解** ⭐⭐⭐
+        //   · `querySelectorAll` 的**真 DOM 能力**：老引擎有、**125 源语料里 0 处真实用量**
+        //     ⇒ 现在返回空数组（不抛）⇒ 真能力记进「待吸收清单」（栖阅自己也没有 ⇒ 相对栖阅不算缺口）⭐⭐⭐
+        // ⚠️⚠️⚠️ **这里【不要】再 append 一次 `document`**（2026-10-26 实证）
+        //
+        //   · scope 前导是**顶层 `var`** ⇒ 在 JSC / vm 里会**泄漏成全局** ⭐⭐⭐
+        //   · ① 泄漏 ⇒ 全局治理（`removeGlobals(notIn: baseline)`）会把它**当垃圾清掉**
+        //     ⇒ jsLib 在「跑过一次规则之后」加载 ⇒ **`document` 突然没了** ⇒ 间歇性炸 ⭐⭐⭐
+        //   · ② 泄漏 ⇒ **掩盖门禁**（全局注入被删了也测不出来）⇒ 平凡通过 ⭐⭐⭐
+        //   ⇒ ⇒ **`document` 只在【全局上下文】注入一次**（JSC `makeContext` / Node `init`）
+        //      ⇒ 两条路径（`run` / `runGlobal`）都看得见 ⇒ **单点注入 ⇒ 不会漂移** ⭐⭐⭐
         // ⭐⭐⭐ **消息收集**（登录链路用）—— 老引擎的 `QR.__qrMsgSink` 同款
         //   站方**只**用 `java.toast` / `java.log` 报登录结果 ⇒ 这段原文是唯一依据 ⭐⭐⭐
         //   ⚠️ 收集器必须是**局部 var**（`var` 在 eval 里是脚本作用域）
