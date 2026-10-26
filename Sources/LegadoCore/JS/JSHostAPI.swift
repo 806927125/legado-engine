@@ -357,7 +357,7 @@ public enum JSScopeBuilder {
     ///   · `querySelector` → null ／ `querySelectorAll` → **[]**（真 DOM 能力待吸收；现在至少不抛）⭐⭐⭐
     ///   · `createElement` → 一个**最小假元素**（站方只是 `var e = document.createElement('div')` 挂属性用）⭐⭐⭐
     ///   · 全屏 API（番茄源的 `fullscreenElement` / `exitFullscreen`）→ **安全的空实现**（不抛）⭐⭐⭐
-    static let documentStub = """
+    public static let documentStub = """
     var document = {
       getElementById: function(id) { return null; },
       querySelector: function(sel) { return null; },
