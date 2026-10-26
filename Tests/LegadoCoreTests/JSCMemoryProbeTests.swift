@@ -162,7 +162,7 @@ final class JSCMemoryProbeTests: XCTestCase {
         let kindsAll = try engine.exploreKinds().kinds
         let kinds = kindsAll.count
         let urlBytes = kindsAll.reduce(0) { acc, k in acc + String(k.url).utf8.count }
-        NSLog("JSC-MEM-PROBE ③B 用户变量 ⇒ 分类 \(kinds.count) 个，url 合计 \(urlBytes) 字节")
+        NSLog("JSC-MEM-PROBE ③B 用户变量 ⇒ 分类 \(kinds) 个，url 合计 \(urlBytes) 字节")
         XCTAssertGreaterThan(kinds, 0, "探针没跑出分类 ⇒ 探针本身失效了（不是内存没问题）")
         let afterKinds = mark("③B 用户变量 exploreKinds 后（\(kinds) 个分类，url 合计 \(urlBytes) 字节）")
         XCTAssertLessThan(afterKinds - base, Self.budgetDeltaMB,
