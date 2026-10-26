@@ -19,13 +19,13 @@ final class JSCRetentionBisectTests: XCTestCase {
 
     private static func report(_ name: String, _ box: Box) {
         let alive = box.ctx != nil
-        print("[JSC-BISECT] \(name) ⇒ \(alive ? "🔴 还活着（有人强持有）" : "🟢 已释放")")
+        print("[JSC-BISECT] \(name) => \(alive ? "ALIVE(有人强持有)" : "RELEASED(没人持有)")")
     }
 
     // ① 裸 context（什么都不做）
     private func bare() -> Box {
         let box = Box()
-        let ctx = JavaScriptCore.JSContext()
+        guard let ctx = JavaScriptCore.JSContext() else { return box }
         box.ctx = ctx
         return box
     }
@@ -33,7 +33,7 @@ final class JSCRetentionBisectTests: XCTestCase {
     // ② context + evaluateScript（会创建 JSValue 包装）
     private func evaluated() -> Box {
         let box = Box()
-        let ctx = JavaScriptCore.JSContext()
+        guard let ctx = JavaScriptCore.JSContext() else { return box }
         _ = ctx.evaluateScript("1+1")
         box.ctx = ctx
         return box
@@ -42,7 +42,7 @@ final class JSCRetentionBisectTests: XCTestCase {
     // ③ context + 挂一个**弱捕获自己**的 block（我修完的样子）
     private func weakBlockOnContext() -> Box {
         let box = Box()
-        let ctx = JavaScriptCore.JSContext()
+        guard let ctx = JavaScriptCore.JSContext() else { return box }
         let block: @convention(block) (String) -> String = { [weak ctx] s in s }
         ctx.setObject(unsafeBitCast(block, to: AnyObject.self), forKeyedSubscript: "__hostJSON" as NSString)
         box.ctx = ctx
@@ -52,7 +52,7 @@ final class JSCRetentionBisectTests: XCTestCase {
     // ④ context + 挂一个**强捕获自己**的 block（老代码的样子 ⇒ 必环）
     private func strongBlockOnContext() -> Box {
         let box = Box()
-        let ctx = JavaScriptCore.JSContext()
+        guard let ctx = JavaScriptCore.JSContext() else { return box }
         let block: @convention(block) (String) -> String = { s in s + String(describing: ctx) }
         ctx.setObject(unsafeBitCast(block, to: AnyObject.self), forKeyedSubscript: "__hostJSON" as NSString)
         box.ctx = ctx
@@ -62,7 +62,7 @@ final class JSCRetentionBisectTests: XCTestCase {
     // ⑤ context + 注入 Java 兼容层（2197 行 JS ⇒ 真实路径的一半）
     private func withJavaCompat() -> Box {
         let box = Box()
-        let ctx = JavaScriptCore.JSContext()
+        guard let ctx = JavaScriptCore.JSContext() else { return box }
         for src in JSCExecutor.javaCompatSources() {
             _ = ctx.evaluateScript("(0, eval)(" + JSScopeBuilder.jsonLiteral(.string(src)) + ")")
         }
@@ -73,37 +73,35 @@ final class JSCRetentionBisectTests: XCTestCase {
     // ⑥ ⭐ **显式 VM + context，然后两个都放掉**
     private func explicitVMBothReleased() -> Box {
         let box = Box()
-        do {
-            let vm = JavaScriptCore.JSVirtualMachine()
-            let ctx = JavaScriptCore.JSContext(virtualMachine: vm)
-            box.ctx = ctx
-            // vm 在这里出作用域 ⇒ 只剩 context 自己撑着
-        }
+        let vm = JavaScriptCore.JSVirtualMachine()
+        guard let ctx = JavaScriptCore.JSContext(virtualMachine: vm) else { return box }
+        box.ctx = ctx
+        // vm 在这里出作用域 ⇒ 只剩 context 自己撑着
         return box
     }
 
-    // ⑦ ⭐ **显式 VM，context 由 VM 抱着**（老代码 `JSContext()` 的默认行为就是这种）
-    private func explicitVMContextOnlyReleased() -> Box {
+    // ⑦ ⭐ **显式 VM 被一个独立盒子持有**（模拟「执行器持有 VM」的真实修法）
+    private func explicitVMHeldByBox() -> Box {
         let box = Box()
-        let vm = JavaScriptCore.JSVirtualMachine()
-        let ctx = JavaScriptCore.JSContext(virtualMachine: vm)
+        final class VMBox { let vm: JavaScriptCore.JSVirtualMachine; init() { vm = JavaScriptCore.JSVirtualMachine() } }
+        let holder = VMBox()
+        guard let ctx = JavaScriptCore.JSContext(virtualMachine: holder.vm) else { return box }
         box.ctx = ctx
-        // vm 仍活着（局部变量）⇒ 此刻必然活着；等它出作用域后再看
-        withExtendedLifetime(vm) {}
+        // holder 出作用域 ⇒ VM 没人持有了 ⇒ 若 context 还活着 ⇒ 说明 context 自己抱着 VM（环）
         return box
     }
 
     func testBisectWhoRetainsTheContext() throws {
         print("[JSC-BISECT] ===== 谁在持有 JSContext =====")
-        let b1 = bare();                          Self.report("① 裸 context", b1)
-        let b2 = evaluated();                     Self.report("② context + evaluateScript", b2)
-        let b3 = weakBlockOnContext();            Self.report("③ context + 弱捕获 block", b3)
-        let b4 = strongBlockOnContext();          Self.report("④ context + 强捕获 block（老代码）", b4)
-        let b5 = withJavaCompat();                Self.report("⑤ context + Java 兼容层", b5)
-        let b6 = explicitVMBothReleased();        Self.report("⑥ 显式 VM + context（都放掉）", b6)
-        let b7 = explicitVMContextOnlyReleased(); Self.report("⑦ 显式 VM + context（VM 出作用域）", b7)
+        let b1 = bare();                          Self.report("1-bare-context", b1)
+        let b2 = evaluated();                     Self.report("2-eval", b2)
+        let b3 = weakBlockOnContext();            Self.report("3-weak-block", b3)
+        let b4 = strongBlockOnContext();          Self.report("4-strong-block", b4)
+        let b5 = withJavaCompat();                Self.report("5-java-compat", b5)
+        let b6 = explicitVMBothReleased();        Self.report("6-explicit-vm-both-released", b6)
+        let b7 = explicitVMHeldByBox();           Self.report("7-explicit-vm-held-by-box", b7)
         print("[JSC-BISECT] ===== 结束 =====")
-        // ⭐ 本测试**只打印**（不判定）⇒ 结论由人/CI 日志读出来 ⇒ 不做假断言
+        // ⭐ 本测试**只打印**（不判定）⇒ 结论由 CI 日志读出来 ⇒ 不做假断言
     }
 }
 #endif
