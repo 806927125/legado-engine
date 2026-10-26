@@ -133,18 +133,39 @@ final class JSCMemoryProbeTests: XCTestCase {
         XCTAssertLessThan(afterLib - base, Self.budgetDeltaMB,
                           "加载 jsLib 就涨了 \(afterLib - base) MB ⇒ **jsLib 加载有放大**")
 
-        // ⭐⭐⭐ **站方的默认变量表要灌进 varBox**（App 侧 `seedVars` 干的就是这件事）
-        //   ⇒ 不灌 ⇒ 站方 `getArguments` 拿不到 `server` ⇒ 分类请求发不出去 ⭐⭐⭐
-        let vars = try engine.sourceVars()
-        for (k, v) in vars { engine.varBox.set(k, v) }
-        mark("②b 灌入站方默认变量表（\(vars.count) 项）后")
+        // ⭐⭐⭐⭐⭐ **两组变量各跑一遍**（这是 App 与探针的**唯一差别**）⭐⭐⭐⭐⭐
+        //
+        // ⚠️⚠️⚠️ **为什么关键**：站方 `getArguments(open_argument, key)` 的语义是
+        //   「open_argument 是**合法 JSON** ⇒ **不再给默认表**，只认你写的那几项」⭐⭐⭐
+        //   ⇒ App 灌的是**用户变量**（平台/线路/模式）⇒ 站方 exploreUrl 的输出
+        //     可能与「默认表」时**完全不同**（甚至大几个数量级）⭐⭐⭐⭐⭐
+        //   ⇒ 而探针上一版灌的是**站方默认表** ⇒ 所以探针不复现 ⭐⭐⭐
+        //
+        // ① 先用【站方默认表】跑一遍（基线）
+        let defaults = try engine.sourceVars()
+        for (k, v) in defaults { engine.varBox.set(k, v) }
+        mark("②b 灌入站方默认表（\(defaults.count) 项）后")
+        let kindsWithDefaults = try engine.exploreKinds().kinds
+        let urlBytesDefaults = kindsWithDefaults.reduce(0) { $0 + String($1.url).utf8.count }
+        NSLog("JSC-MEM-PROBE ③A 默认表 ⇒ 分类 %ld 个，url 合计 %ld 字节",
+              kindsWithDefaults.count, urlBytesDefaults)
+        let baseAfterDefaults = mark("③A 默认表 exploreKinds 后")
 
-        // ③ 分类（站方 exploreUrl ⇒ 74.7KB 的响应 ⇒ 355 个分类）
-        // ⭐⭐⭐ **不许 `try?` 吞异常** ⇒ 没跑出分类就是「探针没生效」⇒ 必须红 ⭐⭐⭐
+        // ② 再用【App 灌的用户变量】跑一遍（这才是真机路径）
+        let userVars: [String: String] = [
+            "find_source": "番茄", "server": "https://v5.langge.uk",
+            "tab": "小说", "source_type": "男频",
+        ]
+        for (k, v) in userVars { engine.varBox.set(k, v) }
+        mark("②c 灌入 App 的用户变量（\(userVars.count) 项）后")
+
+        // ③ 分类（用【用户变量】⇒ 真机路径）
         let kindsAll = try engine.exploreKinds().kinds
         let kinds = kindsAll.count
+        let urlBytes = kindsAll.reduce(0) { $0 + String($1.url).utf8.count }
+        NSLog("JSC-MEM-PROBE ③B 用户变量 ⇒ 分类 %ld 个，url 合计 %ld 字节", kinds.count, urlBytes)
         XCTAssertGreaterThan(kinds, 0, "探针没跑出分类 ⇒ 探针本身失效了（不是内存没问题）")
-        let afterKinds = mark("③ exploreKinds 后（\(kinds) 个分类）")
+        let afterKinds = mark("③B 用户变量 exploreKinds 后（\(kinds) 个分类，url 合计 \(urlBytes) 字节）")
         XCTAssertLessThan(afterKinds - base, Self.budgetDeltaMB,
                           "分类这一步涨了 \(afterKinds - base) MB ⇒ **放大点在「响应 → 分类对象」**")
 
