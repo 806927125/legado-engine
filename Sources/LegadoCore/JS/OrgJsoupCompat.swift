@@ -283,7 +283,7 @@ public enum OrgJsoupCompat {
         var parg = null;
         if (text.charAt(j3) === '(') {
           // ⭐⭐⭐ 伪类参数里【可以有嵌套括号】（站方真写法：
-          //   `:matchesOwn(内容未加载完成|关闭(阅读|小说)模式)` ⇒ 正则自带分组 ⭐⭐⭐）
+          //   :matchesOwn(内容未加载完成|关闭(阅读|小说)模式) ⇒ 正则自带分组 ⭐⭐⭐）
           //   ⇒ 只找第一个 ')' ⇒ 参数被截断 ⇒ 正则语法错 ⇒ 静默不匹配 ⇒ 规则空 ⭐⭐⭐
           var depth = 0, pc = -1;
           for (var pk = j3; pk < text.length; pk++) {
@@ -538,7 +538,7 @@ public enum OrgJsoupCompat {
     return this;
   };
   El.prototype.raw = function () { return this.n; };
-  // ── 以下一批照抄老引擎（`El.prototype.*`）—— 老实现是事实标准，缺一个站方就可能炸 ⭐⭐⭐
+  // ── 以下一批照抄老引擎（El.prototype.*）—— 老实现是事实标准，缺一个站方就可能炸 ⭐⭐⭐
   El.prototype.attributes = function () { return this.n.attrs; };
   El.prototype.hasAttr = function (name) { return this.n.attrs[String(name).toLowerCase()] !== undefined; };
   El.prototype.removeAttr = function (name) { delete this.n.attrs[String(name).toLowerCase()]; return this; };
@@ -608,7 +608,7 @@ public enum OrgJsoupCompat {
   Doc.prototype.outerHtml = function () { return outerHtmlOf(this.n); };
   Doc.prototype.toString = function () { return this.outerHtml(); };
   Doc.prototype.attr = function (name) { return ''; };
-  // ── 以下一批照抄老引擎（`Doc.prototype.*`）—— 老实现是事实标准 ⭐⭐⭐
+  // ── 以下一批照抄老引擎（Doc.prototype.*）—— 老实现是事实标准 ⭐⭐⭐
   Doc.prototype.getElementById = function (i) {
     var all = selectAll(this.n, '#' + i);
     return all.length ? new El(all[0], this.baseUrl) : null;
@@ -649,12 +649,12 @@ public enum OrgJsoupCompat {
     return t.length ? normalise(wholeTextOf(t[0])) : '';
   };
 
-  /** 裸节点数组 ⇒ El 数组（老引擎的 `makeElements` 收的是【已包装】的元素） */
+  /** 裸节点数组 ⇒ El 数组（老引擎的 makeElements 收的是【已包装】的元素） */
   function wrapAll(nodes, baseUrl) {
     return makeElements(nodes.map(function (n) { return new El(n, baseUrl); }), baseUrl);
   }
 
-  /** Elements = **真数组** + 额外方法（老引擎同款 ⇒ `Array.from(els)` 能用） */
+  /** Elements = **真数组** + 额外方法（老引擎同款 ⇒ Array.from(els) 能用） */
   function makeElements(arr, baseUrl) {
     var e = arr.slice();
     e.size = function () { return e.length; };
@@ -677,7 +677,7 @@ public enum OrgJsoupCompat {
       return { hasNext: function () { return i < e.length; }, next: function () { return e[i++]; } };
     };
     e.toString = function () { return '[' + e.map(String).join(', ') + ']'; };
-    // ── 以下一批照抄老引擎的 `patchElements` —— 站方真在用（`remove()` 净化正文广告）⭐⭐⭐
+    // ── 以下一批照抄老引擎的 patchElements —— 站方真在用（remove() 净化正文广告）⭐⭐⭐
     e.eq = function (i) { return e[Number(i) || 0] || null; };
     e.map = function (fn) { return Array.prototype.map.call(e, fn); };
     e.filter = function (fn) { return makeElements(Array.prototype.filter.call(e, fn), baseUrl); };
