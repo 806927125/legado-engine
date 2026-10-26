@@ -52,12 +52,23 @@ final class ScopeDocumentStubTests: XCTestCase {
         try Self.assertContract(exec)
     }
 
-    #if canImport(JavaScriptCore)
+    /// ⚠️⚠️ **不能复用别的测试类里的嵌套 `FakeAPI`**（`JSCContextReuseTests.FakeAPI` 是**嵌套类型**
+    ///   ⇒ 跨文件不可见 ⇒ macOS CI 直接编译失败）⇒ 自己定义一个（2026-10-26 真机教训）⭐⭐⭐
+    final class DocumentStubAPI: JSHostAPIProvider, @unchecked Sendable {
+        func hostObject(named name: String) -> HostObject? { nil }
+        func callJava(_ method: String, _ args: [JSONValue]) -> JSONValue? { .string("host:" + method) }
+    }
+
+    /// ⭐⭐⭐ **这里【不要】用 `#if canImport(JavaScriptCore)` 把整段挡掉**（2026-10-26 实证）：
+    ///   挡掉 ⇒ **Linux 沙盒根本不编这段** ⇒ macOS 专属的类型错（`cannot find 'FakeAPI' in scope`）
+    ///   ⇒ **在沙盒里完全看不见** ⇒ 只能等 macOS CI 才炸 ⇒ 白等一轮 ⭐⭐⭐
+    ///   ⇒ 现在有 `JSCExecutor+NonAppleStub.swift` ⇒ **两边都能编** ⇒ 沙盒 3 秒就能抓 ⭐⭐⭐
     func testJSCBackendMatchesDocumentContract() throws {
-        let exec = JSCExecutor(api: FakeAPI())
+        try XCTSkipUnless(JSCExecutor.isAvailable,
+                          "⚠️【SKIP】本机没有 JavaScriptCore ⇒ 本次没验 JSC 侧（**不等于通过**）")
+        let exec = JSCExecutor(api: DocumentStubAPI())
         try Self.assertContract(exec)
     }
-    #endif
 
     /// ⭐⭐⭐ **同一份契约**（Node 3 秒 / JSC 慢 ⇒ 但跑的是同一批期望值）
     private static func assertContract(_ exec: JSExecutor) throws {
