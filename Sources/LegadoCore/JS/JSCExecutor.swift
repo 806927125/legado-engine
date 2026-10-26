@@ -231,14 +231,20 @@ public final class JSCExecutor: JSExecutor {
         // ⭐⭐⭐⭐⭐ **单一真相在 `JSEvalShape.swift`**（纯 Foundation ⇒ **Linux 也能编**）
         //   ⇒ 改错本地 3 秒抓到 ⇒ **根治「Linux 全绿、macOS CI 编译失败」** ⭐⭐⭐
         //   ⇒ 而且 JSC / Node 各自的 eval 语义差异**只体现在那一处** ⇒ 不会各自跑偏 ⭐⭐⭐
-        let plan = JSEvalShape.plan(for: code)
-        let attempts = JSEvalShape.scripts(for: plan, backend: .jsc,
-                                           scope: scope, code: code)
+        // ⭐⭐⭐⭐⭐ **形态链（单一真相在 `JSEvalShape.swift`）**（2026-10-26 实测定稿）⭐⭐⭐
+        //
+        //   ① **直接 eval**（主形态）—— 完成值 = 代码作为脚本的完成值；eval 里的 `let` 不重复声明 ⭐⭐⭐
+        //   ② **整段当表达式** —— `@js:{a:1}` 这种对象字面量规则（形态 ① 对它是语法错）⭐⭐⭐
+        //   ③ **整段当函数体** —— 站方写 `return xxx;` 时才合法 ⭐⭐⭐
+        //
+        //   ⇒ 与**老引擎（轻阅 `rule-analyzer.js`）同款** ⇒ 真机行为逐字一致 ⭐⭐⭐⭐⭐
+        let attempts = JSEvalShape.scripts(for: code, scope: scope)
       // ⭐⭐⭐⭐⭐ **看门狗**:JS 跑太久 ⇒ **明确报出来**(是「站方 JS 卡住了」,不是「网络慢」)
         let t0 = Date()
         var value: JavaScriptCore.JSValue?
         var firstError: String?
-        for src in attempts {
+        var attemptsLog: [String] = []
+        for (i, src) in attempts.enumerated() {
             caught.value = nil
             let v = js.evaluateScript(src)
             let elapsed = Date().timeIntervalSince(t0)
@@ -247,22 +253,49 @@ public final class JSCExecutor: JSExecutor {
                     "站方 JS 执行 \(Int(elapsed)) 秒(超过 \(Int(Self.slowScriptThreshold)) 秒)"
                     + "⇒ 疑似死循环/极慢(宿主应回退老引擎:老引擎的 JS 在独立进程里 ⇒ 不会拖死 App)")
             }
-            // ⭐ 站方 JS 抛异常 ⇒ **记下来**（继续试下一种形态）
+            // ⭐⭐⭐⭐⭐ **只有【语法错】才换下一种形态**（老引擎同款）⭐⭐⭐⭐⭐
+            //
+            // ⚠️⚠️⚠️ **为什么不能「任何错都换形态」**：
+            //   运行时错误（TypeError 等）⇒ **站方代码已经跑过了** ⇒ 换形态重跑
+            //   ⇒ **副作用重复**（java.ajax 再发一次 ⇒ 限流打爆）⭐⭐⭐⭐⭐
+            //   ⇒ 语法错 ⇒ **代码根本没跑** ⇒ 换形态**不会重复副作用** ⇒ 安全 ⭐⭐⭐
             if let msg = caught.value {
+                attemptsLog.append("#\(i + 1): \(msg)")
+                if !Self.isSyntaxError(msg) {
+                    // ⭐ 运行时错误 ⇒ **直接抛**（不重跑）⇒ 站方 JS 只执行一次 ⭐⭐⭐
+                    throw JSCError.scriptException("站方 JS 抛异常：\(msg)")
+                }
                 if firstError == nil { firstError = msg }
+                continue
+            }
+            // ⭐ `evaluateScript` 返回 nil ⇒ 也是失败 ⇒ 记下来换下一种形态
+            guard let v else {
+                attemptsLog.append("#\(i + 1): evaluateScript 没返回值")
+                if firstError == nil { firstError = "脚本执行失败（evaluateScript 没返回值）" }
                 continue
             }
             // ⭐⭐⭐⭐⭐ **执行成功 ⇒ 就用它**（哪怕是 undefined/null）
             //   ⇒ **绝不因为「没值」就再跑一遍** ⇒ **站方 JS 只执行一次** ⇒ 副作用不重复 ⭐⭐⭐
-            //   ⇒ ⚠️ 以前这里「undefined ⇒ 试下一种形态」⇒ **重复执行 2~3 次** ⇒ 真机回归的根因 ⭐⭐⭐
             value = v
             break
         }
-        if value == nil, let e = firstError {
-            throw JSCError.scriptException(e)
+        // ⭐⭐⭐ **没有值 ⇒ 明确报出来**（不许静默空 ⇒ 否则规则静默失效）⭐⭐⭐
+        if value == nil || value?.isUndefined == true || value?.isNull == true {
+            if let e = firstError {
+                throw JSCError.scriptException(
+                    "站方 JS 抛异常：\(e) | 形态尝试: " + attemptsLog.joined(separator: " || "))
+            }
+            return .null
         }
         guard let value else { return .null }
         return Self.toJSON(value)
+    }
+
+    /// ⭐⭐⭐ **是不是【语法错】**（只有语法错才允许换形态）⭐⭐⭐
+    ///
+    /// ⚠️ JSC 的异常消息形如 `SyntaxError: Unexpected identifier 'is'`
+    private static func isSyntaxError(_ message: String) -> Bool {
+        message.contains("SyntaxError")
     }
 
     /// ⭐⭐⭐ **全局求值**（**间接 eval**）—— **站方 jsLib 专用**
@@ -596,22 +629,37 @@ public final class JSCExecutor: JSExecutor {
     }
 
     /// JSValue → JSONValue
+    ///
+    /// ⭐⭐⭐⭐⭐ **数组/对象的内容必须保住**（2026-10-26 真机回归的**头号真凶**）⭐⭐⭐⭐⭐
+    ///
+    /// ⚠️⚠️⚠️ **原来的 bug**（真机「JM小说 0 本书」的根因）：
+    /// ```swift
+    /// let items = (v.toArray() ?? []).compactMap { $0 as? JSValue }   // ❌ 永远是空数组
+    /// ```
+    ///   · `toArray()` 返回的是 **`[Any]`**（已经桥接成 Foundation 值：NSNumber/NSString/NSDictionary…）
+    ///     ⇒ **`as? JSValue` 永远失败** ⇒ ⇒ **数组被清空** ⭐⭐⭐
+    ///   · 对象同理：`val as? JSValue` 永远失败 ⇒ **对象的字段全丢** ⭐⭐⭐
+    ///   ⇒ 站方 JS 返回「书列表 / 章列表」⇒ ⇒ **引擎拿到空数组 / 空对象**
+    ///   ⇒ ⇒ 表现：**「书出得来但字段全空」/「0 本书」/「目录 0 章」** ⭐⭐⭐⭐⭐
+    ///   ⇒ ⇒ 而 **Node 后端走 JSON.stringify** ⇒ 内容完整 ⇒ **沙盒全绿、真机全空** ⭐⭐⭐⭐⭐
+    ///
+    /// ⭐ **正解**：用 `JSONValue.from`（它认 NSNumber/NSString/[Any]/[String: Any]）⭐
     static func toJSON(_ v: JSValue) -> JSONValue {
         if v.isUndefined || v.isNull { return .null }
         if v.isBoolean { return .bool(v.toBool()) }
         if v.isNumber { return .double(v.toDouble()) }
         if v.isString { return .string(v.toString()) }
         if v.isArray {
-            // ⚠️ `toArray()` 返回 `[Any]` ⇒ 要转成 JSValue
-            let items = (v.toArray() ?? []).compactMap { $0 as? JSValue }
-            return .array(items.map { toJSON($0) })
+            // ⚠️⚠️ `toArray()` 给的是 `[Any]`（Foundation 值）⇒ **不能 `as? JSValue`** ⇒ 用 `JSONValue.from` ⭐⭐⭐
+            let items = v.toArray() ?? []
+            return .array(items.map { JSONValue.from($0) })
         }
         if v.isObject {
-            // ⚠️ `toDictionary()` 返回 `[AnyHashable: Any]` ⇒ key 要转 String
+            // ⚠️⚠️ 同理：`toDictionary()` 给的是 `[AnyHashable: Any]` ⇒ 值也是 Foundation 值 ⭐⭐⭐
             var obj: [String: JSONValue] = [:]
             for (k, val) in (v.toDictionary() ?? [:]) {
-                guard let ks = k as? String, let jv = val as? JSValue else { continue }
-                obj[ks] = toJSON(jv)
+                guard let ks = k as? String else { continue }
+                obj[ks] = JSONValue.from(val)
             }
             return .object(obj)
         }

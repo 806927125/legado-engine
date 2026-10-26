@@ -187,10 +187,12 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
         // ⭐⭐⭐ **预计算纯计算方法**（站方包装函数是**同步**的 ⇒ JS 侧只能查表）⭐⭐⭐
         let cache = Self.pureMethodCache(engineAPI: engineAPI, base: currentBase, code: code)
         // ⭐⭐⭐⭐⭐ **形态选择在 Swift 侧算好**（`JSEvalShape` ⇒ 单一真相 ⇒ JSC / Node 不漂移）
-        let plan = JSEvalShape.plan(for: code)
-        let planTag = plan == .objectLiteral ? "objectLiteral"
-            : (plan == .topLevelReturn ? "topLevelReturn" : "script")
-        let reply = try send(["cmd": "run", "code": code, "scope": scope, "plan": planTag,
+        // ⭐⭐⭐⭐⭐ **形态链由 Swift 侧算好**（`JSEvalShape` ⇒ 单一真相 ⇒ JSC / Node 不漂移）⭐⭐⭐
+        //
+        //   ⇒ Node harness **不再自己拼脚本** ⇒ 只负责「按顺序试，**只在语法错时换形态**」⭐⭐⭐
+        //   ⇒ 与 JSC 侧**同一份脚本文本** ⇒ 语义逐字一致 ⭐⭐⭐⭐⭐
+        let attempts = JSEvalShape.scripts(for: code, scope: scope)
+        let reply = try send(["cmd": "run", "attempts": attempts, "code": code,
                               "hostProps": props, "hostCache": cache])
         if let err = reply["error"] as? String {
             throw SourceError.unsupported("Node JS 报错：\(err)")
@@ -892,36 +894,31 @@ function setHostProps(props, cache) {
   }
 }
 
-function runEval(code, scope, planTag) {
-  // ⭐⭐⭐⭐⭐ **形态由 Swift 侧算好**（`JSEvalShape` ⇒ 单一真相 ⇒ JSC / Node 不会漂移）⭐⭐⭐
-  // ⇒ 这里只负责「把形态拼成脚本」⭐⭐⭐
-  var sc = (scope || '').replace(/\s*$/, '') + ';\n';
-  var attempts;
-  if (planTag === 'objectLiteral') {
-    // ⭐⭐⭐ 对象字面量 ⇒ 整段当表达式（两个后端一致）
-    attempts = [sc + '(' + code + '\n)'];
-  } else if (planTag === 'topLevelReturn') {
-    // ⭐⭐⭐ 顶层有 return ⇒ 函数体形态（只跑一次）
-    attempts = [sc + '(function(){\n' + code + '\n})()'];
-  } else {
-    // ⭐⭐⭐ 主力形态：**Node 用 eval 块**（eval 完成值 = 块内最后表达式 + let 局部）
-    attempts = [sc + '(function(){ return eval(' + JSON.stringify('{ ' + code + ' }') + '); })()',
-                sc + '(function(){\n' + code + '\n})()'];
-  }
-
+function runEval(attempts) {
+  // ⭐⭐⭐⭐⭐ **形态链由 Swift 侧算好**（`JSEvalShape.scripts` ⇒ 单一真相 ⇒ JSC / Node 不漂移）⭐⭐⭐
+  //
+  // ⭐⭐⭐⭐⭐ **只有【语法错】才换下一种形态**（老引擎 `rule-analyzer.js` 同款）⭐⭐⭐⭐⭐
+  //
+  // ⚠️⚠️⚠️ **为什么不能「任何错都换形态」**：
+  //   运行时错误（TypeError 等）⇒ **站方代码已经跑过了** ⇒ 换形态重跑
+  //   ⇒ **副作用重复**（java.ajax 再发一次 ⇒ 限流打爆）⭐⭐⭐⭐⭐
+  //   ⇒ 语法错 ⇒ **代码根本没跑** ⇒ 换形态**不会重复副作用** ⇒ 安全 ⭐⭐⭐
+  //
+  // ⭐ **执行成功就返回**（哪怕 undefined/null）⇒ **不重复执行** ⇒ 副作用不重复 ⭐⭐⭐
   let firstErr = null;
   const errs = [];
   for (let i = 0; i < attempts.length; i++) {
     let v = null, err = null;
     try { v = vm.runInContext(attempts[i], ctx); } catch (e) { err = e; }
     if (err) {
+      const isSyntax = /SyntaxError/.test(String((err && err.name) || '') + ' ' + String(err && err.message || err));
+      if (!isSyntax) throw err;   // ⭐ 运行时错误直接抛（不重跑）⭐⭐⭐
       errs.push('#' + (i + 1) + ': ' + String(err && err.message || err));
       if (!firstErr) firstErr = err;
       continue;
     }
-    // ⭐⭐⭐ **执行成功就返回**（哪怕 undefined/null）⇒ **不重复执行** ⇒ 副作用不重复 ⭐⭐⭐
     if (v === undefined || v === null) {
-      // ⭐⭐⭐⭐⭐ 「形态 1 抛错 + 形态 2 没值」⇒ 把【真错】抛出去（诊断不许说谎）
+      // ⭐⭐⭐⭐⭐ 「形态 1 抛错 + 形态 2 没值」⇒ 把【真错】抛出去（诊断不许说谎）⭐⭐⭐
       if (firstErr) {
         throw new Error(String(firstErr && firstErr.message || firstErr)
           + ' | 形态尝试: ' + errs.join(' || '));
@@ -1012,7 +1009,7 @@ rl.on('line', function(line) {
       process.stdout.write(JSON.stringify({ ok: true, value: v, globals: globals() }) + '\n');
     } else if (req.cmd === 'run') {
       setHostProps(req.hostProps, req.hostCache);
-      const v = runEval(req.code, req.scope, req.plan || 'script');
+      const v = runEval(req.attempts || []);
       process.stdout.write(JSON.stringify({ ok: true, value: v, globals: globals() }) + '\n');
     } else if (req.cmd === 'routes') {
       ctx.__qrRoutes = req.routes || [];

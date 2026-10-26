@@ -51,6 +51,28 @@ final class JSCExecutionShapeTests: XCTestCase {
                      key: "kw", page: 1)
     }
 
+    /// ⭐⭐⭐⭐⭐ **形态语义契约 · JSC 后端**（macOS CI 跑）⭐⭐⭐⭐⭐
+    ///
+    /// ⚠️ **与 Node 后端跑【同一份契约】**（`ShapeSemanticsContract`）
+    ///   ⇒ 两个后端**不可能漂移** ⭐⭐⭐
+    ///   ⇒ Node 侧在 Linux 沙盒就能验 ⇒ 反馈 3 秒 ⭐⭐⭐
+    func testJSCMeetsShapeSemanticsContract() throws {
+        let exec = JSCExecutor(api: CountingAPI())
+        let c = ctx()
+        try ShapeSemanticsContract.check("JSC 后端") { code in
+            try exec.run(code, context: c)
+        }
+    }
+
+    /// ⭐⭐⭐⭐⭐ **同一段含 `let` 的代码跑三次**（真机「重复声明」的老坑）⭐⭐⭐⭐⭐
+    func testJSCRepeatedLetDoesNotCrash() throws {
+        let exec = JSCExecutor(api: CountingAPI())
+        let c = ctx()
+        try ShapeSemanticsContract.checkRepeatedLet("JSC 后端") { code in
+            try exec.run(code, context: c)
+        }
+    }
+
     /// ⭐⭐⭐⭐⭐ **基础求值探针：JSC 的 evaluateScript 到底返回什么**（2026-10-26）
     ///
     /// ⚠️ 前面的失败说明 **JSC 上【所有形态】都出不来值** ⇒ ⇒ 必须先验最基础的：
@@ -135,11 +157,61 @@ final class JSCExecutionShapeTests: XCTestCase {
         XCTAssertEqual(v.scalarString, "id=7", "顶层 return 必须出值")
     }
 
-    /// ⭐⭐⭐ **对象字面量**（站方把它当规则用）
+    /// ⭐⭐⭐ **对象字面量（两个字段）**（站方把它当规则用）
+    ///
+    /// ⭐⭐⭐ **形态链实测（2026-10-26 macOS CI）**：
+    ///   · 形态 ①（直接 eval）⇒ `{ name: 'x', author: 'y' }` 是**语法错**
+    ///     （标签语句带逗号不合法）⇒ ⇒ 自动落到形态 ②（整段当表达式）⇒ **拿到对象** ⭐⭐⭐
+    ///   · ⇒ **与老引擎（轻阅 `rule-analyzer.js`）同款** ⇒ 真机行为一致 ⭐⭐⭐
+    ///
+    /// ⚠️⚠️ **这条同时验了 `toJSON` 的修复**（数组/对象的内容不许丢）⭐⭐⭐⭐⭐
+    ///   ⇒ 以前 `toJSON` 用 `as? JSValue` ⇒ **字段全丢** ⇒ 真机「0 本书 / 字段全空」⭐⭐⭐
     func testObjectLiteralStillWorks() throws {
         let exec = JSCExecutor(api: CountingAPI())
         let v = try exec.run("{ name: '书名', author: '作者' }", context: ctx())
-        XCTAssertEqual(v.scalarString, "书名", "对象字面量必须出值（取 name）")
+        guard case .object(let obj) = v else {
+            XCTFail("对象字面量必须出对象，实际=\(v)")
+            return
+        }
+        XCTAssertEqual(obj["name"]?.scalarString, "书名", "对象的 name 字段不能丢")
+        XCTAssertEqual(obj["author"]?.scalarString, "作者", "对象的 author 字段不能丢")
+    }
+
+    /// ⭐⭐⭐ **对象字面量（单字段）⇒ 老引擎的语义是【字符串】** ⭐⭐⭐
+    ///
+    /// ⚠️ `{ name: 'x' }` 在脚本里是**标签语句** ⇒ 完成值 = `'x'`（字符串）
+    ///   ⇒ 形态 ① 直接出值 ⇒ **不落到形态 ②** ⇒ 与老引擎逐字一致 ⭐⭐⭐
+    func testSingleFieldObjectLiteralYieldsLabelValue() throws {
+        let exec = JSCExecutor(api: CountingAPI())
+        let v = try exec.run("{ name: '书名' }", context: ctx())
+        XCTAssertEqual(v.scalarString, "书名", "单字段对象字面量 = 标签语句的完成值（老引擎同款）")
+    }
+
+    /// ⭐⭐⭐⭐⭐ **数组的内容不许丢**（真机「0 本书 / 0 章」的头号真凶）⭐⭐⭐⭐⭐
+    ///
+    /// ⚠️⚠️⚠️ 以前 `toJSON` 写的是 `compactMap { $0 as? JSValue }`
+    ///   ⇒ `toArray()` 给的是 **Foundation 值** ⇒ 转换**永远失败** ⇒ **数组被清空** ⭐⭐⭐
+    ///   ⇒ 站方 JS 返回书列表 ⇒ 引擎拿到空数组 ⇒ **0 本书** ⭐⭐⭐⭐⭐
+    func testArrayContentIsPreserved() throws {
+        let exec = JSCExecutor(api: CountingAPI())
+        let v = try exec.run("[1, 2, 3]", context: ctx())
+        guard case .array(let items) = v else {
+            XCTFail("数组必须出数组，实际=\(v)")
+            return
+        }
+        XCTAssertEqual(items.count, 3, "数组的 3 个元素不能丢（实际=\(items.count)）")
+    }
+
+    /// ⭐⭐⭐ **对象字面量（显式括号）的字段不许丢** ⭐⭐⭐
+    func testObjectContentIsPreserved() throws {
+        let exec = JSCExecutor(api: CountingAPI())
+        let v = try exec.run("({ a: 1, b: 'x' })", context: ctx())
+        guard case .object(let obj) = v else {
+            XCTFail("必须出对象，实际=\(v)")
+            return
+        }
+        XCTAssertEqual(obj.count, 2, "对象的 2 个字段不能丢（实际=\(obj.count)）")
+        XCTAssertEqual(obj["b"]?.scalarString, "x")
     }
 
     /// ⭐⭐⭐ **`var` + 末行**（大灰狼 jsLib 的常见形态）
@@ -154,7 +226,14 @@ final class JSCExecutionShapeTests: XCTestCase {
     func testReturnInsideFunctionNotMisjudged() throws {
         let exec = JSCExecutor(api: CountingAPI())
         let v = try exec.run("(function(){ return []; })()", context: ctx())
-        XCTAssertFalse(v.scalarString.isEmpty, "函数体内的 return 必须正常出值")
+        // ⭐⭐⭐ **断言的是「值是不是数组」，不是「字符串非空」** ⭐⭐⭐
+        //   · 空数组的 `scalarString` 本来就是 "" ⇒ 断言字符串 ⇒ 永远失败 ⇒ 测不出东西 ⭐⭐⭐
+        //   · 真正的判据 = **函数体内的 return 没被误判成顶层 return**
+        //     （误判 ⇒ 整段被包进函数体 ⇒ 值 = undefined ⇒ 这里就不是数组了）⭐⭐⭐
+        guard case .array = v else {
+            XCTFail("函数体内的 return 必须出数组（说明没被误判成顶层 return），实际=\(v)")
+            return
+        }
     }
 
     /// ⭐⭐⭐ **语法错要能报出来**（不是静默空）
