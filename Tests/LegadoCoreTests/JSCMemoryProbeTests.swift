@@ -104,7 +104,7 @@ final class JSCMemoryProbeTests: XCTestCase {
         func mb() -> Int { Self.footprintBytes() / (1024 * 1024) }
         func mark(_ label: String) -> Int {
             let m = mb()
-            print("⭐ [JSC 内存探针] \(label) ⇒ footprint \(m) MB")
+            NSLog("JSC-MEM-PROBE %@ => footprint %d MB", label, m)
             return m
         }
 
@@ -116,24 +116,40 @@ final class JSCMemoryProbeTests: XCTestCase {
             try engine.loadJsLib(lib)
         }
         let afterLib = mark("② 加载站方 jsLib 后")
+        XCTAssertNoThrow(try engine.sourceVars(), "站方默认变量表取不到 ⇒ 探针环境不对")
         XCTAssertLessThan(afterLib - base, Self.budgetDeltaMB,
                           "加载 jsLib 就涨了 \(afterLib - base) MB ⇒ **jsLib 加载有放大**")
 
+        // ⭐⭐⭐ **站方的默认变量表要灌进 varBox**（App 侧 `seedVars` 干的就是这件事）
+        //   ⇒ 不灌 ⇒ 站方 `getArguments` 拿不到 `server` ⇒ 分类请求发不出去 ⭐⭐⭐
+        let vars = try engine.sourceVars()
+        for (k, v) in vars { engine.varBox.set(k, v) }
+        mark("②b 灌入站方默认变量表（\(vars.count) 项）后")
+
         // ③ 分类（站方 exploreUrl ⇒ 74.7KB 的响应 ⇒ 355 个分类）
-        let kinds = (try? engine.exploreKinds().kinds.count) ?? 0
+        // ⭐⭐⭐ **不许 `try?` 吞异常** ⇒ 没跑出分类就是「探针没生效」⇒ 必须红 ⭐⭐⭐
+        let kindsAll = try engine.exploreKinds().kinds
+        let kinds = kindsAll.count
+        XCTAssertGreaterThan(kinds, 0, "探针没跑出分类 ⇒ 探针本身失效了（不是内存没问题）")
         let afterKinds = mark("③ exploreKinds 后（\(kinds) 个分类）")
         XCTAssertLessThan(afterKinds - base, Self.budgetDeltaMB,
                           "分类这一步涨了 \(afterKinds - base) MB ⇒ **放大点在「响应 → 分类对象」**")
 
         // ④ 书单（13.6KB 的响应 ⇒ 27 本）
-        var books = 0
-        if let url = (try? engine.exploreKinds().kinds.first?.url), !url.isEmpty {
-            books = (try? engine.explore(url).count) ?? 0
-        }
+        //   ⚠️ **结果必须【留着】**（像 App 的缓存那样）⇒ 否则量不到「结果拽住内存」⭐⭐⭐
+        let target = try XCTUnwrap(kindsAll.first { /get_discover/.test(String($0.url)) },
+                                  "应有一个 get_discover 分类")
+        let booksAll = try engine.explore(target.url)
+        let books = booksAll.count
+        XCTAssertGreaterThan(books, 0, "探针没跑出书单 ⇒ 探针本身失效了")
         let afterBooks = mark("④ explore 后（\(books) 本）")
         XCTAssertLessThan(afterBooks - base, Self.budgetDeltaMB,
                           "书单这一步涨了 \(afterBooks - base) MB ⇒ **放大点在「响应 → 书对象」**")
 
+        // ⭐ 把结果**留在内存里**（别被优化掉）⇒ 最后再测一次「结果还活着时的水位」
+        let afterHold = mark("⑤ 结果仍被持有时")
+        XCTAssertLessThan(afterHold - base, Self.budgetDeltaMB,
+                          "结果还活着就涨了 \(afterHold - base) MB ⇒ **结果拽住了内存**")
         print("⭐ [JSC 内存探针] 全部步骤的增量都在 \(Self.budgetDeltaMB) MB 以内 ⇒ 没有放大")
     }
 }
