@@ -51,6 +51,9 @@ final class JSCMemoryProbeTests: XCTestCase {
         weak var engineRef: SourceEngine?
         func hostObject(named name: String) -> HostObject? {
             if name == "source" { return engineRef?.sourceObject }
+            // ⭐ 站方 exploreUrl 还会调 `cookie.getCookie()` ⇒ 缺它就抛
+            //   「cookie.getCookie is not a function」⇒ 探针跑不到真路径 ⭐⭐⭐
+            if name == "cookie" { return engineRef?.cookieObject }
             return nil
         }
         func callJava(_ method: String, _ args: [JSONValue]) -> JSONValue? { nil }
@@ -107,7 +110,8 @@ final class JSCMemoryProbeTests: XCTestCase {
             guard let resp = try? transport.send(req) else { return nil }
             return .string(String(data: resp.body, encoding: .utf8) ?? "")
         }
-        let engine = SourceEngine(source: source, fetcher: PageFetcher(transport: transport), js: exec)
+        let engine = SourceEngine(source: source, fetcher: PageFetcher(transport: transport), js: exec,
+                                  cookies: MemoryCookieService())
         api.engineRef = engine      // ⭐ 回填 ⇒ 站方 JS 能用 `source.getVariable()`
 
         func mb() -> Int { Self.footprintBytes() / (1024 * 1024) }
