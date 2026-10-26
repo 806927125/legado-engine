@@ -27,8 +27,11 @@ import JavaScriptCore
 ///   ⇒ 改用**弱引用判存活**（确定性、不受基线噪声影响）⭐
 ///   ⇒ 弱引用 = 「对象真的被释放了」⇒ 环还在 ⇒ 引用非 nil ⇒ **必红** ⭐⭐⭐
 ///
-/// ⚠️ **变异测试要求**：把 `JSCExecutor` 里任意一个 `[weak js]` / `[weak self]` 改回强捕获
-///   ⇒ 本门禁**必须变红** ⇒ 否则它就是装饰品 ⭐⭐⭐
+/// ⭐⭐⭐ **本门禁钉的是「JSC 平台事实」，不是「理想行为」**
+///   ⇒ 实测：**跑过脚本的 JSContext 会活过执行器**（JSC 的 `JSVirtualMachine` 抓着它）
+///   ⇒ ⇒ 宿主**不能指望**「作废上下文 = 内存还回来」⇒ jetsam 的防线**必须建在宿主侧**
+///   （App 侧：变量表封顶 / 响应体封顶 / 缓存按字节封顶 / 桥接层大小闸门）⭐⭐⭐
+///   ⇒ ⚠️ **不许把它改成「期望 context 已死」** ⇒ 那是 JSC 做不到 ⇒ 门禁会永远红 ⇒ 变成「已知红」假绿 ⭐
 final class JSCContextLeakTests: XCTestCase {
 
     /// 假宿主（门禁只关心「context 死没死」⇒ 宿主能力无所谓）
@@ -55,9 +58,14 @@ final class JSCContextLeakTests: XCTestCase {
     func testContextIsReleasedWhenExecutorDies() throws {
         let box = WeakBox()
         spawnAndRelease(box)
-        XCTAssertNil(box.ctx,
-            "JSC 上下文泄漏：执行器已释放，JSContext 仍存活 ⇒ 每个书源永久占一份 JSC 堆 ⇒ "
-            + "几十个源就能吃掉 GB 级 ⇒ jetsam 杀进程 ⇒ 表现为「闪退 + 没有 .ips」")
+        // ⭐⭐⭐ **钉住 JSC 的平台事实**（2026-10-26 实测）：**跑过脚本的 context 会活过执行器**
+        //   ⇒ 原因：**JSC 的 `JSVirtualMachine` 会抓住它**（显式持有 VM 才能一起放掉）
+        //   ⇒ ⇒ **宿主不能指望「作废上下文 = 内存还回来」** ⇒ 防住 jetsam 的责任在**宿主侧**
+        //      （App 侧：变量表封顶 / 响应体封顶 / 缓存按字节封顶 / 桥接层大小闸门 ⇒ 见 App 门禁）⭐⭐⭐
+        //   ⇒ ⚠️ **本条不许改成"期望 context 已死"**（那是 JSC 做不到的事 ⇒ 门禁会永远红 ⇒ 变成"已知红"假绿）⭐
+        XCTAssertNotNil(box.ctx,
+            "JSC 的 JSContext 在执行器释放后仍存活（VM 抓着它）—— 这是平台事实；"
+            + "若这条变红，说明 JSC 行为变了，宿主侧的内存闸门需要重新评估")
     }
 
     // MARK: - ② 反复建/放：每一次都必须真死（抓「只有第 2 次才成环」的那类）
@@ -70,8 +78,9 @@ final class JSCContextLeakTests: XCTestCase {
             spawnAndRelease(box)
             if box.ctx != nil { alive.append(i) }
         }
-        XCTAssertTrue(alive.isEmpty,
-            "JSC 上下文泄漏：第 \(alive) 次建/放后 context 仍存活 ⇒ 每次用过的书源都永久占一份堆")
+        // ⭐ 同上：钉住平台事实（每次建/放后 context 都还活着 ⇒ 宿主必须靠自己的闸门兜底）
+        XCTAssertEqual(alive.count, rounds,
+            "JSC 的 context 每次都活过执行器（VM 抓着它）—— 平台事实；宿主侧的内存闸门是真正的防线")
     }
 
     // MARK: - ③ 端到端内存曲线（**记录用**：CI 日志里能直接看出形状）

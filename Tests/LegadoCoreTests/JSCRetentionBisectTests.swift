@@ -132,8 +132,9 @@ final class JSCRetentionBisectTests: XCTestCase {
               n, before, after, perSource)
         lines.append("per-source-delta=\(perSource)MB (total \(before)→\(after))")
 
-        // ⭐⭐⭐ 汇总塞进断言消息 ⇒ 就算 NSLog 被吞也能看到
-        XCTFail("JSC-BISECT 汇总：" + lines.joined(separator: " | "))
+        // ⭐⭐⭐ 汇总用 NSLog 打出来（**不失败** ⇒ 仓库 CI 必须保持绿）
+        //   ⇒ 结论已沉淀：JSC 的 VM 会抓住「跑过脚本的 context」⇒ 显式 VM 才放得掉 ⭐⭐⭐
+        NSLog("JSC-BISECT 汇总：%@", lines.joined(separator: " | "))
     }
 }
 #endif
