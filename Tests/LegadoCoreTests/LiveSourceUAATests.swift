@@ -47,6 +47,12 @@ final class LiveSourceUAATests: XCTestCase {
     "wordCountFormat":"17.5万","finished":"1","categories":"[]","tags":"[]"}]}}
     """
 
+    /// ⭐ JSC 后端要一个 host provider（Linux 编译不到 ⇒ 这段在 macOS 才生效）⭐
+    final class NoopAPI: JSHostAPIProvider, @unchecked Sendable {
+        func hostObject(named name: String) -> HostObject? { nil }
+        func callJava(_ method: String, _ args: [JSONValue]) -> JSONValue? { nil }
+    }
+
     final class MemTransport: HTTPTransport, @unchecked Sendable {
         private let body: String
         private(set) var lastURL: String = ""
@@ -81,7 +87,7 @@ final class LiveSourceUAATests: XCTestCase {
     func testUAASearchProducesBookUrlOnJSC() throws {
         #if canImport(JavaScriptCore)
         let src = try loadSource()
-        let js = JSCExecutor()
+        let js = try JSCExecutor(api: NoopAPI())
         let transport = MemTransport(body: Self.searchResponse)
         let engine = SourceEngine(source: src, fetcher: PageFetcher(transport: transport), js: js)
         try engine.loadJsLib(try loadJsLib())
