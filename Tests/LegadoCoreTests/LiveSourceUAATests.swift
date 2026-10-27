@@ -74,8 +74,11 @@ final class LiveSourceUAATests: XCTestCase {
         try engine.loadJsLib(try loadJsLib())
 
         let books = try engine.search("测试")
+        // ⭐ 诊断：把真实请求 URL 打出来（Node/JSC 两边对不上时一眼看出）⭐
+        print("[UAA] 请求 URL = \(transport.lastURL)")
+        for d in engine.failureDiagnosticLines { print("[UAA] 诊断: \(d)") }
         XCTAssertFalse(books.isEmpty,
-                       "⭐⭐⭐ 原版源必须能出书（真机症状：bookUrl 为空 ⇒ 详情/目录全断）")
+                       "⭐⭐⭐ 原版源必须能出书（真机症状：bookUrl 为空 ⇒ 详情/目录全断）请求 URL=\(transport.lastURL)")
         let url = books[0].bookUrl
         XCTAssertFalse(url.isEmpty, "⭐⭐⭐ bookUrl 不能为空（真机症状）")
         XCTAssertTrue(url.contains("/novel/info"),
@@ -93,7 +96,9 @@ final class LiveSourceUAATests: XCTestCase {
         try engine.loadJsLib(try loadJsLib())
 
         let books = try engine.search("测试")
-        XCTAssertFalse(books.isEmpty, "⭐⭐⭐ 原版源必须能出书（JSC）")
+        print("[UAA/JSC] 请求 URL = \(transport.lastURL)")
+        for d in engine.failureDiagnosticLines { print("[UAA/JSC] 诊断: \(d)") }
+        XCTAssertFalse(books.isEmpty, "⭐⭐⭐ 原版源必须能出书（JSC）请求 URL=\(transport.lastURL)")
         XCTAssertFalse(books[0].bookUrl.isEmpty, "⭐⭐⭐ bookUrl 不能为空（JSC）")
         XCTAssertTrue(books[0].bookUrl.contains("/novel/info"),
                       "⭐⭐⭐ bookUrl 必须带正确类型（JSC）⇒ 实际：\(books[0].bookUrl)")

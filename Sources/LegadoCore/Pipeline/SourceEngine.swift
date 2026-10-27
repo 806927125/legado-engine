@@ -1797,7 +1797,8 @@ public final class SourceEngine {
     ///   ⇒ 新引擎原来报的是**原始规则**（`{{page}}` 还在里面）⇒ **跟老引擎不一致** ⭐⭐⭐
     ///   ⇒ 用户在诊断面板看到「请求URL = …curpage={{page}}」⇒ 会以为规则坏了 ⭐⭐⭐
     public func preparedURL(_ urlRule: String, page: Int = 1, key: String = "") -> String {
-        var ctx = EvalContext(base: .page(""), baseUrl: source.bookSourceUrl, varBox: javaVars)
+        var ctx = EvalContext(base: .page(""), baseUrl: source.bookSourceUrl,
+                              book: bookObject, source: sourceObject, varBox: javaVars)
         ctx.page = page
         ctx.key = key
         return TemplateEngine.render(analyzeURLJS(urlRule, ctx: ctx), ctx: ctx, js: evaluator.js)
@@ -1913,7 +1914,12 @@ public final class SourceEngine {
                        key: String = "") throws -> Page {
         let baseURL = base ?? source.bookSourceUrl
         // 模板插值（`{{page}}` / `{{key}}` / `{{baseUrl}}`）
-        var ctx = EvalContext(base: .page(""), baseUrl: baseURL, varBox: javaVars)
+        // ⭐⭐⭐ **URL 规则的 JS 作用域里必须有 `source` / `book`**
+        //   （站方的 searchUrl 是 `@js: … source.get('order') …` ⇒ 没有 source ⇒ JSC 上抛错
+        //    ⇒ URL 空 ⇒ 「不是页面 URL：」⇒ 整条链废 ⇒ **JSC 绿、Node 红/反之**）⭐⭐⭐
+        var ctx = EvalContext(base: .page(""), baseUrl: baseURL,
+                              book: bookObject, source: sourceObject, chapter: chapterObject,
+                              varBox: javaVars)
         ctx.page = page
         ctx.key = key
         // ⭐⭐⭐ **URL 规则里的 `@js:` / `<js>`**（老引擎事实标准）⇒ 先跑 JS 再插模板 ⭐
