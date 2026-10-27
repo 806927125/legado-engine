@@ -52,3 +52,25 @@ public final class VarBox: @unchecked Sendable {
         return storage
     }
 }
+
+
+/// ⭐⭐⭐ **站方变量（Legado `source.variable`）** —— **一整串**，不是 map
+///
+/// ⚠️ **为什么必须与「书源变量」分开**（2026-10-27 实证）：
+///   · Legado：`source.getVariable()` / `setVariable(str)` ⇒ **站方变量**（一个字符串）
+///     而 `source.get(key)` / `put(key,v)` ⇒ **书源变量**（map）⇒ **两套，互不污染** ⭐
+///   · 混成一套 ⇒ 站方 `setVariable(token)` 会把 `put` 存的项**整份冲掉** ⭐⭐⭐
+///     （聚合源 NovelHub 改一次发现页筛选 ⇒ 解锁态没了；UAA 源把 token 塞进去
+///      ⇒ 请求头变成 `Bearer {"androidId":"…"}` ⇒ 服务端 403「无效JWT」⇒ 永远拿不到 token）
+public final class TextSlot: @unchecked Sendable {
+    private var value: String
+    private let lock = NSLock()
+
+    public init(_ initial: String = "") { self.value = initial }
+
+    /// 整串（站方变量的全部内容）
+    public var text: String {
+        get { lock.lock(); defer { lock.unlock() }; return value }
+        set { lock.lock(); defer { lock.unlock() }; value = newValue }
+    }
+}

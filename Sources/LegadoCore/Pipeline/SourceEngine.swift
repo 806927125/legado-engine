@@ -27,8 +27,19 @@ public final class SourceEngine {
     public let source: BookSource
     /// 抓页面的入口
     public let fetcher: PageFetcher
-    /// ⭐⭐ **源级变量的共享存储**（站方 `java.put` / `java.get` 读写的就是它）
+    /// ⭐⭐ **书源变量**（`source.get(key)` / `put(key,v)` 读写的就是它）的共享存储
     public let varBox: VarBox
+
+    /// ⭐⭐⭐ **站方变量（Legado `source.getVariable()` / `setVariable(str)`）**
+    ///
+    /// ⚠️ **nil ⇒ 老语义**（`getVariable()` 返回整份 varBox 的 JSON）⇒ **老宿主零影响** ⭐
+    /// ⚠️ **非 nil ⇒ Legado 语义**：
+    ///   · `getVariable()` = 这一串（`sourceVariable.text`）
+    ///   · `setVariable(str)` = 改这一串
+    ///   · 而 `get/put` 走 varBox（书源变量）⇒ **两套互不污染** ⭐⭐⭐
+    ///
+    /// ⚠️ 是**引用**（class）⇒ 宿主每个 op 改 `text` 即可 ⇒ 已建好的 sourceObject 也看得见 ⭐
+    public let sourceVariable: TextSlot?
 
     /// ⭐⭐⭐ **`java.put/get` 的独立存储**（**不是**站方变量那份！）
     ///
@@ -106,7 +117,8 @@ public final class SourceEngine {
     public init(source: BookSource, fetcher: PageFetcher, js: JSExecutor? = nil,
                 storage: KeyValueStorage? = nil, files: FileStorage? = nil,
                 browser: BrowserProvider? = nil, notifier: Notifier? = nil,
-                logger: EngineLogger? = nil, cookies: CookieService? = nil) {
+                logger: EngineLogger? = nil, cookies: CookieService? = nil,
+                sourceVariable: TextSlot? = nil) {
         self.source = source
         self.fetcher = fetcher
         // ⭐⭐ **源级请求头**（54 个源在用 ⇒ 缺了就 403 / 空页）
@@ -114,6 +126,8 @@ public final class SourceEngine {
         // ⭐⭐ 源级变量的**共享**存储（跨规则 / 跨 JS 调用可写）
         self.varBox = VarBox()
         self.javaVars = VarBox()
+        // ⭐⭐⭐ **站方变量槽**（nil ⇒ 老语义；非 nil ⇒ Legado 两套语义）⭐
+        self.sourceVariable = sourceVariable
         // ⭐ DOM 缓存（每源一个 ⇒ 天然隔离）
         self.domCache = DOMCache()
         self.evaluator = Evaluator(js: js)
@@ -138,6 +152,7 @@ public final class SourceEngine {
         // ⇒ 修：**init 里就把 `sourceObject` 建好** ⇒ 宿主通道从第一次调用就完整 ⭐
         //   （jsLib 里的 `source.getVariable()` / 发现页的 `source.setVariable()` 都活了）
         sourceObject = Self.makeSourceObject(source, varBox: varBox,
+                                              sourceVariable: sourceVariable,
                                               loginInfo: loadLoginInfo(),
                                               storage: storage)
         // ⭐⭐ **让引擎接管 `java.ajax`**（站方 JS 抓页面用 —— 125 源里 22 处 / 12 个源）
@@ -524,6 +539,7 @@ public final class SourceEngine {
         //   ⇒ 与 `toc()` / `content()` 的顺序保持一致（那边本来就在规则之前建）⭐
         bookObject = Self.makeBookObject(book, variables: variables)
         sourceObject = Self.makeSourceObject(source, varBox: varBox,
+                                              sourceVariable: sourceVariable,
                                               loginInfo: loadLoginInfo(),
                                               storage: storage)
 
@@ -1547,12 +1563,42 @@ public final class SourceEngine {
     /// ⚠️ **`get` 不能实现成「返回整份 vars」** —— 站方是
     ///   `String(source.get("nhAuthed") || "")` 这样比对的 ⇒ 拿到整份 JSON 哈希对不上。
     public static func makeSourceObject(_ source: BookSource, varBox: VarBox,
+                                        sourceVariable: TextSlot? = nil,
                                         loginInfo: [String: String] = [:],
                                         loginHeader: String = "",
                                         storage: KeyValueStorage? = nil) -> HostObject {
         var methods: [String: HostMethod] = [:]
 
-        // ── 整份变量 ────────────────────────────────────────────
+        // ── ⭐⭐⭐ 站方变量 vs 书源变量（Legado 语义）────────────────────
+        //
+        // ⚠️⚠️ **Legado 是两套**（2026-10-27 实证）：
+        //   · `source.getVariable()` / `setVariable(str)` ⇒ **站方变量**（一个字符串）
+        //   · `source.get(key)` / `put(key,v)`            ⇒ **书源变量**（map）
+        //   ⇒ 混成一套 ⇒ 站方 `setVariable(token)` 会把 `put` 存的项**整份冲掉** ⭐⭐⭐
+        //
+        // ⚠️ **老宿主兼容**：`sourceVariable == nil` ⇒ 保持老语义
+        //   （`getVariable()` = 整份 varBox JSON；`setVariable(json)` = 整份替换 varBox）⭐
+        if let sv = sourceVariable {
+            methods["getVariable"] = { _ in .string(sv.text) }   // ⭐ Legado 语义
+            methods["setVariable"] = { args in
+                let a = args.first
+                if args.count > 1 {
+                    // ② `setVariable(key, value)` ⇒ 改**书源变量**的一项（老宿主也这么用）
+                    let k = args[0].scalarString
+                    if !k.isEmpty { varBox.set(k, args[1].scalarString) }
+                } else if case .object(let o)? = a {
+                    // ① 传对象 ⇒ 序列化成串存进站方变量（站方极少这么用）
+                    var flat: [String: String] = [:]
+                    for (k, v) in o { flat[k] = v.scalarString }
+                    let data = (try? JSONSerialization.data(withJSONObject: flat)) ?? Data()
+                    sv.text = String(data: data, encoding: .utf8) ?? ""
+                } else {
+                    // ③ `setVariable(jsonString)` ⇒ 站方变量 = 那一串（**原样存**）⭐
+                    sv.text = a?.scalarString ?? ""
+                }
+                return .string("")
+            }
+        } else {
         methods["getVariable"] = { _ in .string(Self.varsJSON(varBox)) }
         methods["setVariable"] = { args in
             let a = args.first
@@ -1576,6 +1622,7 @@ public final class SourceEngine {
                 }
             }
             return .string("")
+        }
         }
 
         // ── ⭐⭐ 单项变量（真实语料 127 处）──────────────────────
