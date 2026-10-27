@@ -67,6 +67,25 @@ public struct RuleParser {
             return .js(String(s.dropFirst(4)))
         }
 
+        // ⭐⭐⭐⭐⭐ **③' 尾部后处理（`@js:` / `<js>`）必须【先于 `||` 切分】提取**
+        //
+        // ⚠️⚠️⚠️ **为什么顺序反了就是真机「详情目录都不能用」的根因**（2026-10-27 真机实证）：
+        //   站方真实规则（UAA 四合一 / 知秋）：
+        //     `videoId||id` ⏎ `@js:` `let type = baseUrl.match(…)[1]` ⏎ `getApiUrl('/'+type+'/info', {novelId: result})`
+        //   ⇒ 语义 = **「(videoId || id) 选出 id ⇒ 交给 JS 拼 URL」**（JS 跑在**整条链之后**）⭐⭐⭐
+        //
+        //   以前 `||` 先切 ⇒ 变成 `["videoId", "id\n@js:…"]`
+        //   ⇒ ① 尾部 `@js:` **只挂在最后一段** ⇒ 第一段命中时 **JS 根本不跑** ⇒ URL 是裸 id ⭐⭐⭐
+        //   ⇒ ② head 带着尾换行（`"id\n"`）⇒ JSON 相对路径被**误判成 CSS 选择器**
+        //      ⇒ 空 ⇒ 「|| 兜底链全部未命中」⭐⭐⭐（= 真机诊断里那行字）
+        //   ⇒ ③ 更糟：JS 代码里的 `||`（JS 的「或」运算符）会被 `||` 切分**腰斩** ⭐⭐⭐
+        //
+        // ⇒ **正解：先把尾部后处理摘出来 ⇒ 剩下的 head 再切 `||`/`&&` ⇒ 整条链的值当 `result` 喂给 JS** ⭐⭐⭐
+        //   （与老引擎 `analyzeJsInUrl` 同款：`@js:` 贪婪到末尾 / `<js>` 非贪婪）⭐⭐⭐
+        if let (head, post) = Self.splitPostProcess(s), !head.isEmpty {
+            return .post(parseInternal(head, isJSON: isJSON), post)
+        }
+
         // ③ `||` 择一（§S-FBK-01）—— 优先级最高
         let orParts = Self.splitTopLevel(s, separators: ["||"])
         if orParts.count > 1 {
@@ -328,7 +347,13 @@ public struct RuleParser {
     public static func splitPostProcess(_ s: String) -> (String, RuleNode.PostProcess)? {
         // `@js:` 后缀
         if let idx = s.range(of: "@js:", options: .backwards) {
-            let head = String(s[..<idx.lowerBound]).trimmingCharacters(in: .whitespaces)
+            // ⭐⭐⭐ **head 要连换行一起 trim**（2026-10-27 真机实证）
+            //   站方复合规则是**换行分隔**的：`videoId||id` ⏎ `@js:…`
+            //   ⇒ head = `"videoId||id\n"` ⇒ 尾换行留着 ⇒
+            //     · JSON 相对路径被**误判成 CSS 选择器**（`id\n` 不是合法 JSONPath）⇒ 空 ⭐⭐⭐
+            //     · 「|| 兜底链全部未命中」= 真机那行诊断 ⭐⭐⭐
+            //   ⇒ 老引擎是 `body.slice(0, idx).trim()`（**JS 的 trim 连换行一起**）⇒ 照抄 ⭐⭐⭐
+            let head = String(s[..<idx.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let code = String(s[idx.upperBound...])
             if !head.isEmpty { return (head, .js(code)) }
         }
@@ -352,7 +377,7 @@ public struct RuleParser {
         if let open = s.range(of: "<js>", options: .backwards),
            let close = s.range(of: "</js>", options: .backwards),
            open.lowerBound < close.lowerBound {
-            let head = String(s[..<open.lowerBound]).trimmingCharacters(in: .whitespaces)
+            let head = String(s[..<open.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
             let code = String(s[open.upperBound..<close.lowerBound])
             let tail = String(s[close.upperBound...]).trimmingCharacters(in: .whitespaces)
             if !head.isEmpty {
