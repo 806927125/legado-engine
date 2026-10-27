@@ -1032,6 +1032,19 @@ public struct Evaluator {
 
     // MARK: - JS
 
+    /// ⭐⭐⭐⭐⭐ **跑一段 JS 拿字符串**（URL 规则里的 `@js:` / `<js>` 用）
+    ///
+    /// ⚠️ **老引擎的事实标准**（`reference/js/engine.js` 的 `analyzeJsInUrl`）：
+    ///   URL 里可以内嵌 `@js:`（**贪婪到末尾**）或 `<js>…</js>` ⇒ 求值结果当 URL 用 ⭐
+    ///   ⇒ 新引擎以前**只认 {{}} 模板** ⇒ `@js:` 的 URL 被百分号编码
+    ///   ⇒ 「不是页面 URL：@js%3A…」⇒ 站方的 bookUrl/tocUrl 规则全废
+    ///   ⇒ **详情/目录/正文全断**（2026-10-27 真机实证）⭐⭐⭐
+    public func evalJSString(_ code: String, ctx: EvalContext) -> String {
+        var diag = EngineDiagnostic(rule: code)
+        let v = runJS(code, base: ctx.base, ctx: ctx, diag: &diag)
+        return v.jsonValue.scalarString
+    }
+
     private func runJS(_ code: String, base: RuleBase, ctx: EvalContext,
                        diag: inout EngineDiagnostic) -> RuleValue {
         guard let js else {

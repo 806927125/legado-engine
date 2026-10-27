@@ -1800,7 +1800,69 @@ public final class SourceEngine {
         var ctx = EvalContext(base: .page(""), baseUrl: source.bookSourceUrl, varBox: javaVars)
         ctx.page = page
         ctx.key = key
-        return TemplateEngine.render(urlRule, ctx: ctx, js: evaluator.js)
+        return TemplateEngine.render(analyzeURLJS(urlRule, ctx: ctx), ctx: ctx, js: evaluator.js)
+    }
+
+    // MARK: - ⭐⭐⭐⭐⭐ **URL 规则里的 `@js:` / `<js>`**（老引擎的事实标准）
+
+    /// ⭐⭐⭐⭐⭐ **URL 里内嵌的 `@js:`（贪婪到末尾）/ `<js>…</js>`** ⇒ 求值结果当 URL 用
+    ///
+    /// ⚠️⚠️ **为什么必须有**（2026-10-27 真机实证 · 源「✿UAA四合一（知秋）」**原版**）：
+    ///   站方的 `ruleSearch.bookUrl` 是：
+    ///     id
+    ///     @js:
+    ///     let type = baseUrl.match(new RegExp(api + '/(\w+)/'))[1]
+    ///     getApiUrl(`/${type}/info`, { novelId: result })
+    ///   ⇒ **URL 规则里带 `@js:`** ⇒ 老引擎一直支持（`engine.js` 的 `analyzeJsInUrl`）
+    ///   ⇒ 新引擎以前**只认 {{}} 模板** ⇒ `@js:` 被百分号编码
+    ///   ⇒ 「不是页面 URL：@js%3A…」⇒ 兜底链全未命中 ⇒ **bookUrl 为空**
+    ///   ⇒ ⇒ **详情页打不开 / 目录 0 章 / 正文也断** ⭐⭐⭐
+    ///
+    /// ⭐ **语义照抄老引擎**（`analyzeJsInUrl`）：
+    ///   · `@js:` **贪婪到末尾**；`<js>…</js>` 非贪婪
+    ///   · JS 的作用域里 `result` = **累积到这里的 URL**（`urlJsScope(ctx, acc)`）
+    ///   · 文本里的 `@result` 会被替换成累积值
+    ///   · **出错 ⇒ 记日志**（`[URL 里的 JS 出错]`）⇒ 不静默吞（面板里看得见）⭐
+    public func analyzeURLJS(_ urlRule: String, ctx: EvalContext) -> String {
+        guard urlRule.contains("@js:") || urlRule.contains("<js>") else { return urlRule }
+        // ⚠️ 老引擎的正则：`@js:` 贪婪到末尾 / `<js>` 非贪婪
+        guard let re = try? NSRegularExpression(pattern: "@js:([\\s\\S]*)|<js>([\\s\\S]*?)</js>") else {
+            return urlRule
+        }
+        let ns = urlRule as NSString
+        var out = ""
+        var acc = ""
+        var last = 0
+        var matches = re.matches(in: urlRule, range: NSRange(location: 0, length: ns.length))
+        for m in matches {
+            let before = ns.substring(with: NSRange(location: last, length: m.range.location - last))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !before.isEmpty {
+                out += before.replacingOccurrences(of: "@result", with: acc)
+            }
+            let code: String
+            if m.range(at: 1).location != NSNotFound {
+                code = ns.substring(with: m.range(at: 1))
+            } else {
+                code = ns.substring(with: m.range(at: 2))
+            }
+            // ⭐ JS 的作用域：`result` = 累积到这里的 URL（老引擎 urlJsScope 同款）⭐
+            var jsCtx = ctx
+            jsCtx.base = .page(acc)
+            let v = evaluator.evalJSString(code, ctx: jsCtx)
+            acc = v.isEmpty ? "" : v
+            out += acc
+            last = m.range.location + m.range.length
+            if m.range(at: 1).location != NSNotFound {   // `@js:` 贪婪到末尾
+                last = ns.length
+                break
+            }
+        }
+        let tail = ns.substring(from: last).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !tail.isEmpty {
+            out += tail.replacingOccurrences(of: "@result", with: acc)
+        }
+        return out.isEmpty ? acc : out
     }
 
     /// ⭐⭐⭐ **诊断用的列表求值**（暴露 `listItems` 给诊断 op 用）
@@ -1854,7 +1916,8 @@ public final class SourceEngine {
         var ctx = EvalContext(base: .page(""), baseUrl: baseURL, varBox: javaVars)
         ctx.page = page
         ctx.key = key
-        let rule = TemplateEngine.render(urlRule, ctx: ctx, js: evaluator.js)
+        // ⭐⭐⭐ **URL 规则里的 `@js:` / `<js>`**（老引擎事实标准）⇒ 先跑 JS 再插模板 ⭐
+        let rule = TemplateEngine.render(analyzeURLJS(urlRule, ctx: ctx), ctx: ctx, js: evaluator.js)
 
         // ⭐⭐⭐ **`data:` 伪 URL 绝不能真去 fetch**（2026-10-24 真机「大灰狼详情空白」实证）
         //   站方聚合源（🍅大灰狼）的 bookUrl / tocUrl / chapterUrl 全是
@@ -2091,7 +2154,9 @@ public final class SourceEngine {
                               baseUrl: page.url, raw: page.text,
                               book: bookObject, source: sourceObject, chapter: chapterObject,
                               varBox: javaVars, isJSON: page.isJSON, document: page.document)
-        let rendered = TemplateEngine.render(t, ctx: ctx, js: evaluator.js)
+        // ⭐⭐⭐ **URL 规则里的 `@js:` / `<js>`**（老引擎事实标准）
+        //   ⚠️ 站方的 `ruleSearch.bookUrl` 就是这种写法 ⇒ 以前被百分号编码 ⇒ bookUrl 空 ⭐⭐⭐
+        let rendered = TemplateEngine.render(analyzeURLJS(t, ctx: ctx), ctx: ctx, js: evaluator.js)
         // ②b ⭐ 走 `URLBuilder.parse` ⇒ **剥掉 `,{json}` 选项后缀** + 绝对化
         //   （站方真实写法：`https://chuangshi.qq.com/chapter/26150754,{"headers":{…}}`
         //     ⇒ 不剥后缀 ⇒ 服务器收到一坨带逗号的 URL ⇒ 404 ⇒ **目录 0 章** ⭐）
