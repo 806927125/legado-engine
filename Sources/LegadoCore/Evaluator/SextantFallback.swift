@@ -1,4 +1,5 @@
 import Foundation
+import Hitch
 import Sextant
 
 /// ⭐⭐⭐⭐⭐ **Sextant 兜底**（MIT · vendored）—— 标准 JSONPath + **完整**过滤表达式
@@ -28,8 +29,9 @@ public enum SextantFallback {
     }
 
     /// ⭐⭐⭐ **路径是否合法**（`nil` = 合法；非 nil = 错误原因）⇒ 给诊断用
+    /// （Sextant 的 `String` 扩展有 `query(validate:)` 重载 ⇒ 直接用字符串版即可）
     public static func validate(_ path: String) -> String? {
-        json.query(validate: Hitch(path))
+        path.query(validate: path)
     }
 
     // MARK: - 内部

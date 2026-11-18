@@ -44,6 +44,9 @@ let package = Package(
         .target(name: "LegadoCore", dependencies: [
             .product(name: "SwiftSoup", package: "SwiftSoup"),
             "Sextant",
+            // ⚠️ Sextant 的公开 API 里用了 `Hitch`（如 `query(values: Hitch)`）⇒ 目标必须**直接**依赖它
+            //   ⇒ 否则 `import Hitch` 在 LegadoCore 里找不到类型（真机 CI 实证）⭐⭐⭐
+            "Hitch",
         ]),
         // ⭐ 参考实现（轻阅的 AnalyzeUrl.swift）—— 只读，用于 URL 规则对拍
         .target(name: "AnalyzeUrlReference", path: "reference/swift"),
