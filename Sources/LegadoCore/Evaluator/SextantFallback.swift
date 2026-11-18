@@ -24,7 +24,7 @@ public enum SextantFallback {
     /// ⭐⭐⭐ **用 Sextant 求值一条路径**（`nil` = Sextant 也认不了）
     public static func select(_ root: JSONValue, _ path: String) -> [JSONValue]? {
         guard let json = jsonText(root) else { return nil }
-        guard let hits = json.query(values: Hitch(path)) else { return nil }
+        guard let hits = json.query(values: Hitch(string: path)) else { return nil }
         return hits.compactMap { $0 }.map { JSONValue.from($0) }
     }
 
