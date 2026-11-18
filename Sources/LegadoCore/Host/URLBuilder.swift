@@ -36,9 +36,59 @@ public enum URLBuilder {
         /// 基准 URL（目录部分）
         public var baseUrl: String
 
+        // ────────────────────────────────────────────────────────────
+        // ⭐⭐⭐⭐⭐ **URL 选项全集**（2026-11-18 · 对齐 Legado/legado-E/栖阅）
+        //
+        // ⚠️ **为什么整组补**：轻阅原来只支持 `method` / `headers` / `body`
+        //   ⇒ 而 **legado-E 的 `AnalyzeUrl`**（`option.getMethod/getHeaderMap/getBody/getType/
+        //      getCharset/getRetry/useWebView/getWebJs/getBodyJs/getDnsIp/getJs/getServerID/
+        //      getWebViewDelayTime`）与**栖阅的 17 键**高度一致
+        //   ⇒ ⇒ **柴阅/栖阅能做、轻阅不能做**的根因就在这里 ⭐⭐⭐
+        //
+        // ⭐ **每个键都是站方真在用的**（本地 125 源语料实测）⇒ 不是「理论能力」
+        //
+        /// 站方显式指定的字符集（**优先于响应头**）—— 老站常不声明/声明错 ⇒ 乱码 ⭐⭐⭐
+        public var charset: String
+        /// 失败重试次数（0 = 不重试）
+        public var retry: Int
+        /// 用 WebView 发这个请求（需要宿主实现）
+        public var useWebView: Bool
+        /// WebView 里跑的 JS（拿它吐出的内容）
+        public var webJs: String
+        /// 请求体由 JS 生成
+        public var bodyJs: String
+        /// URL 里内嵌的 JS（`@js:` / `<js>`）
+        public var js: String
+        /// 指定 DNS IP（需要宿主实现）
+        public var dnsIp: String
+        /// 指定服务器 ID（需要宿主实现）
+        public var serverID: String
+        /// WebView 延迟（秒）
+        public var webViewDelayTime: Double
+        /// 代理（宿主实现）
+        public var proxy: String
+        /// 类型标记（站方自定义，宿主不解释）
+        public var type: String
+        /// 初始请求头
+        public var initialHeaderMap: [String: String]
+        /// 请求上下文变量
+        public var requestContextVariables: [String: String]
+        /// 响应正则提取（宿主实现）
+        public var sourceRegex: String
+        /// 覆盖 URL 正则（宿主实现）
+        public var overrideUrlRegex: String
+        /// 请求超时（秒，站方显式指定 ⇒ 覆盖默认）
+        public var requestTimeout: Double?
+
         public init(url: String, method: String, headers: [String: String], body: String, baseUrl: String) {
             self.url = url; self.method = method; self.headers = headers
             self.body = body; self.baseUrl = baseUrl
+            self.charset = ""; self.retry = 0; self.useWebView = false
+            self.webJs = ""; self.bodyJs = ""; self.js = ""
+            self.dnsIp = ""; self.serverID = ""; self.webViewDelayTime = 0
+            self.proxy = ""; self.type = ""
+            self.initialHeaderMap = [:]; self.requestContextVariables = [:]
+            self.sourceRegex = ""; self.overrideUrlRegex = ""; self.requestTimeout = nil
         }
     }
 
@@ -122,7 +172,30 @@ public enum URLBuilder {
             }
         }
 
-        return Built(url: abs, method: method, headers: headers, body: body, baseUrl: dirOf(abs))
+        var out = Built(url: abs, method: method, headers: headers, body: body, baseUrl: dirOf(abs))
+        // ── ⑨ 其余选项（Legado/栖阅 全集）────────────────────────────
+        // ⚠️ **代理不在 header 里**（legado-E 的 AnalyzeUrl 会把 `proxy` 从 headerMap 里摘出来）⭐
+        out.charset = (options["charset"] as? String) ?? ""
+        out.retry = (options["retry"] as? Int) ?? ((options["retry"] as? NSNumber)?.intValue ?? 0)
+        out.useWebView = (options["useWebView"] as? Bool) ?? false
+        out.webJs = (options["webJs"] as? String) ?? ""
+        out.bodyJs = (options["bodyJs"] as? String) ?? ""
+        out.js = (options["js"] as? String) ?? ""
+        out.dnsIp = (options["dnsIp"] as? String) ?? ""
+        out.serverID = (options["serverID"] as? String) ?? ""
+        out.webViewDelayTime = (options["webViewDelayTime"] as? NSNumber)?.doubleValue ?? 0
+        out.proxy = (options["proxy"] as? String) ?? ""
+        out.type = (options["type"] as? String) ?? ""
+        out.sourceRegex = (options["sourceRegex"] as? String) ?? ""
+        out.overrideUrlRegex = (options["overrideUrlRegex"] as? String) ?? ""
+        out.requestTimeout = (options["requestTimeout"] as? NSNumber)?.doubleValue
+        if let m = options["initialHeaderMap"] as? [String: Any] {
+            for (k, v) in m { out.initialHeaderMap[k] = String(describing: v) }
+        }
+        if let m = options["requestContextVariables"] as? [String: Any] {
+            for (k, v) in m { out.requestContextVariables[k] = String(describing: v) }
+        }
+        return out
     }
 
     // MARK: - 字段编码（Legado `analyzeFields`）

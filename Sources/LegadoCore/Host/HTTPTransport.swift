@@ -21,10 +21,48 @@ public struct HTTPRequest: Sendable, Equatable {
     /// 要带上的 cookie（`k=v; k2=v2`）
     public var cookie: String?
 
+    // ────────────────────────────────────────────────────────────
+    // ⭐⭐⭐ **站方 URL 选项透传**（2026-11-18 · 对齐 Legado/legado-E/栖阅）
+    //
+    // ⚠️ **为什么引擎要带这些**：宿主（App）才是真正发请求的人
+    //   ⇒ `charset`（怎么解码）/ `useWebView`/`webJs`/`bodyJs`（怎么发）
+    //   ⇒ `retry`（重试几次）/ `proxy`/`dnsIp`/`serverID`（走哪条线路）
+    //   ⇒ 只有引擎解析了、宿主才知道要做什么 ⭐⭐⭐
+    /// 站方指定的字符集（**优先于响应头**）—— 老站常不声明 ⇒ 乱码 ⭐⭐⭐
+    public var charset: String
+    /// 失败重试次数（0 = 不重试）
+    public var retry: Int
+    /// 用 WebView 发这个请求
+    public var useWebView: Bool
+    /// WebView 里跑的 JS
+    public var webJs: String
+    /// 请求体由 JS 生成
+    public var bodyJs: String
+    /// 指定 DNS IP
+    public var dnsIp: String
+    /// 指定服务器 ID
+    public var serverID: String
+    /// WebView 延迟（秒）
+    public var webViewDelayTime: Double
+    /// 代理
+    public var proxy: String
+    /// 站方的类型标记
+    public var type: String
+    /// 响应正则提取
+    public var sourceRegex: String
+    /// 覆盖 URL 正则
+    public var overrideUrlRegex: String
+    /// 站方指定的请求超时（秒）
+    public var requestTimeout: Double?
+
     public init(url: String, method: String = "GET", headers: [String: String] = [:],
                 body: Data? = nil, timeout: TimeInterval = 8, cookie: String? = nil) {
         self.url = url; self.method = method; self.headers = headers
         self.body = body; self.timeout = timeout; self.cookie = cookie
+        self.charset = ""; self.retry = 0; self.useWebView = false
+        self.webJs = ""; self.bodyJs = ""; self.dnsIp = ""; self.serverID = ""
+        self.webViewDelayTime = 0; self.proxy = ""; self.type = ""
+        self.sourceRegex = ""; self.overrideUrlRegex = ""; self.requestTimeout = nil
     }
 
     /// 从 `URLBuilder` 的产物构造
@@ -33,8 +71,22 @@ public struct HTTPRequest: Sendable, Equatable {
         self.method = built.method
         self.headers = built.headers
         self.body = built.body.isEmpty ? nil : built.body.data(using: .utf8)
-        self.timeout = timeout
+        // ⭐ 站方显式指定超时 ⇒ 覆盖默认（Legado 语义）
+        self.timeout = built.requestTimeout ?? timeout
         self.cookie = cookie
+        self.charset = built.charset
+        self.retry = built.retry
+        self.useWebView = built.useWebView
+        self.webJs = built.webJs
+        self.bodyJs = built.bodyJs
+        self.dnsIp = built.dnsIp
+        self.serverID = built.serverID
+        self.webViewDelayTime = built.webViewDelayTime
+        self.proxy = built.proxy
+        self.type = built.type
+        self.sourceRegex = built.sourceRegex
+        self.overrideUrlRegex = built.overrideUrlRegex
+        self.requestTimeout = built.requestTimeout
     }
 }
 
@@ -112,7 +164,32 @@ public struct PageFetcher: Sendable {
            let jar = cookieJar, let c = jar.cookieHeader(for: built.url), !c.isEmpty {
             request.cookie = c
         }
-        let resp = try transport.send(request)
+        // ⭐⭐⭐⭐⭐ **失败重试**（站方 `url,…,{"retry":2}` ⇒ Legado/栖阅 语义）
+        //
+        // ⚠️ **为什么必须**：老站/聚合源经常「第一次失败、第二次就通」
+        //   ⇒ 站方显式写 `retry` 就是为了这个 ⇒ 柴阅认这个键 ⇒ 轻阅原来不认
+        //   ⇒ ⇒ **同一个源：柴阅能出，轻阅出不来**（少了一次重试）⭐⭐⭐
+        //   ⇒ `retry: 0` = 不重试；`retry: 2` = 最多再试 2 次（总 3 次）
+        var resp: HTTPResponse
+        var attempt = 0
+        var lastError: Error?
+        while true {
+            do {
+                resp = try transport.send(request)
+                lastError = nil
+            } catch {
+                lastError = error
+                resp = HTTPResponse(statusCode: 0, headers: [:], body: Data(), finalURL: nil)
+            }
+            // 只有**请求本身失败**（抛错 / statusCode == 0）才重试
+            // ⚠️ 4xx/5xx 的 HTTP 响应**不算失败**（站方自己要看状态码）⭐⭐⭐
+            let failed = lastError != nil || resp.statusCode == 0
+            if !failed || attempt >= built.retry { break }
+            attempt += 1
+        }
+        if let e = lastError, resp.statusCode == 0 {
+            throw e
+        }
         // 收 cookie（Set-Cookie）
         if let jar = cookieJar {
             jar.store(headers: resp.headers, for: built.url)
