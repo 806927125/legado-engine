@@ -23,10 +23,15 @@ let package = Package(
     dependencies: [
         // HTML 解析 + CSS 选择器（Jsoup 兼容语义）
         .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.6.0"),
+        // ⭐⭐⭐⭐⭐ **本地 vendored 的 MIT 包**（Sextant / Hitch / Spanker）
+        //   ⇒ 栖阅 / 柴阅的引擎用的就是这套 ⇒ JSONPath + 过滤表达式**语义逐字一致**
+        //   ⇒ **path 依赖 ⇒ 不联网** ⇒ 沙盒 / Linux 门禁离线也能编 ⭐⭐⭐
+        .package(path: "Vendor/SextantKit"),
     ],
     targets: [
         .target(name: "LegadoCore", dependencies: [
-            .product(name: "SwiftSoup", package: "SwiftSoup")
+            .product(name: "SwiftSoup", package: "SwiftSoup"),
+            .product(name: "Sextant", package: "SextantKit"),
         ]),
         // ⭐ 参考实现（轻阅的 AnalyzeUrl.swift）—— 只读，用于 URL 规则对拍
         .target(name: "AnalyzeUrlReference", path: "reference/swift"),

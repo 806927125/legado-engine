@@ -116,7 +116,12 @@ public enum JSONPath {
 
     /// 求值：返回**所有命中**（数组）。
     public static func select(_ root: JSONValue, _ path: String) -> [JSONValue]? {
-        guard let steps = parse(path) else { return nil }
+        guard let steps = parse(path) else {
+            // ⭐⭐⭐⭐⭐ **手写解析不了 ⇒ 用 Sextant 兜底**（标准 JSONPath + 完整过滤表达式）
+            //   ⇒ 之前这里返回 nil（= 字段空）⇒ 现在最多「有值」⇒ **严格优于之前** ⭐
+            //   ⇒ 且**手写能解析的路径一律不走这里** ⇒ 已有行为零变化 ⭐⭐⭐
+            return SextantFallback.select(root, path)
+        }
         var current: [JSONValue] = [root]
         for step in steps {
             var next: [JSONValue] = []
@@ -144,6 +149,12 @@ public enum JSONPath {
             }
             current = next
             if current.isEmpty { break }
+        }
+        // ⭐⭐⭐⭐⭐ **结果为空、且路径里带过滤表达式** ⇒ 手写子集算不出来 ⇒ 用 Sextant 重算
+        //   ⇒ 「空 → 有值」⇒ 同上：**严格优于之前**（之前是空，现在有值）⭐
+        //   ⚠️ 只在**带过滤表达式**时兜底（纯路径的空 = 真的没有 ⇒ 不该被改写）⭐
+        if current.isEmpty, path.contains("[?(") {
+            if let alt = SextantFallback.select(root, path), !alt.isEmpty { return alt }
         }
         return current
     }
