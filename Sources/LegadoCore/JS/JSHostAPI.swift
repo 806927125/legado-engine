@@ -394,6 +394,11 @@ public enum JSScopeBuilder {
     public static func build(_ ctx: JSRunContext) -> String {
         var lines: [String] = []
         lines.append("var result = \(Self.resultBinding(ctx.base.resultValue));")
+        // ⭐⭐⭐ **`src` = 当前页原文**（Legado/legado-E/栖阅 的 `bindings["src"] = content`）
+        //   ⇒ 站方常写 `String(src)` 拿整页 ⇒ **缺这个变量 ⇒ ReferenceError ⇒ 整条规则死** ⭐⭐⭐
+        //   ⚠️ 与 `result` 的区别：`result` 是**当前基准**（可能是列表项/init 输出），
+        //   `src` 是**页面原文** ⇒ 列表类规则里两者不同（Legado 同款）⭐⭐⭐
+        lines.append("var src = \(jsonLiteral(.string(ctx.raw)));")
         lines.append("var baseUrl = \(jsonLiteral(.string(ctx.baseUrl)));")
         lines.append("var key = \(jsonLiteral(.string(ctx.key)));")
         lines.append("var page = \(jsonLiteral(.int(ctx.page)));")
