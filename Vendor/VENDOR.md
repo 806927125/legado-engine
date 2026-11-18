@@ -1,6 +1,6 @@
 # Vendored 第三方源码（MIT）
 
-本目录是**第三方 MIT 源码的原样拷贝**，作为**本地 SPM 包**（`SextantKit`）提供给 `LegadoCore`。
+本目录是**第三方 MIT 源码的原样拷贝**，作为**本包内的三个 target**（`Hitch` / `Spanker` / `Sextant`）提供给 `LegadoCore`。
 
 ## 为什么 vendored（而不是 SPM 远程依赖）
 - **不联网** ⇒ 沙盒 / Linux 门禁离线也能 `swift build` ⇒ 不会因为拉不到包而红 ⭐⭐⭐
@@ -12,7 +12,7 @@
 
 | 包 | 来源 | 许可 | 用途 |
 |---|---|---|---|
-| `Sources/Hitch/` | https://github.com/KittyMac/Hitch | MIT（`LICENSE-Hitch.txt` = 上游 README 的许可段） | 高性能字符串 |
+| `Sources/Hitch/`（本包的 target `Hitch`） | https://github.com/KittyMac/Hitch | MIT（`LICENSE-Hitch.txt` = 上游 README 的许可段） | 高性能字符串 |
 | `Sources/Spanker/` | https://github.com/KittyMac/Spanker | MIT（`LICENSE-Spanker.txt`） | 零拷贝 JSON 解析 |
 | `Sources/Sextant/` | https://github.com/KittyMac/Sextant | MIT（`LICENSE-Sextant.txt`） | JSONPath + 过滤表达式求值 |
 
@@ -26,9 +26,9 @@
 ## 同步上游
 ```bash
 git clone --depth 1 https://github.com/KittyMac/Sextant.git /tmp/Sextant
-cp -r /tmp/Sextant/Sources/Sextant/*  Vendor/SextantKit/Sources/Sextant/
-cp /tmp/Sextant/LICENSE                  Vendor/SextantKit/LICENSE-Sextant.txt
-sed -i '/^import Chronometer$/d' Vendor/SextantKit/Sources/Sextant/Sextant.swift
+cp -r /tmp/Sextant/Sources/Sextant/*  Sources/Sextant/
+cp /tmp/Sextant/LICENSE                  Vendor/licenses/LICENSE-Sextant.txt
+sed -i "/^import Chronometer$/d" Sources/Sextant/Sextant.swift
 ```
 
 ## ⚠️ 许可红线
