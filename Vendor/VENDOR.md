@@ -15,13 +15,17 @@
 | `Sources/Hitch/`（本包的 target `Hitch`） | https://github.com/KittyMac/Hitch | MIT（`LICENSE-Hitch.txt` = 上游 README 的许可段） | 高性能字符串 |
 | `Sources/Spanker/` | https://github.com/KittyMac/Spanker | MIT（`LICENSE-Spanker.txt`） | 零拷贝 JSON 解析 |
 | `Sources/Sextant/` | https://github.com/KittyMac/Sextant | MIT（`LICENSE-Sextant.txt`） | JSONPath + 过滤表达式求值 |
+| `Sources/Chronometer/` | https://github.com/KittyMac/Chronometer | MIT（`LICENSE-Chronometer.txt`） | 给 `String` 提供 `date()`（**Sextant 依赖它** ⇒ 必须一起 vendor） |
 
-- ⭐ `Sextant.swift` 里的 `import Chronometer` 在上游是**未使用的**（`measure` 出现 0 次）
-  ⇒ 已删除 ⇒ **不需要** Chronometer（它是 CLI 基准工具，与库无关）。
+## ⚠️ 唯一一次「误判」留下的教训（2026-11-18 真机 CI 编译失败）
+- ⭐⭐⭐ 我曾把 `import Chronometer` 当成「未使用」删掉（理由：`measure` 出现 0 次）
+  ⇒ **CI 直接编译失败**：`value of type 'String' has no member 'date'`
+  ⇒ 因为 **Chronometer 给 `String` 提供 `date()`**，而 Sextant 正好用它 ⭐⭐⭐
+- ⇒ **教训**：判断「某个 import 是否未使用」**不能只看某一个符号名**
+  ⇒ 要看该模块提供的**全部**公开符号是否被用到（`public extension String { func date() }` 这种「附带能力」最容易被漏）⭐⭐⭐
 
-## 唯一的源码改动
-1. `Sextant/Sextant.swift`：删掉未使用的 `import Chronometer`（1 行）
-2. 其余文件**逐字未改**（含所有 `import Hitch` / `import Spanker`）
+## 源码改动
+**0 处**（四个包的源码**逐字未改**，含所有 `import Hitch` / `import Spanker` / `import Chronometer`）
 
 ## 同步上游
 ```bash

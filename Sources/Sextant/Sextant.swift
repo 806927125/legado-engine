@@ -1,6 +1,7 @@
 import Foundation
 import Hitch
 import Spanker
+import Chronometer
 
 public typealias JsonAny = Any?
 public typealias JsonArray = [JsonAny]

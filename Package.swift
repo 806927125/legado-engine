@@ -36,7 +36,11 @@ let package = Package(
         //   `Hitch.ValueType` 与 `Spanker.ValueType` **定义不同** ⇒ 同模块会 invalid redeclaration ⭐⭐⭐
         .target(name: "Hitch"),
         .target(name: "Spanker", dependencies: ["Hitch"]),
-        .target(name: "Sextant", dependencies: ["Hitch", "Spanker"]),
+        // ⚠️ Chronometer 不是「基准工具」—— 它给 `String` 提供 `date()`
+        //   ⇒ Sextant 的 `Sextant.swift` 用了 `.date()` ⇒ **必须一起 vendor** ⭐⭐⭐
+        //   （教训：判断「import 是否未使用」不能只看某个符号名 ⇒ 要看该模块提供的**全部**符号）
+        .target(name: "Chronometer"),
+        .target(name: "Sextant", dependencies: ["Hitch", "Spanker", "Chronometer"]),
         .target(name: "LegadoCore", dependencies: [
             .product(name: "SwiftSoup", package: "SwiftSoup"),
             "Sextant",
