@@ -1,0 +1,1758 @@
+[
+ {
+  "title": "🍖 总排行",
+  "url": "https://m.rouwenwu16.com/top/allvisit-{{page}}.html"
+ },
+ {
+  "title": "🍖 月排行",
+  "url": "https://m.rouwenwu16.com/top/monthvisit-{{page}}.html"
+ },
+ {
+  "title": "🍖 总推荐",
+  "url": "https://m.rouwenwu16.com/top/allvote-{{page}}.html"
+ },
+ {
+  "title": "🍖 月推荐",
+  "url": "https://m.rouwenwu16.com/top/monthvote-{{page}}.html"
+ },
+ {
+  "title": "🍖 总收藏",
+  "url": "https://m.rouwenwu16.com/top/goodnum-{{page}}.html"
+ },
+ {
+  "title": "🍖 字数榜",
+  "url": "https://m.rouwenwu16.com/top/size-{{page}}.html"
+ },
+ {
+  "title": "🍖 更新榜",
+  "url": "https://m.rouwenwu16.com/top/lastupdate-{{page}}.html"
+ },
+ {
+  "title": "🍖 新入库",
+  "url": "https://m.rouwenwu16.com/top/postdate-{{page}}.html"
+ },
+ {
+  "title": "🍖 校园言情",
+  "url": "https://m.rouwenwu16.com/sort/1-{{page}}.html"
+ },
+ {
+  "title": "🍖 都市言情",
+  "url": "https://m.rouwenwu16.com/sort/2-{{page}}.html"
+ },
+ {
+  "title": "🍖 古代言情",
+  "url": "https://m.rouwenwu16.com/sort/3-{{page}}.html"
+ },
+ {
+  "title": "🍖 罗曼史",
+  "url": "https://m.rouwenwu16.com/sort/4-{{page}}.html"
+ },
+ {
+  "title": "🍖 耽美",
+  "url": "https://m.rouwenwu16.com/sort/5-{{page}}.html"
+ },
+ {
+  "title": "🍖 百合",
+  "url": "https://m.rouwenwu16.com/sort/6-{{page}}.html"
+ },
+ {
+  "title": "🍖 同人",
+  "url": "https://m.rouwenwu16.com/sort/7-{{page}}.html"
+ },
+ {
+  "title": "🍖 奇幻玄幻",
+  "url": "https://m.rouwenwu16.com/sort/8-{{page}}.html"
+ },
+ {
+  "title": "🍖 网游竞技",
+  "url": "https://m.rouwenwu16.com/sort/9-{{page}}.html"
+ },
+ {
+  "title": "🍖 科幻异能",
+  "url": "https://m.rouwenwu16.com/sort/10-{{page}}.html"
+ },
+ {
+  "title": "🍖 恐怖灵异",
+  "url": "https://m.rouwenwu16.com/sort/11-{{page}}.html"
+ },
+ {
+  "title": "🍖 惊悚推理",
+  "url": "https://m.rouwenwu16.com/sort/12-{{page}}.html"
+ },
+ {
+  "title": "🍖 武侠仙侠",
+  "url": "https://m.rouwenwu16.com/sort/13-{{page}}.html"
+ },
+ {
+  "title": "🍖 历史军事",
+  "url": "https://m.rouwenwu16.com/sort/14-{{page}}.html"
+ },
+ {
+  "title": "🍖 穿越重生",
+  "url": "https://m.rouwenwu16.com/sort/15-{{page}}.html"
+ },
+ {
+  "title": "🍖 综合其它",
+  "url": "https://m.rouwenwu16.com/sort/16-{{page}}.html"
+ },
+ {
+  "title": "📖 热门 · 全本 ⤵",
+  "url": "https://www.ropafina.com/full/all/{{page}}/"
+ },
+ {
+  "title": "📖 精品 ⤵",
+  "url": "https://www.ropafina.com/mulu/jingpin/{{page}}/"
+ },
+ {
+  "title": "📖 百合 ⤵",
+  "url": "https://www.ropafina.com/mulu/baihe/{{page}}/"
+ },
+ {
+  "title": "📖 耽美 ⤵",
+  "url": "https://www.ropafina.com/mulu/danmei/{{page}}/"
+ },
+ {
+  "title": "📖 都市 ⤵",
+  "url": "https://www.ropafina.com/mulu/dushi/{{page}}/"
+ },
+ {
+  "title": "📖 玄幻 ⤵",
+  "url": "https://www.ropafina.com/mulu/xuanhuan/{{page}}/"
+ },
+ {
+  "title": "📖 仙侠 ⤵",
+  "url": "https://www.ropafina.com/mulu/xianxia/{{page}}/"
+ },
+ {
+  "title": "📖 穿越 ⤵",
+  "url": "https://www.ropafina.com/mulu/chuanyue/{{page}}/"
+ },
+ {
+  "title": "📖 网游 ⤵",
+  "url": "https://www.ropafina.com/mulu/wangyou/{{page}}/"
+ },
+ {
+  "title": "🔞 都市 ⤵",
+  "url": "https://www.aaccoo.com/category/18/{{page}}"
+ },
+ {
+  "title": "🔞 都市激情 ⤵",
+  "url": "https://www.aaccoo.com/category/3/{{page}}"
+ },
+ {
+  "title": "🔞 同人 ⤵",
+  "url": "https://www.aaccoo.com/category/23/{{page}}"
+ },
+ {
+  "title": "🔞 奇幻 ⤵",
+  "url": "https://www.aaccoo.com/category/19/{{page}}"
+ },
+ {
+  "title": "🔞 校园 ⤵",
+  "url": "https://www.aaccoo.com/category/21/{{page}}"
+ },
+ {
+  "title": "🔞 家庭乱伦 ⤵",
+  "url": "https://www.aaccoo.com/category/2/{{page}}"
+ },
+ {
+  "title": "🔞 乱伦 ⤵",
+  "url": "https://www.aaccoo.com/category/20/{{page}}"
+ },
+ {
+  "title": "🔞 玄幻 ⤵",
+  "url": "https://www.aaccoo.com/category/16/{{page}}"
+ },
+ {
+  "title": "🔞 穿越 ⤵",
+  "url": "https://www.aaccoo.com/category/17/{{page}}"
+ },
+ {
+  "title": "🔞 校园春色 ⤵",
+  "url": "https://www.aaccoo.com/category/1/{{page}}"
+ },
+ {
+  "title": "🔞 东方玄幻 ⤵",
+  "url": "https://www.aaccoo.com/category/7/{{page}}"
+ },
+ {
+  "title": "🔞 历史 ⤵",
+  "url": "https://www.aaccoo.com/category/22/{{page}}"
+ },
+ {
+  "title": "🎴 🔥 全部 🔥 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}"
+ },
+ {
+  "title": "🎴 ⏳ 连载 ⏳ ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&end=0"
+ },
+ {
+  "title": "🎴 ⏳ 完结 ⏳ ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&end=1"
+ },
+ {
+  "title": "🎴 📆 更新 📆 ⤵",
+  "url": "https://www.jjmh.top/update"
+ },
+ {
+  "title": "🎴 🌸 青春 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E9%9D%92%E6%98%A5"
+ },
+ {
+  "title": "🎴 💋 性感 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E6%80%A7%E6%84%9F"
+ },
+ {
+  "title": "🎴 🦵 长腿 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E9%95%BF%E8%85%BF"
+ },
+ {
+  "title": "🎴 👯 多人 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E5%A4%9A%E4%BA%BA"
+ },
+ {
+  "title": "🎴 💃 御姐 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E5%BE%A1%E5%A7%90"
+ },
+ {
+  "title": "🎴 🍒 巨乳 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E5%B7%A8%E4%B9%B3"
+ },
+ {
+  "title": "🎴 💒 新婚 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E6%96%B0%E5%A9%9A"
+ },
+ {
+  "title": "🎴 👩 媳妇 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E5%AA%B3%E5%A6%87"
+ },
+ {
+  "title": "🎴 💕 暧昧 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E6%9A%A7%E6%98%A7"
+ },
+ {
+  "title": "🎴 🌼 清纯 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E6%B8%85%E7%BA%AF"
+ },
+ {
+  "title": "🎴 ⛓ 调教 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E8%B0%83%E6%95%99"
+ },
+ {
+  "title": "🎴 💃 少妇 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E5%B0%91%E5%A6%87"
+ },
+ {
+  "title": "🎴 🔥 风骚 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E9%A3%8E%E9%AA%9A"
+ },
+ {
+  "title": "🎴 🏠 同居 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E5%90%8C%E5%B1%85"
+ },
+ {
+  "title": "🎴 🔞 淫乱 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E6%B7%AB%E4%B9%B1"
+ },
+ {
+  "title": "🎴 👫 好友 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E5%A5%BD%E5%8F%8B"
+ },
+ {
+  "title": "🎴 ✨ 女神 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E5%A5%B3%E7%A5%9E"
+ },
+ {
+  "title": "🎴 🎀 诱惑 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E8%AF%B1%E6%83%91"
+ },
+ {
+  "title": "🎴 🔒 偷情 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E5%81%B7%E6%83%85"
+ },
+ {
+  "title": "🎴 💔 出轨 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E5%87%BA%E8%BD%A8"
+ },
+ {
+  "title": "🎴 🌸 正妹 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E6%AD%A3%E5%A6%B9"
+ },
+ {
+  "title": "🎴 📚 家教 ⤵",
+  "url": "https://www.jjmh.top/booklist/?page={{page}}&tag=%E5%AE%B6%E6%95%99"
+ },
+ {
+  "title": "📖 书库",
+  "url": "https://www.faifao.com/novel/page/{{page}}"
+ },
+ {
+  "title": "乡村",
+  "url": "https://www.faifao.com/novel/category/%E4%B9%A1%E6%9D%91/page/{{page}}"
+ },
+ {
+  "title": "乱伦",
+  "url": "https://www.faifao.com/novel/category/%E4%B9%B1%E4%BC%A6/page/{{page}}"
+ },
+ {
+  "title": "历史",
+  "url": "https://www.faifao.com/novel/category/%E5%8E%86%E5%8F%B2/page/{{page}}"
+ },
+ {
+  "title": "同人",
+  "url": "https://www.faifao.com/novel/category/%E5%90%8C%E4%BA%BA/page/{{page}}"
+ },
+ {
+  "title": "奇幻",
+  "url": "https://www.faifao.com/novel/category/%E5%A5%87%E5%B9%BB/page/{{page}}"
+ },
+ {
+  "title": "异能",
+  "url": "https://www.faifao.com/novel/category/%E5%BC%82%E8%83%BD/page/{{page}}"
+ },
+ {
+  "title": "明星",
+  "url": "https://www.faifao.com/novel/category/%E6%98%8E%E6%98%9F/page/{{page}}"
+ },
+ {
+  "title": "架空历史",
+  "url": "https://www.faifao.com/novel/category/%E6%9E%B6%E7%A9%BA%E5%8E%86%E5%8F%B2/page/{{page}}"
+ },
+ {
+  "title": "校园",
+  "url": "https://www.faifao.com/novel/category/%E6%A0%A1%E5%9B%AD/page/{{page}}"
+ },
+ {
+  "title": "武侠",
+  "url": "https://www.faifao.com/novel/category/%E6%AD%A6%E4%BE%A0/page/{{page}}"
+ },
+ {
+  "title": "玄幻",
+  "url": "https://www.faifao.com/novel/category/%E7%8E%84%E5%B9%BB/page/{{page}}"
+ },
+ {
+  "title": "科幻",
+  "url": "https://www.faifao.com/novel/category/%E7%A7%91%E5%B9%BB/page/{{page}}"
+ },
+ {
+  "title": "穿越",
+  "url": "https://www.faifao.com/novel/category/%E7%A9%BF%E8%B6%8A/page/{{page}}"
+ },
+ {
+  "title": "系统",
+  "url": "https://www.faifao.com/novel/category/%E7%B3%BB%E7%BB%9F/page/{{page}}"
+ },
+ {
+  "title": "贤者",
+  "url": "https://www.faifao.com/novel/category/%E8%B4%A4%E8%80%85/page/{{page}}"
+ },
+ {
+  "title": "都市",
+  "url": "https://www.faifao.com/novel/category/%E9%83%BD%E5%B8%82/page/{{page}}"
+ },
+ {
+  "title": "🔥 热门标签",
+  "url": "https://www.faifao.com/novel/page/{{page}}"
+ },
+ {
+  "title": "人妻",
+  "url": "https://www.faifao.com/novel/tag/%E4%BA%BA%E5%A6%BB/page/{{page}}"
+ },
+ {
+  "title": "后宫",
+  "url": "https://www.faifao.com/novel/tag/%E5%90%8E%E5%AE%AB/page/{{page}}"
+ },
+ {
+  "title": "小马拉大车",
+  "url": "https://www.faifao.com/novel/tag/%E5%B0%8F%E9%A9%AC%E6%8B%89%E5%A4%A7%E8%BD%A6/page/{{page}}"
+ },
+ {
+  "title": "强奸",
+  "url": "https://www.faifao.com/novel/tag/%E5%BC%BA%E5%A5%B8/page/{{page}}"
+ },
+ {
+  "title": "母女花",
+  "url": "https://www.faifao.com/novel/tag/%E6%AF%8D%E5%A5%B3%E8%8A%B1/page/{{page}}"
+ },
+ {
+  "title": "母子",
+  "url": "https://www.faifao.com/novel/tag/%E6%AF%8D%E5%AD%90/page/{{page}}"
+ },
+ {
+  "title": "熟女",
+  "url": "https://www.faifao.com/novel/tag/%E7%86%9F%E5%A5%B3/page/{{page}}"
+ },
+ {
+  "title": "猎艳",
+  "url": "https://www.faifao.com/novel/tag/%E7%8C%8E%E8%89%B3/page/{{page}}"
+ },
+ {
+  "title": "破处",
+  "url": "https://www.faifao.com/novel/tag/%E7%A0%B4%E5%A4%84/page/{{page}}"
+ },
+ {
+  "title": "萝莉",
+  "url": "https://www.faifao.com/novel/tag/%E8%90%9D%E8%8E%89/page/{{page}}"
+ },
+ {
+  "title": "JK",
+  "url": "https://www.faifao.com/novel/tag/JK/page/{{page}}"
+ },
+ {
+  "title": "兄妹",
+  "url": "https://www.faifao.com/novel/tag/%E5%85%84%E5%A6%B9/page/{{page}}"
+ },
+ {
+  "title": "反差",
+  "url": "https://www.faifao.com/novel/tag/%E5%8F%8D%E5%B7%AE/page/{{page}}"
+ },
+ {
+  "title": "巨乳",
+  "url": "https://www.faifao.com/novel/tag/%E5%B7%A8%E4%B9%B3/page/{{page}}"
+ },
+ {
+  "title": "恋爱",
+  "url": "https://www.faifao.com/novel/tag/%E6%81%8B%E7%88%B1/page/{{page}}"
+ },
+ {
+  "title": "痴女",
+  "url": "https://www.faifao.com/novel/tag/%E7%97%B4%E5%A5%B3/page/{{page}}"
+ },
+ {
+  "title": "调教",
+  "url": "https://www.faifao.com/novel/tag/%E8%B0%83%E6%95%99/page/{{page}}"
+ },
+ {
+  "title": "骨科",
+  "url": "https://www.faifao.com/novel/tag/%E9%AA%A8%E7%A7%91/page/{{page}}"
+ },
+ {
+  "title": "手枪文",
+  "url": "https://www.faifao.com/novel/tag/%E6%89%8B%E6%9E%AA%E6%96%87/page/{{page}}"
+ },
+ {
+  "title": "剧情",
+  "url": "https://www.faifao.com/novel/tag/%E5%89%A7%E6%83%85/page/{{page}}"
+ },
+ {
+  "title": "性奴",
+  "url": "https://www.faifao.com/novel/tag/%E6%80%A7%E5%A5%B4/page/{{page}}"
+ },
+ {
+  "title": "母女",
+  "url": "https://www.faifao.com/novel/tag/%E6%AF%8D%E5%A5%B3/page/{{page}}"
+ },
+ {
+  "title": "淫堕",
+  "url": "https://www.faifao.com/novel/tag/%E6%B7%AB%E5%A0%95/page/{{page}}"
+ },
+ {
+  "title": "粗口",
+  "url": "https://www.faifao.com/novel/tag/%E7%B2%97%E5%8F%A3/page/{{page}}"
+ },
+ {
+  "title": "📊 排序筛选",
+  "url": "https://www.faifao.com/novel/page/{{page}}"
+ },
+ {
+  "title": "完结",
+  "url": "https://www.faifao.com/novel/sort/finished/page/{{page}}"
+ },
+ {
+  "title": "周阅读",
+  "url": "https://www.faifao.com/novel/sort/views_week/page/{{page}}"
+ },
+ {
+  "title": "月阅读",
+  "url": "https://www.faifao.com/novel/sort/views_month/page/{{page}}"
+ },
+ {
+  "title": "总阅读",
+  "url": "https://www.faifao.com/novel/sort/views_total/page/{{page}}"
+ },
+ {
+  "title": "0-10W字",
+  "url": "https://www.faifao.com/novel/sort/words_small/page/{{page}}"
+ },
+ {
+  "title": "10-100W字",
+  "url": "https://www.faifao.com/novel/sort/words_middle/page/{{page}}"
+ },
+ {
+  "title": "100W+字",
+  "url": "https://www.faifao.com/novel/sort/words_large/page/{{page}}"
+ },
+ {
+  "title": "📖 漫画书库",
+  "url": "https://www.faifao.com/manga/page/{{page}}"
+ },
+ {
+  "title": "📚 分类·单行本",
+  "url": "https://www.faifao.com/manga/category/%E5%8D%95%E8%A1%8C%E6%9C%AC/page/{{page}}"
+ },
+ {
+  "title": "🏷️ 标签·日漫",
+  "url": "https://www.faifao.com/manga/tag/%E6%97%A5%E6%BC%AB/page/{{page}}"
+ },
+ {
+  "title": "📊 排序·评分",
+  "url": "https://www.faifao.com/manga/sort/rating/page/{{page}}"
+ },
+ {
+  "title": "📊 排序·周阅读",
+  "url": "https://www.faifao.com/manga/sort/views_week/page/{{page}}"
+ },
+ {
+  "title": "📊 排序·月阅读",
+  "url": "https://www.faifao.com/manga/sort/views_month/page/{{page}}"
+ },
+ {
+  "title": "📊 排序·总阅读",
+  "url": "https://www.faifao.com/manga/sort/views_total/page/{{page}}"
+ },
+ {
+  "title": "📊 排序·0-10W字",
+  "url": "https://www.faifao.com/manga/sort/words_small/page/{{page}}"
+ },
+ {
+  "title": "🏆 漫画·新漫榜",
+  "url": "https://www.faifao.com/manga/rank/new"
+ },
+ {
+  "title": "🏆 漫画·周榜",
+  "url": "https://www.faifao.com/manga/rank/week"
+ },
+ {
+  "title": "🏆 漫画·月榜",
+  "url": "https://www.faifao.com/manga/rank/month"
+ },
+ {
+  "title": "🏆 漫画·总榜",
+  "url": "https://www.faifao.com/manga/rank/total"
+ },
+ {
+  "title": "  殿堂作品🏆",
+  "url": "https://api-bc.wtzw.com/hall-of-fame?gender=1&page={{page}}&over=-99&sort=0"
+ },
+ {
+  "title": "  原创风云榜🎖️",
+  "url": "https://api-bc.wtzw.com/book-original-award?gender=1&page={{page}}&over=-99&sort=0"
+ },
+ {
+  "title": "  必读榜📘",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=must_read_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  推荐榜🌟",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=rec_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  大热榜日榜🔥",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=hot_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  大热榜月榜🌋",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=hot_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&list_type=month&over=-99&sort=0"
+ },
+ {
+  "title": "  匠心榜⚒️",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=craft_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  飙升榜🚀",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=up_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  新书榜日榜🆕",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=new_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  新书榜月榜🆙",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=new_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&list_type=month&over=-99&sort=0"
+ },
+ {
+  "title": "  礼物榜🎁",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=reward_value_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  好评榜👍",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=good_comment_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  热搜榜日榜🔍",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=hot_search_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  热搜榜月榜🔎",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=hot_search_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&list_type=month&over=-99&sort=0"
+ },
+ {
+  "title": "  新完结榜🎬",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=end_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  完结榜全部🗃️",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=end_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&list_type=month&over=-99&sort=0"
+ },
+ {
+  "title": "  投票榜日榜🗳️",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=ticket_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  投票榜月榜📮",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=ticket_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&list_type=month&over=-99&sort=0"
+ },
+ {
+  "title": "  粉丝榜👥",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=reward_user_list&category_id=0&category_type=0&tab_type=1&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  宗师大师作家👑",
+  "url": "https://api-bc.wtzw.com/original-author-master?over=-99&sort=0"
+ },
+ {
+  "title": "  殿堂作品🏅",
+  "url": "https://api-bc.wtzw.com/hall-of-fame?gender=2&page={{page}}&over=-99&sort=0"
+ },
+ {
+  "title": "  原创风云榜🏵️",
+  "url": "https://api-bc.wtzw.com/book-original-award?gender=2&page={{page}}&over=-99&sort=0"
+ },
+ {
+  "title": "  必读榜📗",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=must_read_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  推荐榜⭐",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=rec_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  大热榜日榜🌞",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=hot_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  大热榜月榜🌙",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=hot_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&list_type=month&over=-99&sort=0"
+ },
+ {
+  "title": "  好评榜👏",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=good_comment_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  热搜榜日榜📡",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=hot_search_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  热搜榜月榜📻",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=hot_search_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&list_type=month&over=-99&sort=0"
+ },
+ {
+  "title": "  新完结榜🎞️",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=end_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  完结榜全部🗒️",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=end_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&list_type=month&over=-99&sort=0"
+ },
+ {
+  "title": "  角色榜月榜🎭",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=character_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  角色榜年榜🥇",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=character_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&list_type=year&over=-99&sort=0"
+ },
+ {
+  "title": "  粉丝榜👪",
+  "url": "https://api-bc.wtzw.com/leader-board?rank_type=reward_user_list&category_id=0&category_type=0&tab_type=2&imei_ip=2937357107&book_privacy=1&read_preference=0&over=-99&sort=0"
+ },
+ {
+  "title": "  宗师大师作家✒️",
+  "url": "https://api-bc.wtzw.com/original-author-master?over=-99&sort=0"
+ },
+ {
+  "title": "🐶 玄幻奇幻",
+  "url": "https://bachashuku.org/sort/1/{{page}}.html"
+ },
+ {
+  "title": "🐶 都市青春",
+  "url": "https://bachashuku.org/sort/2/{{page}}.html"
+ },
+ {
+  "title": "🐶 武侠仙侠",
+  "url": "https://bachashuku.org/sort/3/{{page}}.html"
+ },
+ {
+  "title": "🐶 历史军事",
+  "url": "https://bachashuku.org/sort/4/{{page}}.html"
+ },
+ {
+  "title": "🐶 女生言情",
+  "url": "https://bachashuku.org/sort/5/{{page}}.html"
+ },
+ {
+  "title": "🐶 网游竞技",
+  "url": "https://bachashuku.org/sort/6/{{page}}.html"
+ },
+ {
+  "title": "🐶 长篇连载",
+  "url": "https://bachashuku.org/sort/7/{{page}}.html"
+ },
+ {
+  "title": "🐶 综合其他",
+  "url": "https://bachashuku.org/sort/8/{{page}}.html"
+ },
+ {
+  "title": "🐶 科幻灵异",
+  "url": "https://bachashuku.org/sort/9/{{page}}.html"
+ },
+ {
+  "title": "🐶 周点击",
+  "url": "https://bachashuku.org/top/weekvisit/{{page}}.html"
+ },
+ {
+  "title": "🐶 月点击",
+  "url": "https://bachashuku.org/top/monthvisit/{{page}}.html"
+ },
+ {
+  "title": "🐶 总点击",
+  "url": "https://bachashuku.org/top/allvisit/{{page}}.html"
+ },
+ {
+  "title": "🐶 周推荐",
+  "url": "https://bachashuku.org/top/weekvote/{{page}}.html"
+ },
+ {
+  "title": "🐶 月推荐",
+  "url": "https://bachashuku.org/top/monthvote/{{page}}.html"
+ },
+ {
+  "title": "🐶 总推荐",
+  "url": "https://bachashuku.org/top/allvote/{{page}}.html"
+ },
+ {
+  "title": "🐶 周鲜花",
+  "url": "https://bachashuku.org/top/weekflower/{{page}}.html"
+ },
+ {
+  "title": "🐶 月鲜花",
+  "url": "https://bachashuku.org/top/monthflower/{{page}}.html"
+ },
+ {
+  "title": "🐶 总鲜花",
+  "url": "https://bachashuku.org/top/allflower/{{page}}.html"
+ },
+ {
+  "title": "🐶 总月票",
+  "url": "https://bachashuku.org/top/allvipvote/{{page}}.html"
+ },
+ {
+  "title": "🐶 收藏榜",
+  "url": "https://bachashuku.org/top/goodnum/{{page}}.html"
+ },
+ {
+  "title": "🐶 字数榜",
+  "url": "https://bachashuku.org/top/words/{{page}}.html"
+ },
+ {
+  "title": "🐶 编辑推荐",
+  "url": "https://bachashuku.org/top/toptime/{{page}}.html"
+ },
+ {
+  "title": "🐶 最新入库",
+  "url": "https://bachashuku.org/top/postdate/{{page}}.html"
+ },
+ {
+  "title": "🐶 全本",
+  "url": "https://bachashuku.org/modules/article/toplist.php?fullflag=1&page={{page}}"
+ },
+ {
+  "title": "🎀 章节数",
+  "url": "https://als.aadcn.cn/ALSapi/novels?sort=chapCount&size=15&page={{page}},{\"headers\":{\"x-sec-token\":\"\",\"x-android-id\":\"b4e6060006b920bc\"}}"
+ },
+ {
+  "title": "🎀 更新时间",
+  "url": "https://als.aadcn.cn/ALSapi/novels?sort=updateTime&size=15&page={{page}},{\"headers\":{\"x-sec-token\":\"\",\"x-android-id\":\"b4e6060006b920bc\"}}"
+ },
+ {
+  "title": "🎀 上传时间",
+  "url": "https://als.aadcn.cn/ALSapi/novels?sort=createTime&size=15&page={{page}},{\"headers\":{\"x-sec-token\":\"\",\"x-android-id\":\"b4e6060006b920bc\"}}"
+ },
+ {
+  "title": "🎀 总排行",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/other/rank_hits/order/hits.html?from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 月排行",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/other/rank_hits/order/hits_month.html?from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 周排行",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/other/rank_hits/order/hits_week.html?from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 日排行",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/other/rank_hits/order/hits_day.html?from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 全部·更新",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/all/order/update_time+desc.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 全部·人气",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/all/order/hits+desc.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 全部·字数",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/all/order/word+desc.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 校园",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/61.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 贤者小说",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/79.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 玄幻",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/62.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 奇幻",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/75.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 强奸",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/74.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 同人",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/73.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 科幻",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/71.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 乡村",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/63.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 都市",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/64.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 系统",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/69.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 武侠",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/68.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 历史",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/67.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 明星",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/72.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 乱伦",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/65.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 穿越",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/70.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 凌辱",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/46.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 反差",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/22.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 堕落",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/18.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 纯爱",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/19.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 伪娘",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/52.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 性奴",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/45.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 萝莉",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/48.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 熟女",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/56.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 禁忌",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/51.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 NTR",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/54.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 媚黑",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/53.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 绿帽",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/55.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 调教",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/58.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 女主",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/59.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 正太",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/50.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 下克上",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/43.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 反转",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/23.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 羞耻",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/34.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 百合",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/47.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 重口",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/21.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🎀 其他",
+  "url": "https://xn--vcsx64d.alicesw2.buzz/lists/57.html?page={{page}}&from=nh,{\"headers\":{\"X-Requested-With\":\"mark.via\",\"User-Agent\":\"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1\",\"Accept\":\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\"Accept-Language\":\"zh-CN,zh;q=0.9\",\"Referer\":\"https://xn--vcsx64d.alicesw2.buzz/\"}}"
+ },
+ {
+  "title": "🏞 禁漫·全部",
+  "url": "https://abandon.yyc2mhau.cc/novel/all?page={{page}}"
+ },
+ {
+  "title": "🔥 禁漫·热门",
+  "url": "https://abandon.yyc2mhau.cc/novel/common?type=hot&page={{page}}"
+ },
+ {
+  "title": "🆕 禁漫·最新",
+  "url": "https://abandon.yyc2mhau.cc/novel/common?type=newest&page={{page}}"
+ },
+ {
+  "title": "🏆 禁漫·排行",
+  "url": "https://abandon.yyc2mhau.cc/novel/rank?page={{page}}"
+ },
+ {
+  "title": "✅ 禁漫·已完结",
+  "url": "https://abandon.yyc2mhau.cc/novel/all?status=1&page={{page}}"
+ },
+ {
+  "title": "📖 禁漫·连载中",
+  "url": "https://abandon.yyc2mhau.cc/novel/all?status=2&page={{page}}"
+ },
+ {
+  "title": "🔞 禁漫·都市激情",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/dsjq?page={{page}}"
+ },
+ {
+  "title": "🔞 禁漫·校园春色",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/xycs?page={{page}}"
+ },
+ {
+  "title": "🔞 禁漫·乡村爱情",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/xcaq?page={{page}}"
+ },
+ {
+  "title": "🔞 禁漫·系统异能",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/xtyn?page={{page}}"
+ },
+ {
+  "title": "🔞 禁漫·家庭乱伦",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/jtll?page={{page}}"
+ },
+ {
+  "title": "🔞 禁漫·穿越重生",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/cycs?page={{page}}"
+ },
+ {
+  "title": "⚔️ 禁漫·经典武侠",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/jdwx?page={{page}}"
+ },
+ {
+  "title": "⚔️ 禁漫·同人改编",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/trgb?page={{page}}"
+ },
+ {
+  "title": "🔮 禁漫·科学幻想",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/kxhx?page={{page}}"
+ },
+ {
+  "title": "🔮 禁漫·东方玄幻",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/dfxh?page={{page}}"
+ },
+ {
+  "title": "🎭 禁漫·娱乐明星",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/ylmx?page={{page}}"
+ },
+ {
+  "title": "📜 禁漫·历史架空",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/lsjk?page={{page}}"
+ },
+ {
+  "title": "🐲 禁漫·西方魔幻",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/xfmh?page={{page}}"
+ },
+ {
+  "title": "📿 禁漫·贤者小说",
+  "url": "https://abandon.yyc2mhau.cc/novel/all/xzxs?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·全部",
+  "url": "https://abandon.yyc2mhau.cc/comic/all?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·爱情",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/aq?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·BL",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/bl?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·单本",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/db?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·短篇",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/dp?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·韩漫",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/hg?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·剧情",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/jq?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·乱伦",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/ll?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·奇幻",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/qh?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·日漫",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/rb?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·调教",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/tj?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·同人",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/tr?page={{page}}"
+ },
+ {
+  "title": "📗 漫画·校园",
+  "url": "https://abandon.yyc2mhau.cc/comic/all/xy?page={{page}}"
+ },
+ {
+  "title": "📘 玄幻",
+  "url": "https://www.suduguu.com/xuanhuan/{{page}}.html"
+ },
+ {
+  "title": "📘 仙侠",
+  "url": "https://www.suduguu.com/xianxia/{{page}}.html"
+ },
+ {
+  "title": "📘 都市",
+  "url": "https://www.suduguu.com/dushi/{{page}}.html"
+ },
+ {
+  "title": "📘 历史",
+  "url": "https://www.suduguu.com/lishi/{{page}}.html"
+ },
+ {
+  "title": "📘 军事",
+  "url": "https://www.suduguu.com/junshi/{{page}}.html"
+ },
+ {
+  "title": "📘 科幻",
+  "url": "https://www.suduguu.com/kehuan/{{page}}.html"
+ },
+ {
+  "title": "📘 言情",
+  "url": "https://www.suduguu.com/yanqing/{{page}}.html"
+ },
+ {
+  "title": "📘 悬疑",
+  "url": "https://www.suduguu.com/xuanyi/{{page}}.html"
+ },
+ {
+  "title": "📘 奇幻",
+  "url": "https://www.suduguu.com/qihuan/{{page}}.html"
+ },
+ {
+  "title": "📘 武侠",
+  "url": "https://www.suduguu.com/wuxia/{{page}}.html"
+ },
+ {
+  "title": "📘 轻小说",
+  "url": "https://www.suduguu.com/qing/{{page}}.html"
+ },
+ {
+  "title": "📘 游戏",
+  "url": "https://www.suduguu.com/youxi/{{page}}.html"
+ },
+ {
+  "title": "📘 体育",
+  "url": "https://www.suduguu.com/tiyu/{{page}}.html"
+ },
+ {
+  "title": "📘 官场",
+  "url": "https://www.suduguu.com/guanchang/{{page}}.html"
+ },
+ {
+  "title": "📘 乡村",
+  "url": "https://www.suduguu.com/xiangcun/{{page}}.html"
+ },
+ {
+  "title": "📘 现实",
+  "url": "https://www.suduguu.com/xianshi/{{page}}.html"
+ },
+ {
+  "title": "📘 诸天无限",
+  "url": "https://www.suduguu.com/zhutianwuxian/{{page}}.html"
+ },
+ {
+  "title": "📘 📕 完结",
+  "url": "https://www.suduguu.com/wanjie/{{page}}.html"
+ },
+ {
+  "title": "📘 🆕 最新",
+  "url": "https://www.suduguu.com/zuixin/{{page}}.html"
+ },
+ {
+  "title": "📘 🏆 排行",
+  "url": "https://www.suduguu.com/paihang/{{page}}.html"
+ },
+ {
+  "title": "📚 开心·全部漫画",
+  "url": "https://kxmanhua.com/manga/library?type=0&complete=1&page={{page}}&orderby=1"
+ },
+ {
+  "title": "🎮 开心·3D漫画",
+  "url": "https://kxmanhua.com/manga/library?type=1&complete=1&page={{page}}&orderby=1"
+ },
+ {
+  "title": "🇰🇷 开心·韩漫",
+  "url": "https://kxmanhua.com/manga/library?type=2&complete=1&page={{page}}&orderby=1"
+ },
+ {
+  "title": "🇯🇵 开心·日漫",
+  "url": "https://kxmanhua.com/manga/library?type=3&complete=1&page={{page}}&orderby=1"
+ },
+ {
+  "title": "👤 开心·真人漫画",
+  "url": "https://kxmanhua.com/manga/library?type=4&complete=1&page={{page}}&orderby=1"
+ },
+ {
+  "title": "💙 开心·耽美BL",
+  "url": "https://kxmanhua.com/manga/library?type=5&complete=1&page={{page}}&orderby=1"
+ },
+ {
+  "title": "✅ 开心·完结",
+  "url": "https://kxmanhua.com/manga/library?type=0&complete=2&page={{page}}&orderby=1"
+ },
+ {
+  "title": "📖 开心·连载",
+  "url": "https://kxmanhua.com/manga/library?type=0&complete=3&page={{page}}&orderby=1"
+ },
+ {
+  "title": "🔥 开心·最热",
+  "url": "https://kxmanhua.com/manga/library?type=0&complete=1&page={{page}}&orderby=1"
+ },
+ {
+  "title": "🆕 开心·最近更新",
+  "url": "https://kxmanhua.com/manga/library?type=0&complete=1&page={{page}}&orderby=2"
+ },
+ {
+  "title": "🕒 开心·最新上架",
+  "url": "https://kxmanhua.com/manga/library?type=0&complete=1&page={{page}}&orderby=3"
+ },
+ {
+  "title": "🏯 玄幻",
+  "url": "http://m.ltxswu.me/sort/1_{{page}}/"
+ },
+ {
+  "title": "🗡️ 修真",
+  "url": "http://m.ltxswu.me/sort/2_{{page}}/"
+ },
+ {
+  "title": "🏙️ 都市",
+  "url": "http://m.ltxswu.me/sort/3_{{page}}/"
+ },
+ {
+  "title": "🚀 穿越",
+  "url": "http://m.ltxswu.me/sort/4_{{page}}/"
+ },
+ {
+  "title": "🎮 网游",
+  "url": "http://m.ltxswu.me/sort/5_{{page}}/"
+ },
+ {
+  "title": "👽 科幻",
+  "url": "http://m.ltxswu.me/sort/6_{{page}}/"
+ },
+ {
+  "title": "📦 其他",
+  "url": "http://m.ltxswu.me/sort/8_{{page}}/"
+ },
+ {
+  "title": "🌶️ 辣文合集",
+  "url": "http://m.ltxswu.me/sort/9_{{page}}/"
+ },
+ {
+  "title": "🥩 肉文",
+  "url": "http://m.ltxswu.me/sort/10_{{page}}/"
+ },
+ {
+  "title": "📗 玄幻",
+  "url": "http://www.92xs.info/sort/1-{{page}}.html"
+ },
+ {
+  "title": "⚔️ 武侠",
+  "url": "http://www.92xs.info/sort/2-{{page}}.html"
+ },
+ {
+  "title": "🏙️ 都市",
+  "url": "http://www.92xs.info/sort/3-{{page}}.html"
+ },
+ {
+  "title": "📜 历史",
+  "url": "http://www.92xs.info/sort/4-{{page}}.html"
+ },
+ {
+  "title": "🎖️ 军事",
+  "url": "http://www.92xs.info/sort/5-{{page}}.html"
+ },
+ {
+  "title": "🚀 科幻",
+  "url": "http://www.92xs.info/sort/6-{{page}}.html"
+ },
+ {
+  "title": "🎮 游戏",
+  "url": "http://www.92xs.info/sort/7-{{page}}.html"
+ },
+ {
+  "title": "👻 灵异",
+  "url": "http://www.92xs.info/sort/8-{{page}}.html"
+ },
+ {
+  "title": "🔍 推理",
+  "url": "http://www.92xs.info/sort/9-{{page}}.html"
+ },
+ {
+  "title": "🕵️ 悬疑",
+  "url": "http://www.92xs.info/sort/10-{{page}}.html"
+ },
+ {
+  "title": "😱 恐怖",
+  "url": "http://www.92xs.info/sort/11-{{page}}.html"
+ },
+ {
+  "title": "🔥 点击榜",
+  "url": "http://www.92xs.info/allvisit-{{page}}.html"
+ },
+ {
+  "title": "⭐ 推荐票榜",
+  "url": "http://www.92xs.info/goodnum-{{page}}.html"
+ },
+ {
+  "title": "🔥 热门人气",
+  "url": "https://mapi.hotmangasd.com/api/v3/comics?ordering=-popular&limit=30&offset=0,{\"headers\":{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0\",\"Accept\":\"application/json\",\"version\":\"2024.04.28\",\"platform\":\"3\",\"webp\":\"1\"}}"
+ },
+ {
+  "title": "🕒 最近更新",
+  "url": "https://mapi.hotmangasd.com/api/v3/comics?ordering=-datetime_updated&limit=30&offset=0,{\"headers\":{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0\",\"Accept\":\"application/json\",\"version\":\"2024.04.28\",\"platform\":\"3\",\"webp\":\"1\"}}"
+ },
+ {
+  "title": "🇯🇵 日本",
+  "url": "https://mapi.hotmangasd.com/api/v3/comics?ordering=-popular&region=0&limit=30&offset=0,{\"headers\":{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0\",\"Accept\":\"application/json\",\"version\":\"2024.04.28\",\"platform\":\"3\",\"webp\":\"1\"}}"
+ },
+ {
+  "title": "🇰🇷 韩国",
+  "url": "https://mapi.hotmangasd.com/api/v3/comics?ordering=-popular&region=1&limit=30&offset=0,{\"headers\":{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0\",\"Accept\":\"application/json\",\"version\":\"2024.04.28\",\"platform\":\"3\",\"webp\":\"1\"}}"
+ },
+ {
+  "title": "🌏 欧美",
+  "url": "https://mapi.hotmangasd.com/api/v3/comics?ordering=-popular&region=2&limit=30&offset=0,{\"headers\":{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0\",\"Accept\":\"application/json\",\"version\":\"2024.04.28\",\"platform\":\"3\",\"webp\":\"1\"}}"
+ },
+ {
+  "title": "🎬 港台",
+  "url": "https://mapi.hotmangasd.com/api/v3/comics?ordering=-popular&region=3&limit=30&offset=0,{\"headers\":{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0\",\"Accept\":\"application/json\",\"version\":\"2024.04.28\",\"platform\":\"3\",\"webp\":\"1\"}}"
+ },
+ {
+  "title": "💗 戀愛",
+  "url": "https://mapi.hotmangasd.com/api/v3/comics?ordering=-popular&theme=aiqing&limit=30&offset=0,{\"headers\":{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0\",\"Accept\":\"application/json\",\"version\":\"2024.04.28\",\"platform\":\"3\",\"webp\":\"1\"}}"
+ },
+ {
+  "title": "🔥 熱血",
+  "url": "https://mapi.hotmangasd.com/api/v3/comics?ordering=-popular&theme=rexue&limit=30&offset=0,{\"headers\":{\"User-Agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0\",\"Accept\":\"application/json\",\"version\":\"2024.04.28\",\"platform\":\"3\",\"webp\":\"1\"}}"
+ },
+ {
+  "title": "🔥 人气榜",
+  "url": "https://www.mkzhan.com/top/popularity/"
+ },
+ {
+  "title": "💎 月票榜",
+  "url": "https://www.mkzhan.com/top/ticket/"
+ },
+ {
+  "title": "⭐ 收藏榜",
+  "url": "https://www.mkzhan.com/top/collection/"
+ },
+ {
+  "title": "📌 独家榜",
+  "url": "https://www.mkzhan.com/top/exclusive/"
+ },
+ {
+  "title": "🆕 新作榜",
+  "url": "https://www.mkzhan.com/top/latest/"
+ },
+ {
+  "title": "🚀 上升榜",
+  "url": "https://www.mkzhan.com/top/ascension/"
+ },
+ {
+  "title": "🤝 合作榜",
+  "url": "https://www.mkzhan.com/top/cooperation/"
+ },
+ {
+  "title": "🏅 评分榜",
+  "url": "https://www.mkzhan.com/top/score/"
+ },
+ {
+  "title": "💬 热评榜",
+  "url": "https://www.mkzhan.com/top/comment/"
+ },
+ {
+  "title": "👑 VIP人气",
+  "url": "https://www.mkzhan.com/top/popularity/vip/"
+ },
+ {
+  "title": "💰 付费人气",
+  "url": "https://www.mkzhan.com/top/popularity/pay/"
+ },
+ {
+  "title": "🎁 打赏榜",
+  "url": "https://www.mkzhan.com/top/gratuity/"
+ },
+ {
+  "title": "🔄 最近更新",
+  "url": "https://www.mkzhan.com/update/"
+ },
+ {
+  "title": "霸总",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=1&page={{page}}"
+ },
+ {
+  "title": "修真",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=2&page={{page}}"
+ },
+ {
+  "title": "恋爱",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=3&page={{page}}"
+ },
+ {
+  "title": "校园",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=4&page={{page}}"
+ },
+ {
+  "title": "冒险",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=5&page={{page}}"
+ },
+ {
+  "title": "搞笑",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=6&page={{page}}"
+ },
+ {
+  "title": "生活",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=7&page={{page}}"
+ },
+ {
+  "title": "热血",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=8&page={{page}}"
+ },
+ {
+  "title": "架空",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=9&page={{page}}"
+ },
+ {
+  "title": "后宫",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=10&page={{page}}"
+ },
+ {
+  "title": "玄幻",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=12&page={{page}}"
+ },
+ {
+  "title": "悬疑",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=13&page={{page}}"
+ },
+ {
+  "title": "恐怖",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=14&page={{page}}"
+ },
+ {
+  "title": "灵异",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=15&page={{page}}"
+ },
+ {
+  "title": "动作",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=16&page={{page}}"
+ },
+ {
+  "title": "科幻",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=17&page={{page}}"
+ },
+ {
+  "title": "战争",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=18&page={{page}}"
+ },
+ {
+  "title": "古风",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=19&page={{page}}"
+ },
+ {
+  "title": "穿越",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=20&page={{page}}"
+ },
+ {
+  "title": "竞技",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=21&page={{page}}"
+ },
+ {
+  "title": "励志",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=23&page={{page}}"
+ },
+ {
+  "title": "同人",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=24&page={{page}}"
+ },
+ {
+  "title": "真人",
+  "url": "https://www.mkzhan.com/category/?order=2&theme_id=26&page={{page}}"
+ },
+ {
+  "title": "🦄 UAA（未填令牌）",
+  "url": "https://www.uaa1234.com/console/explore?type=all&size=8&aid=0&account_id=0&page={{page}},{\"headers\":{\"authorization\":\"Bearer \",\"x-android-id\":\"b4e6060006b920bc\"}}"
+ },
+ {
+  "title": "男人气榜",
+  "url": "https://quickapi.biduwenxue.com/api/rankBookList,{\"method\":\"POST\",\"body\":\"current={{page}}&pindao=1&appname=lingmao&rankType=1&pageSize=30&versionName=1.1.18&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C%3A03%3AAB%3A73%3A27%3A7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4\",\"headers\":{\"Content-Type\":\"application/x-www-form-urlencoded\"}}"
+ },
+ {
+  "title": "男收藏榜",
+  "url": "https://quickapi.biduwenxue.com/api/rankBookList,{\"method\":\"POST\",\"body\":\"current={{page}}&pindao=1&appname=lingmao&rankType=2&pageSize=30&versionName=1.1.18&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C%3A03%3AAB%3A73%3A27%3A7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4\",\"headers\":{\"Content-Type\":\"application/x-www-form-urlencoded\"}}"
+ },
+ {
+  "title": "男字数榜",
+  "url": "https://quickapi.biduwenxue.com/api/rankBookList,{\"method\":\"POST\",\"body\":\"current={{page}}&pindao=1&appname=lingmao&rankType=3&pageSize=30&versionName=1.1.18&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C%3A03%3AAB%3A73%3A27%3A7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4\",\"headers\":{\"Content-Type\":\"application/x-www-form-urlencoded\"}}"
+ },
+ {
+  "title": "女人气榜",
+  "url": "https://quickapi.biduwenxue.com/api/rankBookList,{\"method\":\"POST\",\"body\":\"current={{page}}&pindao=2&appname=lingmao&rankType=1&pageSize=30&versionName=1.1.18&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C%3A03%3AAB%3A73%3A27%3A7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4\",\"headers\":{\"Content-Type\":\"application/x-www-form-urlencoded\"}}"
+ },
+ {
+  "title": "女收藏榜",
+  "url": "https://quickapi.biduwenxue.com/api/rankBookList,{\"method\":\"POST\",\"body\":\"current={{page}}&pindao=2&appname=lingmao&rankType=2&pageSize=30&versionName=1.1.18&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C%3A03%3AAB%3A73%3A27%3A7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4\",\"headers\":{\"Content-Type\":\"application/x-www-form-urlencoded\"}}"
+ },
+ {
+  "title": "女字数榜",
+  "url": "https://quickapi.biduwenxue.com/api/rankBookList,{\"method\":\"POST\",\"body\":\"current={{page}}&pindao=2&appname=lingmao&rankType=3&pageSize=30&versionName=1.1.18&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C%3A03%3AAB%3A73%3A27%3A7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4\",\"headers\":{\"Content-Type\":\"application/x-www-form-urlencoded\"}}"
+ },
+ {
+  "title": "都市",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=1&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "玄幻奇幻",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=2&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "历史军事",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=3&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "武侠仙侠",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=4&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "游戏竞技",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=5&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "科幻末世",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=6&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "灵异",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=7&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "公版书",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=18&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "其他",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=19&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "现代言情",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=10&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "古代言情",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=11&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "玄幻言情",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=12&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "校园言情",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=13&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "穿越言情",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=14&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "灵异言情",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=15&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "唯美纯爱",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=16&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "同人",
+  "url": "https://quickapi.biduwenxue.com/api/search/lib?s=17&appname=lingmao&pageNo={{page}}&pageSize=30&versionName=1.1.18&userId=8573311&device=OPM1.171019.019&androidid=d4dd57d6-93ea-4f4d-acaf-b3ea5c0271e9&mac=7C:03:AB:73:27:7E&manufacturer=Xiaomi&channelCode=%E7%81%B5%E7%8C%AB%E5%B0%8F%E8%AF%B4&"
+ },
+ {
+  "title": "🐹 次元姬（未登录）",
+  "url": "https://cyj.vv9v.cn/explore/init?type=all&gender=1,{\"method\":\"GET\",\"webView\":false,\"headers\":{\"Authorization\":\"Bearer \"}}"
+ },
+ {
+  "title": "📕 起点聚合（分类加载失败）",
+  "url": "https://moyue.app/legado/explore/menu?tab=%E5%B0%8F%E8%AF%B4&source=%E7%B2%BE%E5%93%81%E9%99%90%E5%85%8D,{\"headers\":{\"User-Agent\":\"Legado/3.0\",\"X-Device-ID\":\"yd-[object Promise]\"}}"
+ },
+ {
+  "title": "全部",
+  "url": "https://www.xiguashuwu2.com/category/0/{{page}}.html"
+ },
+ {
+  "title": "玄幻",
+  "url": "https://www.xiguashuwu2.com/category/1/{{page}}.html"
+ },
+ {
+  "title": "修真",
+  "url": "https://www.xiguashuwu2.com/category/2/{{page}}.html"
+ },
+ {
+  "title": "都市",
+  "url": "https://www.xiguashuwu2.com/category/3/{{page}}.html"
+ },
+ {
+  "title": "历史",
+  "url": "https://www.xiguashuwu2.com/category/4/{{page}}.html"
+ },
+ {
+  "title": "网游",
+  "url": "https://www.xiguashuwu2.com/category/5/{{page}}.html"
+ },
+ {
+  "title": "科幻",
+  "url": "https://www.xiguashuwu2.com/category/6/{{page}}.html"
+ },
+ {
+  "title": "言情",
+  "url": "https://www.xiguashuwu2.com/category/7/{{page}}.html"
+ },
+ {
+  "title": "其他",
+  "url": "https://www.xiguashuwu2.com/category/8/{{page}}.html"
+ },
+ {
+  "title": "经典",
+  "url": "https://www.xiguashuwu2.com/category/9/{{page}}.html"
+ },
+ {
+  "title": "同人",
+  "url": "https://www.xiguashuwu2.com/category/10/{{page}}.html"
+ },
+ {
+  "title": "高辣",
+  "url": "https://www.xiguashuwu2.com/category/11/{{page}}.html"
+ },
+ {
+  "title": "耽美",
+  "url": "https://www.xiguashuwu2.com/category/12/{{page}}.html"
+ },
+ {
+  "title": "情欲",
+  "url": "https://www.xiguashuwu2.com/category/13/{{page}}.html"
+ },
+ {
+  "title": "复古耽美",
+  "url": "https://www.xiguashuwu2.com/category/14/{{page}}.html"
+ },
+ {
+  "title": "复古言情",
+  "url": "https://www.xiguashuwu2.com/category/15/{{page}}.html"
+ },
+ {
+  "title": "完本",
+  "url": "https://www.xiguashuwu2.com/category/finish/0/{{page}}.html"
+ },
+ {
+  "title": "排行",
+  "url": "https://www.xiguashuwu2.com/rank/all/0/{{page}}.html"
+ },
+ {
+  "title": "全部",
+  "url": "https://91hubs.com/novel/page/{{page}}/"
+ },
+ {
+  "title": "热门",
+  "url": "https://91hubs.com/novel/hot/page/{{page}}/"
+ },
+ {
+  "title": "原创专区",
+  "url": "https://91hubs.com/novel/update/yczq/page/{{page}}/"
+ },
+ {
+  "title": "家庭乱伦",
+  "url": "https://91hubs.com/novel/update/jtll/page/{{page}}/"
+ },
+ {
+  "title": "绿帽NTR",
+  "url": "https://91hubs.com/novel/update/lm-ntr/page/{{page}}/"
+ },
+ {
+  "title": "凌辱调教",
+  "url": "https://91hubs.com/novel/update/lr-tj/page/{{page}}/"
+ },
+ {
+  "title": "同人改编",
+  "url": "https://91hubs.com/novel/update/tr-adapt/page/{{page}}/"
+ },
+ {
+  "title": "都市激情",
+  "url": "https://91hubs.com/novel/update/dsjq/page/{{page}}/"
+ },
+ {
+  "title": "穿越重生",
+  "url": "https://91hubs.com/novel/update/cycs/page/{{page}}/"
+ },
+ {
+  "title": "经典武侠",
+  "url": "https://91hubs.com/novel/update/jd-wuxia/page/{{page}}/"
+ },
+ {
+  "title": "历史演义",
+  "url": "https://91hubs.com/novel/update/lsyy/page/{{page}}/"
+ },
+ {
+  "title": "东方玄幻",
+  "url": "https://91hubs.com/novel/update/dfxh/page/{{page}}/"
+ },
+ {
+  "title": "娱乐明星",
+  "url": "https://91hubs.com/novel/update/ylmx/page/{{page}}/"
+ },
+ {
+  "title": "系统异能",
+  "url": "https://91hubs.com/novel/update/xt-yn/page/{{page}}/"
+ },
+ {
+  "title": "科学幻想",
+  "url": "https://91hubs.com/novel/update/science-fiction/page/{{page}}/"
+ },
+ {
+  "title": "西方魔幻",
+  "url": "https://91hubs.com/novel/update/xfmh/page/{{page}}/"
+ },
+ {
+  "title": "贤者小说",
+  "url": "https://91hubs.com/novel/update/sage-novel/page/{{page}}/"
+ },
+ {
+  "title": "历史架空",
+  "url": "https://91hubs.com/novel/update/lsjk/page/{{page}}/"
+ },
+ {
+  "title": "异能系统",
+  "url": "https://91hubs.com/novel/update/ynxt/page/{{page}}/"
+ },
+ {
+  "title": "古典武侠",
+  "url": "https://91hubs.com/novel/update/gdwx/page/{{page}}/"
+ },
+ {
+  "title": "修真魔幻",
+  "url": "https://91hubs.com/novel/update/xzmh/page/{{page}}/"
+ },
+ {
+  "title": "校园春色",
+  "url": "https://91hubs.com/novel/update/xycs/page/{{page}}/"
+ },
+ {
+  "title": "动漫游戏",
+  "url": "https://91hubs.com/novel/update/dm-game/page/{{page}}/"
+ },
+ {
+  "title": "网红明星",
+  "url": "https://91hubs.com/novel/update/whmx/page/{{page}}/"
+ },
+ {
+  "title": "强奸轮奸",
+  "url": "https://91hubs.com/novel/update/qj-lj/page/{{page}}/"
+ },
+ {
+  "title": "乡村爱情",
+  "url": "https://91hubs.com/novel/update/xcaiqing/page/{{page}}/"
+ },
+ {
+  "title": "其他",
+  "url": "https://91hubs.com/novel/update/other/page/{{page}}/"
+ }
+]
