@@ -21,8 +21,40 @@ import Sextant
 /// ⚠️ 许可：Sextant / Hitch / Spanker 全是 MIT ⇒ 见 `Vendor/SextantKit/VENDOR.md`。
 public enum SextantFallback {
 
+    /// ⭐⭐⭐⭐⭐ **Legado 复合语法标记**（出现这些 ⇒ **绝不能**交给 Sextant）
+    ///
+    /// ⚠️⚠️⚠️ **为什么必须守卫**（2026-11-18 语料差集扫描实测）：
+    ///   245 条真实 JSONPath 规则里，Sextant 能解析而手写不认的有 **17 条**
+    ///   ⇒ 而这 17 条**全是 Legado 的复合语法**（`||` 兜底链 / `##` 正则替换 /
+    ///   `@put:` / `@js:` / `&&` 拼接）⇒
+    ///   ⇒ Sextant 会把它们「解析成功」但**语义完全不对**（它只懂标准 JSONPath）⭐⭐⭐
+    ///   ⇒ 不守 ⇒ **把对的规则改错**（比不兜底更糟）⭐⭐⭐
+    private static let legadoCompositeMarks: [Character] = ["|", "&", "#", "{", "}"]
+
+    /// ⭐ **这条路径是不是「纯标准 JSONPath」**（⇒ 才可以交给 Sextant）
+    ///
+    /// ⭐⭐⭐ **`@` 要分清**：Sextant 过滤表达式里的 `@.x` / `@['x']`（当前项）**是合法的**
+    ///   ⇒ 只有 `@put:` / `@js:` / `@text` 这种 **Legado 取值模式/后处理**才该拦 ⭐⭐⭐
+    public static func isPureJSONPath(_ path: String) -> Bool {
+        // ① Legado 复合标记（`||` `&&` `##` `{…}` 拼接块）
+        if path.contains(where: { legadoCompositeMarks.contains($0) }) { return false }
+        // ② `@` 后必须是 `.` / `[` / 引号 ⇒ 其余（`@put:` `@js:` `@text`…）都拦
+        var i = path.startIndex
+        while let r = path[i...].firstIndex(of: "@") {
+            let next = path.index(after: r)
+            guard next < path.endIndex else { return false }
+            let c = path[next]
+            if c != "." && c != "[" && c != "'" && c != "\"" { return false }
+            i = path.index(after: next)
+        }
+        return true
+    }
+
     /// ⭐⭐⭐ **用 Sextant 求值一条路径**（`nil` = Sextant 也认不了）
+    ///
+    /// ⚠️ **含 Legado 复合语法 ⇒ 直接返回 nil**（保持原行为 ⇒ 零回归）⭐⭐⭐
     public static func select(_ root: JSONValue, _ path: String) -> [JSONValue]? {
+        guard isPureJSONPath(path) else { return nil }
         guard let json = jsonText(root) else { return nil }
         guard let hits = json.query(values: Hitch(string: path)) else { return nil }
         return hits.compactMap { $0 }.map { JSONValue.from($0) }

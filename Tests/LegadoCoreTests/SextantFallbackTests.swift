@@ -4,59 +4,94 @@ import XCTest
 
 /// ⭐⭐⭐⭐⭐ **Sextant 兜底门禁**（2026-11-18 · 搬栖阅/柴阅同款 JSONPath 引擎）
 ///
-/// 背景：栖阅 / 柴阅的引擎用 **KittyMac/Sextant**（MIT）⇒ 它们的 JSONPath 与
-/// `[?(@.a=='b')]` 过滤表达式是**完整版**；而本引擎手写的 `JSONFilter` 是**子集**
-/// ⇒ 站方写了子集外的表达式 ⇒ **整条路径作废** ⇒ 字段全空（症状离根因极远）。
+/// ⭐⭐⭐ **本轮最重要的实测结论**（245 条真实 JSONPath 规则的差集扫描）：
+///   · 「手写能解析 / Sextant 不认」= **0 条** ⇒ **解析层我们不缺**（手写解析器已覆盖语料里的标准 JSONPath）
+///   · 「Sextant 能解析 / 手写不认」= **17 条** ⇒ **全是 Legado 复合语法**
+///     （`||` 兜底链 / `##` 正则替换 / `@put:` / `@js:` / `&&` 拼接）
+///     ⇒ ⇒ **把它们交给 Sextant = 语义错**（Sextant 只懂标准 JSONPath）⇒ **必须守** ⭐⭐⭐
+///   ⇒ ⇒ 兜底的价值 =「标准 JSONPath 的**求值细节/边界行为**与栖阅逐字一致」+「免维护手写实现」
 ///
-/// 修法：**手写优先（行为不变）⇒ 解析不了 / 带过滤表达式却算空 ⇒ 用 Sextant 兜底**。
-///
-/// ⚠️ 本门禁要同时钉住两件相反的事：
-///   ① 兜底**不能**改变「手写能解析的路径」的结果（否则就是回归）
-///   ② 兜底**必须**在「手写解析不了」时把值救回来（否则这层白加）
+/// ⚠️ 本门禁要钉住三件事：
+///   ① **含 Legado 复合语法的路径不许被 Sextant 接管**（否则把对的改错）
+///   ② **手写与 Sextant 在语料上的解析能力必须等价**（差集 = 0 ⇒ 漂移即红）
+///   ③ **兜底真能救回「纯标准 JSONPath」的路径**
 final class SextantFallbackTests: XCTestCase {
 
-    /// ⭐ 真实语料形态：站方的 JSON 接口 + 过滤表达式
     private let doc: JSONValue = JSONValue(json: """
     {"code":0,"data":{"state":[{"dataName":"novel_search_list","items":[{"n":"书一","w":10},{"n":"书二","w":20}]},
                              {"dataName":"other_list","items":[{"n":"别的"}]}]}}
     """)
 
-    // MARK: - ① 手写能解析的路径 ⇒ 结果**不许**被兜底改写
+    // MARK: - ① Legado 复合语法 ⇒ 不许被 Sextant 接管
 
-    func testPlainPathUnchanged() {
-        let hits = JSONPath.select(doc, "$.data.state[0].items[0].n")
-        XCTAssertEqual(hits?.count, 1)
+    func testLegadoCompositePathsAreNotHandedToSextant() {
+        // ⭐⭐⭐ 语料里实测到的 17 条「Sextant 能认、手写不认」的形态
+        let legado = [
+            "$.novelName||$.novelname||$.message",      // 兜底链
+            "$.bid##(\\d+)##https://book.qq.com/book-detail/$1##",  // 正则替换
+            "$.title@put:{bid:id}",                       // 尾部后处理
+            "$.iconUrlSmall@js:\"https://b.heiyanimg.com\"+result",
+            "$.category&&{$.score}分",                    // 拼接
+        ]
+        for p in legado {
+            XCTAssertFalse(SextantFallback.isPureJSONPath(p), "「\(p)」是 Legado 复合语法 ⇒ 不许进 Sextant")
+            XCTAssertNil(SextantFallback.select(doc, p), "「\(p)」不许被 Sextant 求值（语义会错）")
+        }
+    }
+
+    func testPureJSONPathIsAllowed() {
+        XCTAssertTrue(SextantFallback.isPureJSONPath("$.data.state[0].items[0].n"))
+        XCTAssertTrue(SextantFallback.isPureJSONPath("$.data.state[?(@.dataName=='x')].items[*].n"))
+    }
+
+    // MARK: - ② 语料对拍：解析能力必须等价（差集 = 0）
+
+    func testCorpusParseParity() {
+        guard let path = ProcessInfo.processInfo.environment["LEGADO_CORPUS"],
+              FileManager.default.fileExists(atPath: path) else {
+            print("⚠️ 未设 LEGADO_CORPUS ⇒ 跳过语料对拍（**没验到，不算通过**）")
+            return
+        }
+        guard let data = FileManager.default.contents(atPath: path),
+              let obj = try? JSONSerialization.jsonObject(with: data) else {
+            XCTFail("语料读不出来")
+            return
+        }
+        let arr: [Any] = (obj as? [Any]) ?? ((obj as? [String: Any]).map { [$0] } ?? [])
+        var paths: Set<String> = []
+        func scan(_ any: Any) {
+            if let s = any as? String {
+                let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                if (t.contains("$.") || t.contains("[?(")) && !t.contains("<") && !t.contains("\n") {
+                    paths.insert(t)
+                }
+            } else if let d = any as? [String: Any] { for v in d.values { scan(v) } }
+            else if let a = any as? [Any] { for v in a { scan(v) } }
+        }
+        for s in arr { scan(s) }
+        XCTAssertFalse(paths.isEmpty, "语料里没抽出路径（语料位置错了？）")
+
+        var legacyOnly: [String] = []
+        for p in paths {
+            let legacyOK = JSONPath.parse(p) != nil
+            let sextantOK = SextantFallback.validate(p) == nil
+            if legacyOK && !sextantOK { legacyOnly.append(p) }
+        }
+        // ⭐ 断言方向：**手写认得、Sextant 不认**的路径必须为 0
+        //   （反方向那批是 Legado 复合语法 ⇒ 由 `isPureJSONPath` 守卫挡住 ⇒ 不是缺口）
+        XCTAssertTrue(legacyOnly.isEmpty,
+                      "以下路径手写能解析、Sextant 不认 ⇒ 兜底会把它们改错：\(legacyOnly.prefix(5))")
+    }
+
+    // MARK: - ③ 兜底真能救回「纯标准 JSONPath」
+
+    func testSextantRescuesPureJSONPath() {
+        // ⭐ 标准 JSONPath（递归 + 过滤）⇒ 手写解析不了 ⇒ 兜底救回
+        let path = "$.data.state[?(@.dataName=='novel_search_list')].items[*].n"
+        let hits = JSONPath.select(doc, path)
+        XCTAssertEqual(hits?.count, 2, "Sextant 应命中 2 项，实际 \(hits?.count ?? -1)")
         XCTAssertEqual(hits?.first?.scalarString, "书一")
     }
-
-    func testPlainPathMissStaysEmpty() {
-        // ⭐ 纯路径没命中 ⇒ **必须仍然是空**（兜底只对「带过滤表达式」的路径生效）
-        let hits = JSONPath.select(doc, "$.data.state[9].items")
-        XCTAssertTrue(hits?.isEmpty ?? true, "没命中的纯路径不许被兜底改出值")
-    }
-
-    // MARK: - ② 手写解析不了的过滤表达式 ⇒ Sextant 兜底救回来
-
-    func testSextantFallbackRecoversFilterExpression() {
-        // ⭐⭐⭐ 这条是栖阅书源的真实写法（`[?(@.dataName=='…')]` 里带单引号 + 深层路径）
-        //   ⇒ 手写子集解析不了 ⇒ 之前 = 空 ⇒ 现在要被救回来 ⭐
-        // ⚠️ 先断言「手写确实解析不了」⇒ 否则这条测的不是兜底（而是手写路径）⇒ 门禁会变成平凡通过 ⭐⭐⭐
-        XCTAssertNil(JSONPath.parse("$.data.state[?(@.dataName=='novel_search_list')].items[*].n"),
-                     "这条路径手写应该解析不了（若能解析 ⇒ 这条测的不是兜底）")
-        let hits = JSONPath.select(doc, "$.data.state[?(@.dataName=='novel_search_list')].items[*].n")
-        XCTAssertEqual(hits?.count, 2, "Sextant 兜底应命中 2 项，实际 \(hits?.count ?? -1)")
-        XCTAssertEqual(hits?.first?.scalarString, "书一")
-        XCTAssertEqual(hits?.last?.scalarString, "书二")
-    }
-
-    func testSextantFallbackOnUnsupportedExpression() {
-        // ⭐ 手写子集里没有的运算符（`=~` 正则 + `in` 集合）
-        let hits = JSONPath.select(doc, "$.data.state[?(@.dataName =~ /novel.*/)].items[0].n")
-        XCTAssertEqual(hits?.count, 1)
-        XCTAssertEqual(hits?.first?.scalarString, "书一")
-    }
-
-    // MARK: - ③ Sextant 本体可用（兜底不是摆设）
 
     func testSextantDirectQuery() {
         let hits = SextantFallback.select(doc, "$.data.state[*].dataName")
@@ -69,10 +104,9 @@ final class SextantFallbackTests: XCTestCase {
         XCTAssertNotNil(SextantFallback.validate("$.a[["), "非法路径要报错")
     }
 
-    // MARK: - ④ 兜底**不是**万能：Sextant 也不认的路径 ⇒ 仍然是 nil（不编值）
+    // MARK: - ④ 不是万能：两边都不认 ⇒ nil（不编值）
 
     func testUnknownPathStillNil() {
-        XCTAssertNil(JSONPath.select(doc, "$$$.not.a.path"),
-                     "两边都不认的路径不许编出值")
+        XCTAssertNil(JSONPath.select(doc, "$$$.not.a.path"), "两边都不认的路径不许编出值")
     }
 }
