@@ -63,6 +63,11 @@ public struct EvalContext: @unchecked Sendable {
     public var key: String
     /// 响应体是不是 JSON —— 会影响模式判定（§S-CLS-08）
     public var isJSON: Bool
+    /// ⭐⭐⭐ **额外注入的变量**（`ruleToc.formatJs` 的 `index` / `title` / `gInt` 等）
+    ///
+    /// ⚠️ legado-E 的 `formatJs` 就是靠这些绑定跑的（`bindings["index"]` / `["title"]` / `["chapter"]`）
+    /// ⇒ 以前没有 ⇒ 站方格式化章节名的规则**没法生效** ⭐⭐⭐
+    public var extra: [String: JSONValue] = [:]
     /// 当前页的 DOM（页面级基准）—— 选择器规则要靠它
     ///
     /// ⚠️ 为什么要单独放 ctx 而不是 base：
@@ -80,7 +85,8 @@ public struct EvalContext: @unchecked Sendable {
                 page: Int = 1,
                 key: String = "",
                 isJSON: Bool = false,
-                document: DOMNode? = nil) {
+                document: DOMNode? = nil,
+                extra: [String: JSONValue] = [:]) {
         self.base = base
         self.baseUrl = baseUrl
         self.raw = raw
@@ -93,6 +99,7 @@ public struct EvalContext: @unchecked Sendable {
         self.key = key
         self.isJSON = isJSON
         self.document = document
+        self.extra = extra
     }
 }
 

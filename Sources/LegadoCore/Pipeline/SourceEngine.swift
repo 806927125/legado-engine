@@ -625,6 +625,10 @@ public final class SourceEngine {
             info.group = value(c, in: nil, page: p, base: base)
         }
         // ⭐ **字数**（44 个源在用）
+        // ⭐⭐⭐ **`ruleBookInfo.updateTime`**（legado-E 2026-11-18 移植）—— 站方给的「更新时间」
+        if let r = rules?.updateTime, !r.isEmpty {
+            info.updateTime = value(r, in: nil, page: p, base: base)
+        }
         if let r = rules?.wordCount, !r.isEmpty {
             info.wordCount = value(r, in: nil, page: p, base: base)
         } else {
@@ -724,14 +728,27 @@ public final class SourceEngine {
                         isVolume = chapterURL.isEmpty
                     }
                     // ⭐ **付费章节标记**（`ruleToc.isVip` —— 9 个源在用）
+                    // ⚠️ **判定口径照 legado-E 的 `isTrue()`**（2026-11-18 移植）：
+                    //   空 / "null" / false / no / not / 0 / 0.0 ⇒ **不算 true**
+                    //   ⇒ 以前「非空即 true」⇒ 站方返回 "false" 也会被当成 VIP ⇒ **目录里一堆假 VIP** ⭐⭐⭐
                     let isVipRule = rules.isVip ?? ""
                     let isVip = isVipRule.isEmpty ? false
-                        : !value(isVipRule, in: item, page: p).isEmpty
+                        : Self.isTrue(value(isVipRule, in: item, page: p))
+                    // ⭐⭐⭐ **`ruleToc.isPay`**（legado-E 2026-11-18 移植）—— 付费标记（与 isVip 分开）
+                    let isPayRule = rules.isPay ?? ""
+                    let isPay = isPayRule.isEmpty ? false
+                        : Self.isTrue(value(isPayRule, in: item, page: p))
+                    // ⭐⭐⭐ **`ruleToc.updateTime`**（legado-E 2026-11-18 移植）—— 章节更新时间
+                    let upTimeRule = rules.updateTime ?? ""
+                    let upTime = upTimeRule.isEmpty ? ""
+                        : value(upTimeRule, in: item, page: p)
                     out.append(Chapter(
                         name: name.isEmpty ? item.text : name,
                         url: chapterURL,
                         isVolume: isVolume,
                         isVip: isVip,
+                        isPay: isPay,
+                        updateTime: upTime,
                         index: out.count
                     ))
                 }
@@ -740,6 +757,37 @@ public final class SourceEngine {
             // ⭐ 下一批页
             if let nextRule = rules.nextTocUrl, !nextRule.isEmpty {
                 queue.append(contentsOf: valueURLs(nextRule, page: p))
+            }
+        }
+        // ⭐⭐⭐⭐⭐ **`ruleToc.formatJs`**（legado-E 2026-11-18 移植）—— 章节名格式化
+        //
+        // ⚠️ **legado-E 的原话**（`model/webBook/BookChapterList.kt`）：
+        //   ```kotlin
+        //   bindings["gInt"] = 0
+        //   list.forEachIndexed { index, ch ->
+        //       bindings["index"]   = index + 1        // ⭐ 1-based
+        //       bindings["chapter"] = ch              // ⭐ 章节对象
+        //       bindings["title"]   = ch.title        // ⭐ 当前章节名
+        //       eval(formatJs, bindings)?.toString()?.let { ch.title = it }
+        //   }
+        //   ```
+        //   ⇒ **每个章节跑一次**，结果覆盖章节名（常见：`title.replace(...)` / 加前缀）⭐⭐⭐
+        //   ⇒ 以前没有这一档 ⇒ 站方格式化后的章节名**全用原名** ⇒ 用户看到「目录名不对」⭐⭐⭐
+        if let fmt = rules.formatJs, !fmt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            for i in out.indices {
+                let chObj = Self.makeChapterObject(out[i])
+                // ⚠️ 基准用空页（legado-E 的 eval 只有 bindings，没有 content 基准）
+                //   ⇒ formatJs 靠 `title` / `index` / `chapter` 三个绑定干活
+                let ctx = EvalContext(base: .page(""), baseUrl: "", raw: "",
+                                     book: bookObject, source: sourceObject, chapter: chObj,
+                                     varBox: javaVars,
+                                     extra: ["index": .int(i + 1),
+                                             "title": .string(out[i].name),
+                                             "gInt": .int(0)])
+                let e = evaluator.evalOne(fmt, base: ctx.base, ctx: ctx)
+                diagnostics.append(e.diagnostic)
+                let t = e.value.text
+                if !t.isEmpty { out[i].name = t }
             }
         }
         return out
@@ -790,7 +838,25 @@ public final class SourceEngine {
             }
         }
         var text = parts.joined(separator: "\n")
-        text = Self.clean(text, using: rules.replaceRegex)
+        // ⭐⭐⭐⭐⭐ **`ruleContent.replaceRegex` 的语义 = 当【规则】求值**（legado-E 2026-11-18 移植）
+        //
+        // ⚠️ **legado-E 的原话**（`model/webBook/BookContent.kt`）：
+        //   ```kotlin
+        //   contentStr = contentStr.split(LFRegex).joinToString("\n") { it.trim() }   // ① 每行 trim
+        //   contentStr = analyzeRule.getString(replaceRegex, contentStr)              // ② 当规则求值（content = 正文）
+        //   ```
+        //   ⇒ 站方通常写成 `##正则##替换`（Legado 的「净化」形态）⇒ **必须按规则求值**才能生效 ⭐⭐⭐
+        //   ⇒ 以前我们只认「`正则=>替换` 每行一条」的旧格式 ⇒ 站方标准的 `##…##` **完全没生效** ⭐⭐⭐
+        //   ⇒ ⇒ 正文里该清的没清（广告/书名/二维码…）
+        //
+        // ✅ 现在的口径：**先按规则求值**（Legado/栖阅/legado-E 一致），
+        //    **老格式（`=>`）仍兼容**（旧书源还在用）⇒ 两边都不丢 ⭐⭐⭐
+        text = applyReplaceRegex(text, using: rules.replaceRegex)
+        // ⭐ 老格式兜底（`正则=>替换` 每行一条）—— 只在规则求值**没产出**时用
+        if rules.replaceRegex?.contains("=>") == true {
+            let legacy = Self.clean(text, using: rules.replaceRegex)
+            if legacy != text { text = legacy }
+        }
         // ⭐⭐⭐ **老引擎的收尾加工**（照抄 `reference/js/engine.js` 的 content op，2026-10-24 整链对拍挖出来的）
         //   ① 正文里带 HTML 标签 ⇒ **转成纯文本**（br/p 会变成换行）
         //      （不少源的 content 规则写的是 `@html` ⇒ 不转的话正文里会露出 `<div id=...>` 这种标签）⭐
@@ -2352,6 +2418,44 @@ public final class SourceEngine {
         return kept.joined(separator: "\n")
             .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// ⭐⭐⭐ **Legado 的 `isTrue()` 口径**（legado-E `StringExtensions.isTrue`，2026-11-18 移植）
+    ///
+    /// ```kotlin
+    /// fun String?.isTrue(nullIsTrue: Boolean = false): Boolean {
+    ///     if (this.isNullOrBlank() || this == "null") return nullIsTrue
+    ///     return !this.trim().matches("(?i)^(?:false|no|not|0|0\.0)$".toRegex())
+    /// }
+    /// ```
+    /// ⇒ 空 / "null" / false / no / not / 0 / 0.0 ⇒ **假**；其余非空 ⇒ **真**
+    public static func isTrue(_ s: String?) -> Bool {
+        guard let s else { return false }
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty || t == "null" { return false }
+        let lower = t.lowercased()
+        if ["false", "no", "not", "0", "0.0"].contains(lower) { return false }
+        return true
+    }
+
+    /// ⭐⭐⭐ **`replaceRegex` 按【规则】求值**（legado-E 口径，2026-11-18 移植）
+    ///
+    /// · ① 每行 trim 后用 `\n` 拼回（legado-E 的 `split(LFRegex).joinToString("\n") { it.trim() }`）⭐⭐⭐
+    /// · ② 把整段当**一条规则**，基准 = 正文 ⇒ `##正则##替换` / `@js:` 都生效 ⭐⭐⭐
+    /// · ③ 求值**没产出** ⇒ 保留原正文（别把正文清空）⭐⭐⭐
+    private func applyReplaceRegex(_ text: String, using replaceRegex: String?) -> String {
+        guard let rr = replaceRegex, !rr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return text
+        }
+        // ① 每行 trim（legado-E 原样）
+        let trimmed = text.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .joined(separator: "\n")
+        // ② 当规则处理（口径见 `Evaluator.applyContentProcess` 的注释：
+        //    `##…##` = 删除/替换 · `@js:` = 脚本（正文当 result））
+        let out = evaluator.applyContentProcess(trimmed, ruleText: rr)
+        if out.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return text }
+        return out
     }
 
     public static func clean(_ text: String, using replaceRegex: String?) -> String {

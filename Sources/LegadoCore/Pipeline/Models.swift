@@ -94,16 +94,19 @@ public struct BookInfo: Sendable, Equatable {
     /// 所属书源名
     public var sourceName: String
     public var raw: [String: String]
+    /// ⭐⭐⭐ **`ruleBookInfo.updateTime`**（legado-E 2026-11-18 移植）—— 站方给的「更新时间」
+    public var updateTime: String
 
     public init(name: String = "", author: String = "", intro: String = "", kind: String = "",
                 coverUrl: String = "", lastChapter: String = "", group: String = "",
                 wordCount: String = "",
                 bookUrl: String = "", tocUrl: String = "", sourceName: String = "",
-                raw: [String: String] = [:]) {
+                raw: [String: String] = [:], updateTime: String = "") {
         self.name = name; self.author = author; self.intro = intro; self.kind = kind
         self.coverUrl = coverUrl; self.lastChapter = lastChapter; self.group = group
         self.wordCount = wordCount; self.bookUrl = bookUrl
         self.tocUrl = tocUrl; self.sourceName = sourceName; self.raw = raw
+        self.updateTime = updateTime
     }
 }
 
@@ -116,13 +119,18 @@ public struct Chapter: Sendable, Equatable {
     public var isVolume: Bool
     /// ⭐ **是不是付费章节**（`ruleToc.isVip`）—— 9 个源在用
     public var isVip: Bool
+    /// ⭐⭐⭐ **`ruleToc.isPay`**（legado-E 2026-11-18 移植）—— 付费章节（与 isVip 分开的两套标记）
+    public var isPay: Bool
+    /// ⭐⭐⭐ **`ruleToc.updateTime`**（legado-E 2026-11-18 移植）—— 章节更新时间
+    public var updateTime: String
     /// 目录里的序号
     public var index: Int
 
     public init(name: String = "", url: String = "", isVolume: Bool = false,
-                isVip: Bool = false, index: Int = 0) {
+                isVip: Bool = false, isPay: Bool = false, updateTime: String = "",
+                index: Int = 0) {
         self.name = name; self.url = url; self.isVolume = isVolume
-        self.isVip = isVip; self.index = index
+        self.isVip = isVip; self.isPay = isPay; self.updateTime = updateTime; self.index = index
     }
 }
 

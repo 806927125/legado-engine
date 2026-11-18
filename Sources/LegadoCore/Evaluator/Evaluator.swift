@@ -709,6 +709,63 @@ public struct Evaluator {
 
     // MARK: - 后处理
 
+    /// ⭐⭐⭐⭐⭐ **把一条规则的【净化/后处理】作用到一段文本上**（legado-E 口径，2026-11-18 移植）
+    ///
+    /// **背景**：`ruleContent.replaceRegex` 是**57 个真源在用**的字段，真实语料有三种形态：
+    /// | 形态 | 语义 | 例子 |
+    /// |---|---|---|
+    /// | `##正则1\|正则2##` | **删除**匹配的（最常见） | `##一秒记住.*精彩阅读。\|7017k` |
+    /// | `##正则##替换` | 替换（`$1` 会展开） | `##clickChargeBook\(('(.*?)',(.*?)\)##novel.m?gid=$1&nid=$2` |
+    /// | `@js: …` | **当脚本跑**，正文当 `result` | 晋江文学的「去掉章节简介与正文重复」 |
+    ///
+    /// ⚠️ **以前只认「`正则=>替换` 每行一条」的老格式** ⇒ 站方标准的 `##…##` **完全没生效**
+    ///   ⇒ ⇒ 正文里该清的没清（广告 / 书名 / 二维码…）⭐⭐⭐
+    ///
+    /// ✅ 口径对齐 **legado-E**（`BookContent.kt`：`analyzeRule.getString(replaceRegex, contentStr)`）
+    ///   ⇒ 语义 = 「把 replaceRegex 当规则跑，作用在正文上」
+    public func applyContentProcess(_ text: String, ruleText: String) -> String {
+        let rule = ruleText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rule.isEmpty else { return text }
+
+        // ① JS 形态（`@js:` / `<js>`）⇒ 当脚本跑，**正文当 result**
+        if rule.hasPrefix("@js:") || rule.lowercased().hasPrefix("<js>") {
+            let ctx = EvalContext(base: .page(text), baseUrl: "", raw: text)
+            let e = evalOne(rule, base: ctx.base, ctx: ctx)
+            let out = e.value.text
+            return out.isEmpty ? text : out
+        }
+
+        // ② `##…##` 形态 ⇒ **尾部正则** = 删除/替换（不是「纯提取」）
+        //
+        // ⚠️ **不能靠 `RuleParser.splitPostProcess`**：它要求 `##` 前面**有正文**
+        //   ⇒ 整条规则就是 `##pat##`（站方最常见写法）时 head 为空 ⇒ 它返回 nil ⭐⭐⭐
+        // ⇒ ⇒ 这里**自己切**：从第一个 `##` 到**最后一个** `##`（中间可能还有 `##` ⇒ 那是替换串）
+        if rule.hasPrefix("##") {
+            // ⚠️ **spec = 整条规则**（`parseRegexRule` 的口径：`##pattern##rep1##rep2`）
+            //   ⇒ `##广告行##` ⇒ pattern="广告行"、无替换 ⇒ **删除** ⭐⭐⭐
+            //   ⇒ `##pat##rep`   ⇒ pattern="pat"、替换="rep" ⇒ **替换**（`$1` 会展开）⭐⭐⭐
+            let spec = rule
+            let (pattern, replacements) = RuleParser.parseRegexRule(spec)
+            guard !pattern.isEmpty else { return text }
+            var diag = EngineDiagnostic(rule: rule)
+            let out = applyRegexReplace(text, pattern: pattern, replacements: replacements,
+                                       baseURL: "", diag: &diag)
+            return out.text.isEmpty ? text : out.text
+        }
+        // ②' 「正文 + `##尾部##`」形态 ⇒ 先对正文求值，再把尾部作用在结果上
+        if let (head, post) = RuleParser.splitPostProcess(rule), case .regex(let spec) = post {
+            let (pattern, replacements) = RuleParser.parseRegexRule(spec)
+            guard !pattern.isEmpty else { return text }
+            var diag = EngineDiagnostic(rule: rule)
+            let out = applyRegexReplace(text, pattern: pattern, replacements: replacements,
+                                       baseURL: "", diag: &diag)
+            return out.text.isEmpty ? text : out.text
+        }
+
+        // ③ 其它形态（老格式 `正则=>替换` 每行一条）⇒ 交给调用方的兼容分支
+        return text
+    }
+
     private func applyPost(_ value: RuleValue, _ post: RuleNode.PostProcess, base: RuleBase,
                            ctx: EvalContext, diag: inout EngineDiagnostic) -> RuleValue {
         switch post {
@@ -1055,7 +1112,8 @@ public struct Evaluator {
         }
         let jctx = JSRunContext(base: base, baseUrl: ctx.baseUrl, raw: ctx.raw,
                              book: ctx.book, source: ctx.source, chapter: ctx.chapter,
-                             vars: ctx.vars, varBox: ctx.varBox, key: ctx.key, page: ctx.page, document: ctx.document)
+                             vars: ctx.vars, varBox: ctx.varBox, key: ctx.key, page: ctx.page, document: ctx.document,
+                             extra: ctx.extra)
         do {
             let out = try js.run(code, context: jctx)
             diag.branch = "JS"

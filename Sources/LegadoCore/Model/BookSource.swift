@@ -113,12 +113,23 @@ public struct RuleFields: Codable, Sendable {
     /// ⇒ 非空 ⇒ 这一项是卷标题（不是章节）
     public var isVolume: String?
     public var isVip: String?
+    /// ⭐⭐⭐ **`ruleToc.isPay`**（legado-E 2026-11-18 移植）—— 付费章节标记
+    public var isPay: String?
+    /// ⭐⭐⭐ **`ruleToc.updateTime`**（legado-E 2026-11-18 移植）—— 章节更新时间
+    public var updateTime: String?
+    /// ⭐⭐⭐ **`ruleToc.formatJs`**（legado-E 2026-11-18 移植）—— 章节名格式化（JS）
+    public var formatJs: String?
     public var nextTocUrl: String?
     /// ⭐ **列表页翻页**（`ruleSearch.nextUrl` / `ruleExplore.nextUrl`）
     public var nextUrl: String?
     // 正文
     public var content: String?
     public var nextContentUrl: String?
+    /// ⭐⭐⭐ **`ruleContent.subContent`**（legado-E 2026-11-18 移植）—— 副标题
+    public var subContent: String?
+    /// ⭐⭐⭐ **`ruleContent.replaceRegex`**（legado-E 2026-11-18 移植）
+    ///   ⇒ ⚠️ **语义 = 当【规则】求值**（content = 正文）⇒ 常见写法 `##正则##替换`
+    ///   ⇒ 老的 `正则=>替换`（每行一条）格式仍兼容 ⭐⭐⭐
     public var replaceRegex: String?
     public var sourceRegex: String?
 
@@ -137,7 +148,8 @@ public struct RuleFields: Codable, Sendable {
         case group, category
         case searchUrl, exploreUrl, bookList, tocUrl
         case chapterList, chapterName, chapterUrl, isVolume, isVip, nextTocUrl, nextUrl
-        case content, nextContentUrl, replaceRegex, sourceRegex
+        case isPay, updateTime, formatJs
+        case content, nextContentUrl, subContent, replaceRegex, sourceRegex
         case initRule = "init"
     }
 
@@ -179,10 +191,15 @@ public struct RuleFields: Codable, Sendable {
         chapterUrl = r(.chapterUrl)
         isVolume = r(.isVolume)
         isVip = r(.isVip)
+        // ⭐⭐⭐ legado-E 2026-11-18 移植的字段（规则编译语义逐条对齐）
+        isPay = r(.isPay)
+        updateTime = r(.updateTime)
+        formatJs = r(.formatJs)
         nextTocUrl = r(.nextTocUrl)
         nextUrl = r(.nextUrl)
         content = r(.content)
         nextContentUrl = r(.nextContentUrl)
+        subContent = r(.subContent)
         replaceRegex = r(.replaceRegex)
         sourceRegex = r(.sourceRegex)
         initRule = r(.initRule)
