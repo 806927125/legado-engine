@@ -192,7 +192,22 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
         let props = Self.hostPropertiesPayload(context)
         let scope = JSScopeBuilder.build(context)
         // ⭐⭐⭐ **预计算纯计算方法**（站方包装函数是**同步**的 ⇒ JS 侧只能查表）⭐⭐⭐
-        let cache = Self.pureMethodCache(engineAPI: engineAPI, base: currentBase, code: code)
+        var cache = Self.pureMethodCache(engineAPI: engineAPI, base: currentBase, code: code)
+        // ⭐⭐⭐⭐⭐ **宿主对象（source/book/chapter）的方法也要预计算**（2026-11-18）
+        //   ⇒ 否则沙盒里 `source.get("nhAuthed")` 恒 undefined ⇒ **解锁态读不到**
+        //   ⇒ ⇒ 详情字段全空 ⇒ **沙盒后端 ≠ 真机后端** ⇒ 对拍结论失真 ⭐⭐⭐⭐⭐
+        for (k, v) in Self.hostObjectMethodCache(hostObjects: hostObjects, code: code,
+                                                  globalLiterals: globalHostLiterals,
+                                                  globalNoArg: globalHostNoArg) {
+            cache[k] = v
+        }
+        if ProcessInfo.processInfo.environment["QR_DEBUG_HOSTCACHE"] == "1" {
+            let ks = cache.keys.filter { $0.hasPrefix("source") }.sorted()
+            print("[HOSTCACHE] source 键 = \(ks)")
+            print("[HOSTCACHE] globalLiterals = \(globalHostLiterals.keys.sorted())")
+            print("[HOSTCACHE] nhAuthed 值 = \(cache["source|get|[\"nhAuthed\",null,null,null]"] ?? "<无>")")
+            print("[HOSTCACHE] varBox.all = \(String(describing: hostObjects["source"]?.methods["get"] != nil))")
+        }
         // ⭐⭐⭐⭐⭐ **形态选择在 Swift 侧算好**（`JSEvalShape` ⇒ 单一真相 ⇒ JSC / Node 不漂移）
         // ⭐⭐⭐⭐⭐ **形态链由 Swift 侧算好**（`JSEvalShape` ⇒ 单一真相 ⇒ JSC / Node 不漂移）⭐⭐⭐
         //
@@ -210,6 +225,11 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
     /// ⭐⭐⭐ **全局求值**（站方 jsLib ⇒ 间接 eval ⇒ 留在全局）
     public func runGlobal(_ code: String, context: JSRunContext) throws -> JSONValue {
         lock.lock(); defer { lock.unlock() }
+        // ⭐⭐⭐⭐⭐ **扫一次 jsLib 里的宿主对象字面量调用**（2026-11-18）
+        //   ⇒ 解锁态（`source.get("nhAuthed")`）就住在 jsLib 里 ⇒ 只扫规则正文读不到 ⭐⭐⭐
+        let scanned = Self.scanHostLiterals(code)
+        globalHostLiterals = scanned.literals
+        globalHostNoArg = scanned.noArg
         let reply = try send(["cmd": "runGlobal", "code": code])
         if let err = reply["error"] as? String {
             throw SourceError.unsupported("Node JS（jsLib）报错：\(err)")
@@ -308,6 +328,10 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
         return out
     }
 
+    /// ⭐⭐⭐⭐⭐ **jsLib（全局代码）里的宿主对象字面量调用**（**扫一次** ⇒ 每次 run 只算值）
+    private var globalHostLiterals: [String: [String]] = [:]
+    private var globalHostNoArg: Set<String> = []
+
     /// ⭐⭐⭐ **宿主对象的属性**（每次 run 更新 ⇒ 传给 Node）
     private static func hostPropertiesPayload(_ ctx: JSRunContext) -> [String: [String: Any]] {
         var out: [String: [String: Any]] = [:]
@@ -395,6 +419,129 @@ public final class NodeJSExecutor: JSExecutor, @unchecked Sendable {
     }
 
     /// ⭐⭐⭐ **从代码里抠出 `java.<method>('字面量')` 的字面量参数**
+    /// ⭐⭐⭐⭐⭐ **宿主对象（`source` / `book` / `chapter`）方法的预计算缓存**
+    ///
+    /// ⚠️⚠️⚠️ **为什么必须**（2026-11-18 整链对拍实证）：
+    ///   站方包装函数是**同步**调 `__hostJSON` ⇒ Node 的 host 往返是**异步** ⇒ 只能预计算 ⭐⭐⭐
+    ///   而以前 Node 后端**只处理 `object == "java"`** ⇒ `source.get("nhAuthed")` **永远 undefined**
+    ///   ⇒ 站方的**解锁态 / 登录态在沙盒里读不到** ⇒ 聚合源详情字段**全空**
+    ///   ⇒ ⇒ **沙盒后端 ≠ 真机后端**（JSC 后端是接了宿主的：`currentHostObjects[object]?.call`）
+    ///   ⇒ ⇒ **对拍结论失真**（两边都空 ⇒ 差集恒 0 = 假绿）⭐⭐⭐⭐⭐
+    ///
+    /// ⚠️ **只读方法才预计算**：写方法（`put` / `setVariable`）预计算 = **副作用提前发生**
+    ///   ⇒ 站方代码分支没走到也会写进去 ⇒ 反而失真 ⇒ **不做** ⭐⭐⭐
+    /// 宿主对象名（**契约里登记的这几个**）
+    private static let hostObjectNames = ["source", "book", "chapter"]
+
+    private static let hostReadOnlyMethods: Set<String> = [
+        "get", "getVariable", "getLoginInfoMap", "getLoginInfo", "getKey", "getLoginHeader",
+    ]
+
+    /// 宿主对象的「没实现」标记（**与 JSC 后端逐字一致**：见 `JSCExecutor.makeHostBlock`）
+    private static let notImplementedMarker = #"{"__qrNotImplemented":true}"#
+
+    private static func hostObjectMethodCache(hostObjects: [String: HostObject],
+                                               code: String,
+                                               globalLiterals: [String: [String]],
+                                               globalNoArg: Set<String>) -> [String: String] {
+        var out: [String: String] = [:]
+        for (name, obj) in hostObjects {
+            for method in obj.methods.keys where Self.hostReadOnlyMethods.contains(method) {
+                // ① 规则正文里的字面量调用
+                var args = Self.literalArgs(object: name, method: method, in: code)
+                // ② ⭐ **jsLib（全局代码）里的字面量调用** —— 解锁态就住在这儿
+                //    （`nhAuth()` 在 jsLib 里调 `source.get("nhAuthed")` ⇒ 规则正文里根本没有）
+                args += globalLiterals["\(name)|\(method)"] ?? []
+                for arg in args {
+                    guard let key = Self.hostCacheKey(object: name, method: method, arg: .string(arg)),
+                          let r = obj.call(method, [.string(arg), .null, .null, .null]) else { continue }
+                    out[key] = Self.hostValueText(r)
+                }
+                // ③ 无参调用（`source.getVariable()` / `source.getKey()` …）
+                let noArg = Self.hasNoArgCall(object: name, method: method, in: code)
+                    || globalNoArg.contains("\(name)|\(method)")
+                if noArg,
+                   let key = Self.hostCacheKey(object: name, method: method, arg: nil),
+                   let r = obj.call(method, [.null, .null, .null, .null]) {
+                    out[key] = Self.hostValueText(r)
+                }
+            }
+            // ④ 契约里登记、但宿主对象**没实现**的方法 ⇒ 标记「没实现」
+            //    ⇒ 与 JSC 后端一致 ⇒ 站方的能力探测（try/catch）走同一条分支 ⭐⭐⭐
+            for e in JSHostAPI.all where e.kind == .method && e.object == name {
+                let prefix = "\(name)|\(e.name)|"
+                if out.keys.contains(where: { $0.hasPrefix(prefix) }) { continue }
+                if let key = Self.hostCacheKey(object: name, method: e.name, arg: nil) {
+                    out[key] = Self.notImplementedMarker
+                }
+            }
+        }
+        return out
+    }
+
+    /// ⭐⭐⭐ **扫全局代码（jsLib）里的宿主对象字面量调用**（**扫一次** ⇒ 每次 run 只算值）
+    ///
+    /// ⚠️ **为什么要扫 jsLib**：站方的**解锁态判断在 jsLib 里**
+    ///   （`nhAuth()` → `source.get("nhAuthed")`）⇒ 规则正文里**根本没有**这句
+    ///   ⇒ 只扫规则正文 ⇒ 解锁态读不到 ⇒ 详情字段全空 ⭐⭐⭐⭐⭐
+    ///
+    /// ⚠️ **为什么「扫一次、每次算值」**：变量是**活的**（解锁时机在登录之后）
+    ///   ⇒ 扫出来的只是「**键名**」⇒ 值每次 run 现算 ⇒ 不会拿到过期值 ⭐⭐⭐
+    static func scanHostLiterals(_ code: String) -> (literals: [String: [String]], noArg: Set<String>) {
+        var literals: [String: [String]] = [:]
+        var noArg: Set<String> = []
+        for name in hostObjectNames {
+            for method in hostReadOnlyMethods {
+                let args = literalArgs(object: name, method: method, in: code)
+                if !args.isEmpty { literals["\(name)|\(method)"] = args }
+                if hasNoArgCall(object: name, method: method, in: code) {
+                    noArg.insert("\(name)|\(method)")
+                }
+            }
+        }
+        return (literals, noArg)
+    }
+
+    /// 缓存 key = `对象|方法|参数数组的 JSON 文本`
+    /// ⚠️ **参数数组必须是 4 位**（包装函数固定 4 个参数 a0..a3）⇒ 缺的位是 `null`
+    ///   ⇒ 否则**永远查不到**（静默 undefined）⭐⭐⭐
+    private static func hostCacheKey(object: String, method: String, arg: JSONValue?) -> String? {
+        let args: [Any] = [arg?.foundationValue ?? NSNull(), NSNull(), NSNull(), NSNull()]
+        guard let data = try? JSONSerialization.data(withJSONObject: args),
+              let text = String(data: data, encoding: .utf8) else { return nil }
+        return "\(object)|\(method)|\(text)"
+    }
+
+    /// 宿主返回值 ⇒ 包装函数要的形态：**数组**（取 `[0]`）
+    private static func hostValueText(_ r: JSONValue) -> String {
+        let any = r.foundationValue
+        guard let data = try? JSONSerialization.data(withJSONObject: [any]),
+              let text = String(data: data, encoding: .utf8) else { return "null" }
+        return text
+    }
+
+    /// 抠出 `对象.方法('字面量')` 的字面量参数
+    private static func literalArgs(object: String, method: String, in code: String) -> [String] {
+        guard let re = try? NSRegularExpression(
+            pattern: "\\b\(NSRegularExpression.escapedPattern(for: object))\\.\(NSRegularExpression.escapedPattern(for: method))\\(\\s*(['\"])([^'\"]*)\\1\\s*\\)") else { return [] }
+        let ns = code as NSString
+        var out: [String] = []
+        re.enumerateMatches(in: code, range: NSRange(location: 0, length: ns.length)) { m, _, _ in
+            guard let m, m.numberOfRanges >= 3 else { return }
+            let v = ns.substring(with: m.range(at: 2))
+            if !out.contains(v) { out.append(v) }
+        }
+        return out
+    }
+
+    /// 代码里有没有 `对象.方法()` 这种**无参**调用
+    private static func hasNoArgCall(object: String, method: String, in code: String) -> Bool {
+        let pattern = "\\b\(NSRegularExpression.escapedPattern(for: object))\\.\(NSRegularExpression.escapedPattern(for: method))\\(\\s*\\)"
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return false }
+        let ns = code as NSString
+        return re.firstMatch(in: code, range: NSRange(location: 0, length: ns.length)) != nil
+    }
+
     private static func literalArgs(of method: String, in code: String) -> [String] {
         guard let re = try? NSRegularExpression(
             pattern: "java\\.\(method)\\(\\s*(['\"])([^'\"]*)\\1\\s*\\)") else { return [] }
@@ -848,6 +995,9 @@ ctx.__hostJSON = function(object, method, argsJSON) {
     return ctx.__hostCache[key];
   }
   // ⚠️ 缓存里没有 ⇒ **宿主没实现**（老引擎上也会是 undefined）⇒ 返回 null
+  if (process.env.QR_DEBUG_HOSTCACHE === '1') {
+    try { console.error('[HOSTCACHE-MISS] ' + key); } catch (e) {}
+  }
   return 'null';
 };
 

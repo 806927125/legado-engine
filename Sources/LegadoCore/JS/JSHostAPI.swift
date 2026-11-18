@@ -393,7 +393,7 @@ public enum JSScopeBuilder {
     ///   ```
     public static func build(_ ctx: JSRunContext) -> String {
         var lines: [String] = []
-        lines.append("var result = \(jsonLiteral(Self.toJSON(ctx.base.resultValue)));")
+        lines.append("var result = \(Self.resultBinding(ctx.base.resultValue));")
         lines.append("var baseUrl = \(jsonLiteral(.string(ctx.baseUrl)));")
         lines.append("var key = \(jsonLiteral(.string(ctx.key)));")
         lines.append("var page = \(jsonLiteral(.int(ctx.page)));")
@@ -589,6 +589,39 @@ public enum JSScopeBuilder {
     public static func toJSON(_ r: RuleValue) -> JSONValue {
         // ⭐ 口径统一到核心层（`RuleValue.jsonValue`）⇒ 免得两处转换慢慢长歪
         r.jsonValue
+    }
+
+    /// ⭐⭐⭐⭐⭐ **`result` 的绑定表达式**（2026-11-18 · 对齐栖阅 `makeJavaScriptJSONObjectValue`）
+    ///
+    /// ⚠️ **为什么 JSON 对象要「包一层」**：
+    ///   站方的详情字段几乎都这么写（起点聚合 / 大灰狼 / UAA…）：
+    ///   ```js
+    ///   var _R = String((typeof result !== "undefined" && result != null) ? result : "");
+    ///   var _MB = JSON.parse(_R) || {};        // ← 拿 result 当【页面原文】解 JSON
+    ///   ```
+    ///   ⇒ 裸对象 ⇒ `String(result)` = **"[object Object]"** ⇒ `JSON.parse` 抛
+    ///   ⇒ **整片详情字段全空**（不是某个字段）⭐⭐⭐
+    ///
+    /// ⭐ **栖阅的做法**（`AnalyzeRule+JavaScript` 的 cstring 原文）：
+    ///   `makeJavaScriptJSONObjectValue(jsonString)` ⇒ **JSON 文本 → 对象**，
+    ///   **并覆写 `toString` / `valueOf` 回到原始文本**
+    ///   ⇒ `result.book_id` 能用（对象）· `String(result)` 也是原始 JSON 文本（文本）
+    ///   ⇒ **两边的用法同时成立** ⭐⭐⭐
+    ///
+    /// ⚠️ **只对 JSON 对象/数组包**；字符串 / 节点 / 空值保持原样（别多包一层）
+    public static func resultBinding(_ value: RuleValue) -> String {
+        let jv = Self.toJSON(value)
+        switch jv {
+        case .object, .array:
+            let raw = jsonLiteral(jv)              // 原始 JSON 文本
+            let rawLiteral = jsonLiteral(.string(raw))
+            return "(function(__raw){var __o=JSON.parse(__raw);"
+                 + "try{Object.defineProperty(__o,'toString',{value:function(){return __raw;},enumerable:false,configurable:true,writable:true});"
+                 + "Object.defineProperty(__o,'valueOf',{value:function(){return __raw;},enumerable:false,configurable:true,writable:true});}catch(e){}"
+                 + "return __o;})(\(rawLiteral))"
+        default:
+            return jsonLiteral(jv)
+        }
     }
 
     /// JSON 值 → JS 字面量
